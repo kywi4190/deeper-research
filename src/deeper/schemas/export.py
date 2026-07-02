@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from .allocation import AllocationTable
-from .angles import AngleMap, CoverageReport
+from .angles import AngleMap, CartographerReport, CoverageReport
 from .base import ArtifactModel
 from .common import ContradictionLedger, SourceRecord
 from .dossier import Dossier, VerificationReport
@@ -30,6 +30,7 @@ ARTIFACT_REGISTRY: dict[str, type[ArtifactModel]] = {
     "brief": Brief,
     "destination": DestinationModel,
     "preferences": Preferences,
+    "cartographer-report": CartographerReport,
     "angle-map": AngleMap,
     "coverage-report": CoverageReport,
     "allocation": AllocationTable,

@@ -6,7 +6,15 @@ agents; JSON Schemas export into schemas/ for inlining into agent prompts.
 """
 
 from .allocation import AllocationKind, AllocationRow, AllocationTable
-from .angles import Angle, AngleMap, CoverageReport, DedupEntry, SubAngle
+from .angles import (
+    Angle,
+    AngleMap,
+    CartographerReport,
+    CoverageReport,
+    DedupEntry,
+    RawAngle,
+    SubAngle,
+)
 from .base import (
     SLUG_PATTERN,
     ArtifactModel,
@@ -117,8 +125,10 @@ __all__ = [
     # S1 angles
     "Angle",
     "AngleMap",
+    "CartographerReport",
     "CoverageReport",
     "DedupEntry",
+    "RawAngle",
     "SubAngle",
     # S2 allocation
     "AllocationKind",

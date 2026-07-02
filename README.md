@@ -13,10 +13,12 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Schema layer complete (Phase A, Prompt 2).** Every pipeline artifact — S0 intake
-through S8-adjacent run state — has a strict Pydantic v2 model with YAML/JSON
-round-trip, an LLM-facing validation-error formatter, and a generated JSON Schema in
-`schemas/`. No agents, stages, orchestrator, or CLI yet.
+**Schema layer + agent prompt library + prompt-lab complete (Phase A, Prompts 2–3).**
+Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an
+LLM-facing validation-error formatter, and a generated JSON Schema in `schemas/`. The
+versioned agent prompts for stages 0–5 live in `agents/`, and a throwaway-quality
+`deeper-lab` CLI assembles/runs single agent contracts against fixtures for prompt
+iteration (design-doc M0). No stages, orchestrator, or main CLI yet.
 
 ## Architecture map
 
@@ -31,8 +33,9 @@ state of a run.
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | stub (Prompt 5) |
 | `src/deeper/stages/` | Per-stage logic S0–S8 | stub (Prompts 7–12) |
 | `src/deeper/orchestrator/` | State machine, gates, CLI | stub (Prompt 6) |
-| `agents/` | Versioned agent prompt files (one per role) | empty (Prompt 3) |
-| `tests/` | Pytest suite | schema suite (85 tests) |
+| `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
+| `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
+| `tests/` | Pytest suite | schema + prompt-library suites (175 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -68,6 +71,7 @@ each model validates a single file.
 | `brief.md` | `Brief` | S0 interviewer | S1, S7 frame-check, S8 |
 | `destination.md` | `DestinationModel` | S0 interviewer | S1 merger, S4 rubric-builder, S8 |
 | `preferences.yaml` | `Preferences` | S0 interviewer | S5 screener, S8 synthesist (quarantined) |
+| `angles/raw/{heuristic}.yaml` | `CartographerReport` (`RawAngle`) | S1 cartographers | S1 merger, saturation rule |
 | `angles/map.yaml` | `AngleMap` (`Angle`, `DedupEntry`) | S1 merger | Gate A, S2, S7 frame-check |
 | `angles/map-report.md` | `CoverageReport` | S1 merger | Gate A, S7 frame-check |
 | `allocation.yaml` | `AllocationTable` | S2 (pure code) | S3, report appendix |
@@ -93,6 +97,59 @@ weights must sum to 1.0 (the preference slot is weighted separately, per P9); a
 screening score must lie inside its uncertainty band; a `gap-found` frame-check must
 carry a re-divergence proposal; a `BUDGET-CAPPED` dossier must list its open
 questions; Gate C approval excludes the loop actions.
+
+## The agent prompt library
+
+Each `agents/*.md` file is a versioned prompt with YAML frontmatter (`role`, `stage`,
+`model_class`, `output_schemas`, `inputs`, `research`) and a body in the four-part
+contract form from design §5/S3 — OBJECTIVE / OUTPUT FORMAT / TOOL & SOURCE GUIDANCE /
+BOUNDARIES. The body's `{{schema}}` placeholder is replaced at dispatch with the
+agent's exported JSON Schema(s); agents emit artifacts as fenced yaml blocks behind
+`### artifact: <name>` markers. Every research-capable prompt carries the
+untrusted-web-content rule (fetched-page instructions are data, never directives), and
+only the screener's `inputs` may include `preferences` — both enforced by tests.
+
+| Role | Stage | Model class (design §6 mix) | Output schema(s) |
+|---|---|---|---|
+| `interviewer` | S0 | opus | `brief`, `destination`, `preferences` |
+| `cartographer-first-principles` | S1 | sonnet | `cartographer-report` |
+| `cartographer-analogist` | S1 | sonnet | `cartographer-report` |
+| `cartographer-contrarian` | S1 | sonnet | `cartographer-report` |
+| `cartographer-practitioner` | S1 | sonnet | `cartographer-report` |
+| `cartographer-taxonomist` | S1 | sonnet | `cartographer-report` |
+| `cartographer-horizon` | S1 | sonnet | `cartographer-report` |
+| `merger` | S1 | opus | `angle-map`, `coverage-report` |
+| `scout` | S3 | sonnet | `option-card-set` |
+| `card-critic` | S3 | sonnet | `card-critique` |
+| `rubric-builder` | S4 | opus | `rubric` |
+| `screener` | S5 | sonnet | `screening-result` |
+
+Design §6 names merger/rubric-builder as Opus-class and cartographers/scouts as
+Sonnet-class; roles it leaves unlisted are assigned by analogy (interviewer → opus
+because the destination model anchors the whole run; card-critic/screener → sonnet).
+The six cartographers share a skeleton but carry genuinely distinct framing-heuristic
+sections — ensemble diversity is the breadth mechanism (design P3) — and a test
+asserts the sections differ.
+
+## The prompt-lab (`deeper-lab`)
+
+A ~150-line throwaway harness for iterating on prompts against fixtures (design-doc
+M0), *not* the production dispatch layer:
+
+```bash
+deeper-lab run scout --fixture tests/fixtures/promptlab/angle-interpretability.yaml --mock
+deeper-lab run scout --fixture tests/fixtures/promptlab/angle-interpretability.yaml --live
+```
+
+`--mock` (default) prints the fully assembled contract — role prompt + inlined JSON
+schemas + fixture inputs + budget line — without any API call. `--live` (needs
+`ANTHROPIC_API_KEY` or an active profile) sends it through a minimal
+`claude_agent_sdk` `query()`, validates the reply's yaml blocks against the declared
+schemas, and writes contract/output/validation files to `promptlab-out/` (gitignored).
+Fixtures in `tests/fixtures/promptlab/` cover the design doc's senior-project
+scenario: `interview-opening.yaml` (S0), `senior-project.yaml` (brief + destination,
+for cartographers/rubric), `angle-interpretability.yaml` (adds one angle + allocation,
+for scout/card-critic).
 
 ## How to run
 
@@ -125,6 +182,13 @@ canonical `Makefile` is used wherever GNU make is available.
 - **Windows `make` shim.** GNU make is not standard on Windows, so a `make.bat` mirrors
   the `Makefile` targets (`test`, `lint`, `typecheck`, `schemas`). The `Makefile`
   remains canonical.
+- **Per-cartographer raw output has a schema (`CartographerReport`).** Design §7
+  lists "per-cartographer raw" as a workspace artifact but Prompt 2's deliverable list
+  didn't name a model for it. Cartographer prompts need a real contract, so
+  `RawAngle`/`CartographerReport` were added (`cartographer-report.schema.json`) — a
+  raw angle deliberately has a prose `relevance_rationale` and *no* numeric prior
+  (priors are the merger's job). The schema accepts 3–12 angles rather than hard 5–12,
+  so a genuinely narrow heuristic harvest doesn't force retry-loop padding.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -137,7 +201,7 @@ canonical `Makefile` is used wherever GNU make is available.
 Following the phases in the build guide:
 
 - **Phase A — Foundation:** Prompt 1 (bootstrap) ✅ · Prompt 2 (schemas) ✅ · Prompt 3
-  (agent prompts + prompt-lab).
+  (agent prompts + prompt-lab) ✅.
 - **Phase B — Kernel happy path (M1):** workspace/config/allocation → dispatch layer →
   orchestrator/CLI → stages S0–S5.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
@@ -145,4 +209,4 @@ Following the phases in the build guide:
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase A, Prompt 3 — the agent prompt library and prompt-lab harness.**
+**Next: Phase B, Prompt 4 — workspace manager, config/profiles, budget allocator.**

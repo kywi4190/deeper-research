@@ -18,6 +18,7 @@ from deeper.schemas import (
     AngleMap,
     Brief,
     CardCritique,
+    CartographerReport,
     ContradictionLedger,
     CoverageReport,
     DestinationModel,
@@ -114,6 +115,32 @@ def valid_preferences() -> dict:
             },
         ],
         "risk_appetite": ("Comfortable with a risky project if a fallback publication path exists"),
+        "notes": None,
+    }
+
+
+def _raw_angle(name: str) -> dict:
+    return {
+        "name": name,
+        "definition": f"Projects in the {name.lower()} region of the space.",
+        "distinctness_rationale": "Varies a dimension no other candidate angle varies.",
+        "example_options": ["a concrete existing option", "another concrete option"],
+        "relevance_rationale": (
+            "The destination rewards publishable insight under the brief's deadline; "
+            "this region decouples contribution from training compute."
+        ),
+        "notes": None,
+    }
+
+
+def valid_cartographer_report() -> dict:
+    return {
+        "heuristic": "first-principles",
+        "angles": [
+            _raw_angle("Interpretability of existing models"),
+            _raw_angle("Empirical benchmarking studies"),
+            _raw_angle("Research infrastructure contributions"),
+        ],
         "notes": None,
     }
 
@@ -797,6 +824,7 @@ VALID_CASES = [
     (Brief, valid_brief),
     (DestinationModel, valid_destination),
     (Preferences, valid_preferences),
+    (CartographerReport, valid_cartographer_report),
     (AngleMap, valid_angle_map),
     (CoverageReport, valid_coverage_report),
     (AllocationTable, valid_allocation),
@@ -844,6 +872,19 @@ def _invalid_cases() -> list[tuple[type, dict, str]]:
         Preferences,
         _mutate(valid_preferences, lambda p: p["items"][0].update(strength="overwhelming")),
         "bad-strength",
+    )
+    add(
+        CartographerReport,
+        _mutate(
+            valid_cartographer_report,
+            lambda p: p["angles"][0].update(relevance_prior=0.8),
+        ),
+        "raw-angle-numeric-prior-forbidden",
+    )
+    add(
+        CartographerReport,
+        _mutate(valid_cartographer_report, lambda p: p.update(angles=p["angles"][:2])),
+        "too-few-angles",
     )
     add(
         AngleMap,

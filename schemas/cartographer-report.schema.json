@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "Heuristic": {
+      "description": "The cartographer framing personas \u2014 ensemble diversity is the breadth\nmechanism (design P3, \u00a75/S1).",
+      "enum": [
+        "first-principles",
+        "analogist",
+        "contrarian",
+        "practitioner",
+        "taxonomist",
+        "horizon-scanner"
+      ],
+      "title": "Heuristic",
+      "type": "string"
+    },
+    "RawAngle": {
+      "additionalProperties": false,
+      "description": "One candidate angle exactly as a cartographer emits it, before merger\ndedup. Deliberately has NO numeric relevance prior: assigning priors is the\nmerger's job (design \u00a75/S1); cartographers give a prose rationale only.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "distinctness_rationale": {
+          "description": "Why this is a distinct region and not a variant of another angle.",
+          "minLength": 1,
+          "title": "Distinctness Rationale",
+          "type": "string"
+        },
+        "example_options": {
+          "description": "2-3 concrete options proving the angle is non-empty \u2014 existence proofs, never endorsements.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Example Options",
+          "type": "array"
+        },
+        "relevance_rationale": {
+          "description": "Estimated-relevance rationale in prose, grounded only in the brief and destination model \u2014 never a number, never a ranking.",
+          "minLength": 1,
+          "title": "Relevance Rationale",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "name",
+        "definition",
+        "distinctness_rationale",
+        "example_options",
+        "relevance_rationale"
+      ],
+      "title": "RawAngle",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "angles/raw/{heuristic} \u2014 one cartographer's candidate angles (design \u00a77\nlists per-cartographer raw output as a workspace artifact). The merger and\nthe saturation rule consume these.",
+  "properties": {
+    "heuristic": {
+      "$ref": "#/$defs/Heuristic"
+    },
+    "angles": {
+      "description": "Target 5-12 candidate angles; fewer than 5 only when the heuristic genuinely yields a narrow harvest (say why in notes).",
+      "items": {
+        "$ref": "#/$defs/RawAngle"
+      },
+      "maxItems": 12,
+      "minItems": 3,
+      "title": "Angles",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "heuristic",
+    "angles"
+  ],
+  "title": "CartographerReport",
+  "type": "object"
+}

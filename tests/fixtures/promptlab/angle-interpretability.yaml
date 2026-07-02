@@ -1,0 +1,56 @@
+# Senior-project scenario, scoped to one approved angle — the scout fixture
+# named in the build guide's verify step (also usable for card-critic drafts).
+description: Scout the interpretability-research angle of the senior-project run.
+budget: >-
+  You have 4 allocated budget units, so target about 8 distinct option cards,
+  and at most 10 web searches. Check kill-risk candidates cheaply as you go.
+inputs:
+  brief: |
+    goal: Choose the senior research project that best positions me for admission
+      to a top ML PhD program
+    answer_type: decision
+    scope_in:
+      - projects feasible within two semesters
+      - projects with a faculty supervisor at my university
+    scope_out:
+      - industry internships
+      - coursework-only options
+    constraints:
+      - statement: Thesis must be submitted by April 2027
+        kind: deadline
+      - statement: Compute limited to the lab's shared 4x A100 node
+        kind: budget
+    notes: null
+  destination: |
+    judges:
+      - description: PhD admissions committees at top-tier ML programs
+        rewards:
+          - description: First-author publications at top venues (NeurIPS, ICML, ICLR)
+            evidence:
+              - url: "https://transformer-circuits.pub/2023/monosemantic-features"
+                tier: T1
+                title: Towards Monosemanticity
+          - description: Strong, specific recommendation letters from research supervisors
+            evidence: []
+    notes: null
+  angle: |
+    id: interpretability-research
+    name: Interpretability of existing models
+    definition: Projects that reverse-engineer the internals of trained models
+      rather than training new ones.
+    distinctness_rationale: Varies the novelty-source dimension — insight into
+      existing artifacts vs construction of new ones — orthogonal to model scale.
+    example_options:
+      - sparse autoencoder feature atlas for a small LM
+      - circuit analysis of induction heads
+    relevance_prior: 0.8
+    prior_justification: The destination rewards first-author publishable insight
+      under a two-semester deadline and compute cap; analysis projects decouple
+      contribution from training scale, fitting both.
+    contributing_heuristics: [first-principles, practitioner]
+    sub_angles: []
+    notes: null
+  allocation: |
+    angle_id: interpretability-research
+    units: 4
+    target_option_count: 8

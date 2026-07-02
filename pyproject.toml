@@ -20,6 +20,9 @@ dependencies = [
     "pytest-asyncio",
 ]
 
+[project.scripts]
+deeper-lab = "deeper.promptlab:app"
+
 [project.optional-dependencies]
 dev = [
     "ruff",

@@ -1,0 +1,35 @@
+# Senior-project scenario (the design doc's running example).
+# Brief + destination only: the input set for cartographers and rubric iteration.
+description: Choose a senior research project to position for top ML PhD admissions.
+budget: >-
+  You have at most 6 web searches. Spend them existence-proofing example options
+  and grounding relevance rationales, not surveying broadly.
+inputs:
+  brief: |
+    goal: Choose the senior research project that best positions me for admission
+      to a top ML PhD program
+    answer_type: decision
+    scope_in:
+      - projects feasible within two semesters
+      - projects with a faculty supervisor at my university
+    scope_out:
+      - industry internships
+      - coursework-only options
+    constraints:
+      - statement: Thesis must be submitted by April 2027
+        kind: deadline
+      - statement: Compute limited to the lab's shared 4x A100 node
+        kind: budget
+    notes: null
+  destination: |
+    judges:
+      - description: PhD admissions committees at top-tier ML programs
+        rewards:
+          - description: First-author publications at top venues (NeurIPS, ICML, ICLR)
+            evidence:
+              - url: "https://transformer-circuits.pub/2023/monosemantic-features"
+                tier: T1
+                title: Towards Monosemanticity
+          - description: Strong, specific recommendation letters from research supervisors
+            evidence: []
+    notes: null

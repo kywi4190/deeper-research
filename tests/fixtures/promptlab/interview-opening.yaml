@@ -1,0 +1,18 @@
+# Interviewer fixture: the raw goal plus a short simulated transcript, so the
+# lab can exercise classification + push-back without a live human. In lab runs
+# the interviewer should treat the transcript as the answers it has so far.
+description: S0 intake for the senior-project scenario, from a simulated transcript.
+budget: >-
+  You have at most 3 web searches, only to verify destination-facts. You have
+  already spent 5 of your 8 interview questions producing the transcript below.
+inputs:
+  goal: |
+    Which senior research project should I pick to best position myself for
+    top ML PhD programs?
+  user-statements: |
+    - "The thesis has to be submitted by April 2027, that's the department deadline."
+    - "It must be a machine learning project."
+    - "I've heard admissions committees mostly care about publications and letters."
+    - "Our lab only has a shared 4x A100 node, so nothing compute-crazy."
+    - "Honestly I find mechanistic interpretability fascinating."
+    - "I'd take a risky project if there's a fallback way to publish something."

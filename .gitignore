@@ -1,4 +1,5 @@
 runs/
+promptlab-out/
 .env
 __pycache__/
 .pytest_cache/

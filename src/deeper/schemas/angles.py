@@ -13,6 +13,43 @@ from .base import ArtifactModel, NonEmptyStr, Probability, Slug
 from .common import Heuristic
 
 
+class RawAngle(ArtifactModel):
+    """One candidate angle exactly as a cartographer emits it, before merger
+    dedup. Deliberately has NO numeric relevance prior: assigning priors is the
+    merger's job (design §5/S1); cartographers give a prose rationale only."""
+
+    name: NonEmptyStr
+    definition: NonEmptyStr
+    distinctness_rationale: NonEmptyStr = Field(
+        description="Why this is a distinct region and not a variant of another angle."
+    )
+    example_options: list[NonEmptyStr] = Field(
+        min_length=1,
+        description="2-3 concrete options proving the angle is non-empty — "
+        "existence proofs, never endorsements.",
+    )
+    relevance_rationale: NonEmptyStr = Field(
+        description="Estimated-relevance rationale in prose, grounded only in the "
+        "brief and destination model — never a number, never a ranking."
+    )
+    notes: str | None = None
+
+
+class CartographerReport(ArtifactModel):
+    """angles/raw/{heuristic} — one cartographer's candidate angles (design §7
+    lists per-cartographer raw output as a workspace artifact). The merger and
+    the saturation rule consume these."""
+
+    heuristic: Heuristic
+    angles: list[RawAngle] = Field(
+        min_length=3,
+        max_length=12,
+        description="Target 5-12 candidate angles; fewer than 5 only when the "
+        "heuristic genuinely yields a narrow harvest (say why in notes).",
+    )
+    notes: str | None = None
+
+
 class SubAngle(ArtifactModel):
     """Second (and final) taxonomy level — 'angle → sub-angle where warranted'."""
 
