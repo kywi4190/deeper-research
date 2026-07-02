@@ -1,0 +1,2 @@
+# Exported JSON Schemas (generated from src/deeper/schemas/) live here.
+# Populated in Prompt 2 via `make schemas`.
