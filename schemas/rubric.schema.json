@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "Criterion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "measurement_method": {
+          "description": "What evidence would move this score \u2014 tells analysts what to fetch.",
+          "minLength": 1,
+          "title": "Measurement Method",
+          "type": "string"
+        },
+        "levels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Anchored score levels: exactly keys 1-5, each a concrete description of what that score means.",
+          "title": "Levels",
+          "type": "object"
+        },
+        "weight": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Weight",
+          "type": "number"
+        },
+        "justification": {
+          "description": "Why this weight \u2014 traceable to the destination model.",
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "definition",
+        "measurement_method",
+        "levels",
+        "weight",
+        "justification"
+      ],
+      "title": "Criterion",
+      "type": "object"
+    },
+    "PreferenceSlot": {
+      "additionalProperties": false,
+      "description": "The one bounded, visible place where tastes may bend the destination-optimal\nanswer. Its weight is set at Gate B.",
+      "properties": {
+        "weight": {
+          "default": 0.2,
+          "description": "Fraction of the combined score the preference component may claim.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "title": "PreferenceSlot",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "rubric.yaml: 5-9 destination-derived criteria plus the preference slot.",
+  "properties": {
+    "criteria": {
+      "items": {
+        "$ref": "#/$defs/Criterion"
+      },
+      "maxItems": 9,
+      "minItems": 5,
+      "title": "Criteria",
+      "type": "array"
+    },
+    "preference_slot": {
+      "$ref": "#/$defs/PreferenceSlot"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "criteria",
+    "preference_slot"
+  ],
+  "title": "Rubric",
+  "type": "object"
+}

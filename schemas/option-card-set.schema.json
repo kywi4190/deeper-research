@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "EvidenceItem": {
+      "additionalProperties": false,
+      "description": "One piece of evidence with its source \u2014 the unit of 'preliminary evidence'\non option cards and of new tournament material.",
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "text",
+        "source"
+      ],
+      "title": "EvidenceItem",
+      "type": "object"
+    },
+    "KillRisk": {
+      "additionalProperties": false,
+      "description": "A single fact that, if true, eliminates the option. Checked FIRST in\nscreening with one cheap lookup \u2014 the check_hint is what keeps it cheap.",
+      "properties": {
+        "fact": {
+          "minLength": 1,
+          "title": "Fact",
+          "type": "string"
+        },
+        "check_hint": {
+          "description": "How to verify this with a single cheap lookup or computation.",
+          "minLength": 1,
+          "title": "Check Hint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fact",
+        "check_hint"
+      ],
+      "title": "KillRisk",
+      "type": "object"
+    },
+    "OptionCard": {
+      "additionalProperties": false,
+      "description": "One specific solution within an angle, at screening depth (~300-500 words).",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "mechanism": {
+          "description": "How it works, in about two sentences.",
+          "minLength": 1,
+          "title": "Mechanism",
+          "type": "string"
+        },
+        "preliminary_evidence": {
+          "description": "Evidence of viability, each item with a tiered source ref \u2014 source-tier honesty is a critic checklist item.",
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          },
+          "minItems": 1,
+          "title": "Preliminary Evidence",
+          "type": "array"
+        },
+        "uncertainties": {
+          "description": "2-3 key unknowns that screening/deep-dive must resolve.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Uncertainties",
+          "type": "array"
+        },
+        "kill_risks": {
+          "items": {
+            "$ref": "#/$defs/KillRisk"
+          },
+          "title": "Kill Risks",
+          "type": "array"
+        },
+        "misplaced_flag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If this option really belongs to another angle, name that angle here instead of absorbing it (scout boundary rule).",
+          "title": "Misplaced Flag"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "angle_id",
+        "description",
+        "mechanism",
+        "preliminary_evidence",
+        "uncertainties"
+      ],
+      "title": "OptionCard",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "options/{angle}/cards.yaml \u2014 one scout's output for one angle.",
+  "properties": {
+    "angle_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Angle Id",
+      "type": "string"
+    },
+    "cards": {
+      "items": {
+        "$ref": "#/$defs/OptionCard"
+      },
+      "minItems": 1,
+      "title": "Cards",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "angle_id",
+    "cards"
+  ],
+  "title": "OptionCardSet",
+  "type": "object"
+}

@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "AllocationKind": {
+      "enum": [
+        "initial",
+        "reflow"
+      ],
+      "title": "AllocationKind",
+      "type": "string"
+    },
+    "AllocationRow": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "relevance_prior": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Relevance Prior",
+          "type": "number"
+        },
+        "units": {
+          "description": "Budget units allocated to this angle.",
+          "minimum": 0,
+          "title": "Units",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "angle_id",
+        "relevance_prior",
+        "units"
+      ],
+      "title": "AllocationRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "allocation.yaml: the formula's inputs and outputs together, so the\nallocation is reproducible and auditable from the file alone.",
+  "properties": {
+    "kind": {
+      "$ref": "#/$defs/AllocationKind",
+      "default": "initial"
+    },
+    "total_budget_units": {
+      "minimum": 1,
+      "title": "Total Budget Units",
+      "type": "integer"
+    },
+    "floor": {
+      "description": "Minimum units per surviving angle.",
+      "minimum": 0,
+      "title": "Floor",
+      "type": "integer"
+    },
+    "gamma": {
+      "description": "Concentration exponent \u2014 the breadth dial.",
+      "exclusiveMinimum": 0,
+      "title": "Gamma",
+      "type": "number"
+    },
+    "per_angle_cap_pct": {
+      "exclusiveMinimum": 0,
+      "maximum": 100,
+      "title": "Per Angle Cap Pct",
+      "type": "number"
+    },
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/AllocationRow"
+      },
+      "minItems": 1,
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "total_budget_units",
+    "floor",
+    "gamma",
+    "per_angle_cap_pct",
+    "rows"
+  ],
+  "title": "AllocationTable",
+  "type": "object"
+}

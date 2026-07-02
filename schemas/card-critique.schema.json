@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "CompletenessIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "card_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Card Id",
+          "type": "string"
+        },
+        "issue": {
+          "minLength": 1,
+          "title": "Issue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "card_id",
+        "issue"
+      ],
+      "title": "CompletenessIssue",
+      "type": "object"
+    },
+    "DistinctnessIssue": {
+      "additionalProperties": false,
+      "description": "Two-or-more cards that are really one option.",
+      "properties": {
+        "card_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Card Ids",
+          "type": "array"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "card_ids",
+        "rationale"
+      ],
+      "title": "DistinctnessIssue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "options/{angle}/critique \u2014 the card-critic's checklist review.",
+  "properties": {
+    "angle_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Angle Id",
+      "type": "string"
+    },
+    "completeness_issues": {
+      "items": {
+        "$ref": "#/$defs/CompletenessIssue"
+      },
+      "title": "Completeness Issues",
+      "type": "array"
+    },
+    "redundancy_pct": {
+      "description": "Share of cards that are minor variants of earlier cards; >40 stops the angle early and returns units to the reflow pool.",
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Redundancy Pct",
+      "type": "number"
+    },
+    "distinctness_issues": {
+      "items": {
+        "$ref": "#/$defs/DistinctnessIssue"
+      },
+      "title": "Distinctness Issues",
+      "type": "array"
+    },
+    "missed_options": {
+      "description": "Plausible options the scout missed \u2014 targets for reflowed budget and a frame-check input if never scouted.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 3,
+      "title": "Missed Options",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "angle_id",
+    "redundancy_pct"
+  ],
+  "title": "CardCritique",
+  "type": "object"
+}

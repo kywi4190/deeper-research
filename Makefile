@@ -10,6 +10,6 @@ lint:
 typecheck:
 	mypy
 
-# Regenerates JSON-schema exports into schemas/ (no-op until the schema layer exists).
+# Regenerates JSON-schema exports into schemas/ from the Pydantic models.
 schemas:
-	@echo "No schema exporter yet (added in Prompt 2)."
+	python -m deeper.schemas

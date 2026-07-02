@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Registry entry for a fetched source in the content-addressed sources/ cache\n(design \u00a76 source hygiene): tier, retrieval date, and URL make the run\nauditable offline.",
+  "properties": {
+    "url": {
+      "minLength": 1,
+      "title": "Url",
+      "type": "string"
+    },
+    "tier": {
+      "$ref": "#/$defs/SourceTier"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "content_hash": {
+      "minLength": 1,
+      "title": "Content Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "tier",
+    "retrieved_at",
+    "content_hash"
+  ],
+  "title": "SourceRecord",
+  "type": "object"
+}

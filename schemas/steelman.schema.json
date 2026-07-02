@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "SteelmanTrigger": {
+      "enum": [
+        "runner-up",
+        "rank-inversion"
+      ],
+      "title": "SteelmanTrigger",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The strongest case that this option should win.",
+  "properties": {
+    "option_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Option Id",
+      "type": "string"
+    },
+    "trigger": {
+      "$ref": "#/$defs/SteelmanTrigger",
+      "description": "Why this option earned a steelman \u2014 inversions are exactly where preference-overfitting would hide."
+    },
+    "case": {
+      "minLength": 1,
+      "title": "Case",
+      "type": "string"
+    },
+    "supporting_claim_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "title": "Supporting Claim Ids",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "option_id",
+    "trigger",
+    "case"
+  ],
+  "title": "Steelman",
+  "type": "object"
+}

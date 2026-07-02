@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "Heuristic": {
+      "description": "The cartographer framing personas \u2014 ensemble diversity is the breadth\nmechanism (design P3, \u00a75/S1).",
+      "enum": [
+        "first-principles",
+        "analogist",
+        "contrarian",
+        "practitioner",
+        "taxonomist",
+        "horizon-scanner"
+      ],
+      "title": "Heuristic",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The merger's coverage self-report: which heuristics contributed which\nangles, and where the map feels thin (design \u00a75/S1).",
+  "properties": {
+    "contributions": {
+      "additionalProperties": {
+        "items": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "Heuristic -> angle ids it contributed.",
+      "propertyNames": {
+        "$ref": "#/$defs/Heuristic"
+      },
+      "title": "Contributions",
+      "type": "object"
+    },
+    "thin_areas": {
+      "description": "Regions the merger suspects are under-mapped \u2014 Gate A review fodder.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Thin Areas",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "contributions"
+  ],
+  "title": "CoverageReport",
+  "type": "object"
+}

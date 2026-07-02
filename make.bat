@@ -18,7 +18,7 @@ if /I "%TARGET%"=="typecheck" (
     goto :eof
 )
 if /I "%TARGET%"=="schemas" (
-    echo No schema exporter yet (added in Prompt 2).
+    python -m deeper.schemas
     goto :eof
 )
 echo Unknown target: %TARGET%

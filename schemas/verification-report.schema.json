@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "Verdict": {
+      "description": "Verifier adjudication of a dossier claim (design \u00a75/S6).",
+      "enum": [
+        "verified",
+        "unsupported",
+        "contradicted"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    },
+    "VerificationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
+        "evidence_quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Quoted source text supporting the verdict.",
+          "title": "Evidence Quote"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "claim_id",
+        "verdict"
+      ],
+      "title": "VerificationResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "dossiers/{option}-verification: the independent verifier's adjudication.\nSampling covers ALL load-bearing claims plus a random 20% of the rest.",
+  "properties": {
+    "option_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Option Id",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/VerificationResult"
+      },
+      "minItems": 1,
+      "title": "Results",
+      "type": "array"
+    },
+    "sampled_load_bearing_count": {
+      "minimum": 0,
+      "title": "Sampled Load Bearing Count",
+      "type": "integer"
+    },
+    "sampled_other_count": {
+      "minimum": 0,
+      "title": "Sampled Other Count",
+      "type": "integer"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "option_id",
+    "results",
+    "sampled_load_bearing_count",
+    "sampled_other_count"
+  ],
+  "title": "VerificationReport",
+  "type": "object"
+}

@@ -1,0 +1,129 @@
+{
+  "$defs": {
+    "AngleAddition": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "note": {
+          "description": "Guidance for the scout that will be assigned.",
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "note"
+      ],
+      "title": "AngleAddition",
+      "type": "object"
+    },
+    "AngleRemoval": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Mandatory \u2014 removals are logged and re-examined by the S7 frame-checker.",
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "angle_id",
+        "reason"
+      ],
+      "title": "AngleRemoval",
+      "type": "object"
+    },
+    "PriorAdjustment": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "new_prior": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "New Prior",
+          "type": "number"
+        }
+      },
+      "required": [
+        "angle_id",
+        "new_prior"
+      ],
+      "title": "PriorAdjustment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Frame review: approve / add angle / remove angle / adjust prior / request\nanother cartography pass with a hint.",
+  "properties": {
+    "approved": {
+      "title": "Approved",
+      "type": "boolean"
+    },
+    "added_angles": {
+      "items": {
+        "$ref": "#/$defs/AngleAddition"
+      },
+      "title": "Added Angles",
+      "type": "array"
+    },
+    "removed_angles": {
+      "items": {
+        "$ref": "#/$defs/AngleRemoval"
+      },
+      "title": "Removed Angles",
+      "type": "array"
+    },
+    "prior_adjustments": {
+      "items": {
+        "$ref": "#/$defs/PriorAdjustment"
+      },
+      "title": "Prior Adjustments",
+      "type": "array"
+    },
+    "rerun_hint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Set to request another cartography pass with this hint \u2014 mutually exclusive with approval.",
+      "title": "Rerun Hint"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "approved"
+  ],
+  "title": "GateADecision",
+  "type": "object"
+}

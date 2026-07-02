@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "CheckFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "finding": {
+          "minLength": 1,
+          "title": "Finding",
+          "type": "string"
+        },
+        "consequential": {
+          "description": "True if this finding could plausibly change the answer.",
+          "title": "Consequential",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "finding",
+        "consequential"
+      ],
+      "title": "CheckFinding",
+      "type": "object"
+    },
+    "FrameCheckVerdict": {
+      "enum": [
+        "pass",
+        "gap-found"
+      ],
+      "title": "FrameCheckVerdict",
+      "type": "string"
+    },
+    "RedivergenceKind": {
+      "enum": [
+        "new-angle",
+        "scout-task"
+      ],
+      "title": "RedivergenceKind",
+      "type": "string"
+    },
+    "RedivergenceProposal": {
+      "additionalProperties": false,
+      "description": "A specific new angle or scouting task with an estimated cost \u2014 approved\n(or not) by the human at Gate C.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/RedivergenceKind"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "target_angle_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Existing angle to re-scout, for scout-task proposals.",
+          "title": "Target Angle Id"
+        },
+        "estimated_cost_units": {
+          "minimum": 1,
+          "title": "Estimated Cost Units",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "description",
+        "estimated_cost_units"
+      ],
+      "title": "RedivergenceProposal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "tournament/frame-check: 'Is there a plausible answer to the brief that\nthis map could not have produced?' \u2014 the anti-overfitting backstop.",
+  "properties": {
+    "verdict": {
+      "$ref": "#/$defs/FrameCheckVerdict"
+    },
+    "removals_check": {
+      "$ref": "#/$defs/CheckFinding",
+      "description": "Gate-A removals whose absence now looks consequential."
+    },
+    "missed_options_check": {
+      "$ref": "#/$defs/CheckFinding",
+      "description": "Critique-flagged missed options that were never scouted."
+    },
+    "rubric_fragility_check": {
+      "$ref": "#/$defs/CheckFinding",
+      "description": "Would a defensible alternative weighting change the winner?"
+    },
+    "proposal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RedivergenceProposal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "verdict",
+    "removals_check",
+    "missed_options_check",
+    "rubric_fragility_check"
+  ],
+  "title": "FrameCheck",
+  "type": "object"
+}

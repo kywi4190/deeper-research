@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "ContenderReaction": {
+      "additionalProperties": false,
+      "description": "Structured preference feedback the screener converts into preference-slot\nadjustments \u2014 a free re-score, no new research.",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "reaction": {
+          "minLength": 1,
+          "title": "Reaction",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/ReactionDirection"
+        }
+      },
+      "required": [
+        "option_id",
+        "reaction",
+        "direction"
+      ],
+      "title": "ContenderReaction",
+      "type": "object"
+    },
+    "EvidenceChallenge": {
+      "additionalProperties": false,
+      "description": "'I don't believe claim X' -> a targeted verifier/analyst task.",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "claim_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "challenge": {
+          "minLength": 1,
+          "title": "Challenge",
+          "type": "string"
+        }
+      },
+      "required": [
+        "option_id",
+        "claim_id",
+        "challenge"
+      ],
+      "title": "EvidenceChallenge",
+      "type": "object"
+    },
+    "ReactionDirection": {
+      "enum": [
+        "positive",
+        "negative",
+        "neutral"
+      ],
+      "title": "ReactionDirection",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Contender review: preference feedback / evidence challenge / accept\nre-divergence / approve. Approve means proceed to synthesis, so it excludes\nthe loop actions \u2014 run those in their own gate iteration first.",
+  "properties": {
+    "approved": {
+      "title": "Approved",
+      "type": "boolean"
+    },
+    "preference_feedback": {
+      "items": {
+        "$ref": "#/$defs/ContenderReaction"
+      },
+      "title": "Preference Feedback",
+      "type": "array"
+    },
+    "evidence_challenges": {
+      "items": {
+        "$ref": "#/$defs/EvidenceChallenge"
+      },
+      "title": "Evidence Challenges",
+      "type": "array"
+    },
+    "accept_redivergence": {
+      "default": false,
+      "title": "Accept Redivergence",
+      "type": "boolean"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "approved"
+  ],
+  "title": "GateCDecision",
+  "type": "object"
+}

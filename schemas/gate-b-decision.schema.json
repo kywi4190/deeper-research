@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "Criterion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "measurement_method": {
+          "description": "What evidence would move this score \u2014 tells analysts what to fetch.",
+          "minLength": 1,
+          "title": "Measurement Method",
+          "type": "string"
+        },
+        "levels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Anchored score levels: exactly keys 1-5, each a concrete description of what that score means.",
+          "title": "Levels",
+          "type": "object"
+        },
+        "weight": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Weight",
+          "type": "number"
+        },
+        "justification": {
+          "description": "Why this weight \u2014 traceable to the destination model.",
+          "minLength": 1,
+          "title": "Justification",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "definition",
+        "measurement_method",
+        "levels",
+        "weight",
+        "justification"
+      ],
+      "title": "Criterion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Values review: adjust weights, edit criteria, and set the preference-slot\nweight \u2014 the one number that says how much tastes may bend the\ndestination-optimal answer.",
+  "properties": {
+    "approved": {
+      "title": "Approved",
+      "type": "boolean"
+    },
+    "preference_slot_weight": {
+      "description": "0-0.4, matching the report's sensitivity sweep range.",
+      "maximum": 0.4,
+      "minimum": 0,
+      "title": "Preference Slot Weight",
+      "type": "number"
+    },
+    "weight_overrides": {
+      "description": "Criterion id -> new weight.",
+      "patternProperties": {
+        "^[a-z0-9][a-z0-9-]*$": {
+          "type": "number"
+        }
+      },
+      "title": "Weight Overrides",
+      "type": "object"
+    },
+    "edited_criteria": {
+      "description": "Full replacements for edited criteria (diffable, no patch ops).",
+      "items": {
+        "$ref": "#/$defs/Criterion"
+      },
+      "title": "Edited Criteria",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "approved",
+    "preference_slot_weight"
+  ],
+  "title": "GateBDecision",
+  "type": "object"
+}

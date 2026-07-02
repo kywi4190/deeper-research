@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "AnswerType": {
+      "description": "The type of answer the run must produce (drives report shape).",
+      "enum": [
+        "decision",
+        "landscape",
+        "recommendation-with-fallbacks"
+      ],
+      "title": "AnswerType",
+      "type": "string"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "A fact about the world, not a taste \u2014 the interviewer pushes back on\npreferences stated as constraints before anything lands here.",
+      "properties": {
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind"
+        }
+      },
+      "required": [
+        "statement",
+        "kind"
+      ],
+      "title": "Constraint",
+      "type": "object"
+    },
+    "ConstraintKind": {
+      "enum": [
+        "deadline",
+        "budget",
+        "hard-requirement"
+      ],
+      "title": "ConstraintKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The goal restated, with scope boundaries and world-fact constraints.\nThe frame-checker later audits the whole run against this exact text.",
+  "properties": {
+    "goal": {
+      "minLength": 1,
+      "title": "Goal",
+      "type": "string"
+    },
+    "answer_type": {
+      "$ref": "#/$defs/AnswerType"
+    },
+    "scope_in": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Scope In",
+      "type": "array"
+    },
+    "scope_out": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Scope Out",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "title": "Constraints",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "goal",
+    "answer_type"
+  ],
+  "title": "Brief",
+  "type": "object"
+}

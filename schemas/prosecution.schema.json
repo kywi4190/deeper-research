@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "EvidenceItem": {
+      "additionalProperties": false,
+      "description": "One piece of evidence with its source \u2014 the unit of 'preliminary evidence'\non option cards and of new tournament material.",
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "text",
+        "source"
+      ],
+      "title": "EvidenceItem",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The strongest good-faith case AGAINST one top-3 finalist.",
+  "properties": {
+    "option_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Option Id",
+      "type": "string"
+    },
+    "case": {
+      "minLength": 1,
+      "title": "Case",
+      "type": "string"
+    },
+    "regret_path": {
+      "description": "The most likely way choosing this option leads to regret \u2014 mandatory.",
+      "minLength": 1,
+      "title": "Regret Path",
+      "type": "string"
+    },
+    "supporting_claim_ids": {
+      "description": "Dossier claims the case rests on.",
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "title": "Supporting Claim Ids",
+      "type": "array"
+    },
+    "new_evidence": {
+      "description": "Material from the prosecutor's up-to-3 new targeted searches.",
+      "items": {
+        "$ref": "#/$defs/EvidenceItem"
+      },
+      "maxItems": 3,
+      "title": "New Evidence",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "option_id",
+    "case",
+    "regret_path"
+  ],
+  "title": "Prosecution",
+  "type": "object"
+}

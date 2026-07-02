@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "CriterionScore": {
+      "additionalProperties": false,
+      "properties": {
+        "criterion_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Criterion Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Score",
+          "type": "number"
+        },
+        "band": {
+          "$ref": "#/$defs/UncertaintyBand",
+          "description": "Wider when evidence is thin \u2014 under-information triggers more research, not elimination."
+        },
+        "evidence_pointer": {
+          "description": "Where in the card/dossier the score comes from.",
+          "minLength": 1,
+          "title": "Evidence Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "criterion_id",
+        "score",
+        "band",
+        "evidence_pointer"
+      ],
+      "title": "CriterionScore",
+      "type": "object"
+    },
+    "KillRiskCheck": {
+      "additionalProperties": false,
+      "description": "Result of the cheap single-lookup check on a card's kill-risk.",
+      "properties": {
+        "fact": {
+          "minLength": 1,
+          "title": "Fact",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/KillRiskOutcome"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "fact",
+        "outcome"
+      ],
+      "title": "KillRiskCheck",
+      "type": "object"
+    },
+    "KillRiskOutcome": {
+      "enum": [
+        "confirmed",
+        "cleared",
+        "unresolved"
+      ],
+      "title": "KillRiskOutcome",
+      "type": "string"
+    },
+    "OptionScreening": {
+      "additionalProperties": false,
+      "description": "One option's full screening record in screening/scores.yaml.",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "criterion_scores": {
+          "items": {
+            "$ref": "#/$defs/CriterionScore"
+          },
+          "minItems": 1,
+          "title": "Criterion Scores",
+          "type": "array"
+        },
+        "preference_score": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CriterionScore"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The preference-slot score \u2014 the ONLY place tastes enter (P9)."
+        },
+        "kill_risk_checks": {
+          "items": {
+            "$ref": "#/$defs/KillRiskCheck"
+          },
+          "title": "Kill Risk Checks",
+          "type": "array"
+        },
+        "weighted_point": {
+          "description": "Weighted point estimate. Stored so the file alone explains the shortlist decision.",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Weighted Point",
+          "type": "number"
+        },
+        "weighted_ucb": {
+          "description": "Weighted upper confidence bound \u2014 the number the shortlist rule actually compares against the threshold.",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Weighted Ucb",
+          "type": "number"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "option_id",
+        "angle_id",
+        "criterion_scores",
+        "weighted_point",
+        "weighted_ucb"
+      ],
+      "title": "OptionScreening",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    },
+    "UncertaintyBand": {
+      "additionalProperties": false,
+      "properties": {
+        "lo": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Lo",
+          "type": "number"
+        },
+        "hi": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Hi",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lo",
+        "hi"
+      ],
+      "title": "UncertaintyBand",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "screening/scores.yaml.",
+  "properties": {
+    "options": {
+      "items": {
+        "$ref": "#/$defs/OptionScreening"
+      },
+      "minItems": 1,
+      "title": "Options",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "options"
+  ],
+  "title": "ScreeningResult",
+  "type": "object"
+}

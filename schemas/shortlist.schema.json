@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "ShortlistCause": {
+      "enum": [
+        "ucb-above-threshold",
+        "diversity-guardrail-add",
+        "kill-risk-confirmed",
+        "below-threshold",
+        "angle-cap"
+      ],
+      "title": "ShortlistCause",
+      "type": "string"
+    },
+    "ShortlistDecision": {
+      "additionalProperties": false,
+      "description": "Advance/cut with a mandatory reason \u2014 cuts are auditable (design \u00a75/S5).",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/ShortlistOutcome"
+        },
+        "cause": {
+          "$ref": "#/$defs/ShortlistCause"
+        },
+        "reason": {
+          "description": "One-paragraph why-advanced / why-cut note for the audit trail.",
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "option_id",
+        "decision",
+        "cause",
+        "reason"
+      ],
+      "title": "ShortlistDecision",
+      "type": "object"
+    },
+    "ShortlistOutcome": {
+      "enum": [
+        "advanced",
+        "cut"
+      ],
+      "title": "ShortlistOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "screening/shortlist: one decision per screened option, plus the finalists.",
+  "properties": {
+    "threshold": {
+      "description": "The UCB threshold the rule compared against.",
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Threshold",
+      "type": "number"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/ShortlistDecision"
+      },
+      "minItems": 1,
+      "title": "Decisions",
+      "type": "array"
+    },
+    "finalist_ids": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Finalist Ids",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "threshold",
+    "decisions",
+    "finalist_ids"
+  ],
+  "title": "Shortlist",
+  "type": "object"
+}

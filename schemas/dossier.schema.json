@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "load_bearing": {
+          "description": "True if this claim moves a criterion score by >= 1 point; drives verifier sampling and the depth stopping rule.",
+          "title": "Load Bearing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "confidence",
+        "source",
+        "load_bearing"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "Confidence": {
+      "enum": [
+        "high",
+        "med",
+        "low"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "DossierSection": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        },
+        "claim_ids": {
+          "description": "Claims this section's content rests on.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "DossierSection",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "dossiers/{option}: criterion-keyed sections + the five standing sections.\n\nThe standing sections are fixed fields (not a dict) so a missing one is a\nvalidation error, per design \u00a75/S6.",
+  "properties": {
+    "option_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Option Id",
+      "type": "string"
+    },
+    "criterion_sections": {
+      "description": "Rubric criterion id -> evidence section.",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9][a-z0-9-]*$": {
+          "$ref": "#/$defs/DossierSection"
+        }
+      },
+      "title": "Criterion Sections",
+      "type": "object"
+    },
+    "failure_modes": {
+      "$ref": "#/$defs/DossierSection",
+      "description": "Failure modes & prerequisites."
+    },
+    "cost_of_adoption": {
+      "$ref": "#/$defs/DossierSection",
+      "description": "Total cost of adoption: time, money, optionality."
+    },
+    "second_order_effects": {
+      "$ref": "#/$defs/DossierSection"
+    },
+    "strongest_criticism": {
+      "$ref": "#/$defs/DossierSection",
+      "description": "The strongest published criticism, sought explicitly."
+    },
+    "comparable_cases": {
+      "$ref": "#/$defs/DossierSection",
+      "description": "Who chose this and what happened."
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "minItems": 1,
+      "title": "Claims",
+      "type": "array"
+    },
+    "rounds_completed": {
+      "description": "Research rounds run before the stopping rule fired.",
+      "minimum": 1,
+      "title": "Rounds Completed",
+      "type": "integer"
+    },
+    "budget_capped": {
+      "default": false,
+      "description": "True when the per-option cap hit before score stability \u2014 unfinished depth is visible, never silent.",
+      "title": "Budget Capped",
+      "type": "boolean"
+    },
+    "open_questions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Open Questions",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "option_id",
+    "criterion_sections",
+    "failure_modes",
+    "cost_of_adoption",
+    "second_order_effects",
+    "strongest_criticism",
+    "comparable_cases",
+    "claims",
+    "rounds_completed"
+  ],
+  "title": "Dossier",
+  "type": "object"
+}

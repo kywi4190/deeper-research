@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "ScoreUpdate": {
+      "additionalProperties": false,
+      "description": "One judge-applied score change, logged with its cause.",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "criterion_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Criterion Id",
+          "type": "string"
+        },
+        "old_score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Old Score",
+          "type": "number"
+        },
+        "new_score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "New Score",
+          "type": "number"
+        },
+        "cause": {
+          "description": "The decisive tournament material behind the change.",
+          "minLength": 1,
+          "title": "Cause",
+          "type": "string"
+        },
+        "source_artifact": {
+          "description": "Workspace-relative path of the prosecution/steelman/frame-check that surfaced it.",
+          "minLength": 1,
+          "title": "Source Artifact",
+          "type": "string"
+        }
+      },
+      "required": [
+        "option_id",
+        "criterion_id",
+        "old_score",
+        "new_score",
+        "cause",
+        "source_artifact"
+      ],
+      "title": "ScoreUpdate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "tournament/score-updates.yaml.",
+  "properties": {
+    "updates": {
+      "items": {
+        "$ref": "#/$defs/ScoreUpdate"
+      },
+      "title": "Updates",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "title": "ScoreUpdateLog",
+  "type": "object"
+}

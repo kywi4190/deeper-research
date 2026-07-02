@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "PreferenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "strength": {
+          "$ref": "#/$defs/PreferenceStrength",
+          "description": "Drives how hard this item pulls the S5 preference-slot score."
+        }
+      },
+      "required": [
+        "statement",
+        "strength"
+      ],
+      "title": "PreferenceItem",
+      "type": "object"
+    },
+    "PreferenceStrength": {
+      "enum": [
+        "mild",
+        "moderate",
+        "strong"
+      ],
+      "title": "PreferenceStrength",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Tastes only: interests, aesthetics, risk appetite, soft dislikes.\nQUARANTINED \u2014 readable only by the screener and synthesist, enforced by a\nPreToolUse hook, not prompt goodwill (design \u00a76).",
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/PreferenceItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "risk_appetite": {
+      "minLength": 1,
+      "title": "Risk Appetite",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "risk_appetite"
+  ],
+  "title": "Preferences",
+  "type": "object"
+}

@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "Judge": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Who or what ultimately judges the outcome (an admissions committee, a production environment, a reader).",
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "rewards": {
+          "items": {
+            "$ref": "#/$defs/RewardSignal"
+          },
+          "minItems": 1,
+          "title": "Rewards",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "rewards"
+      ],
+      "title": "Judge",
+      "type": "object"
+    },
+    "RewardSignal": {
+      "additionalProperties": false,
+      "description": "One thing the judge rewards. Evidence refs when the destination is\nexternal and verifiable (the interviewer may web-research it).",
+      "properties": {
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "RewardSignal",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What success looks like from the target's perspective. This \u2014 not the\nuser's tastes \u2014 anchors the S4 rubric (design P9).",
+  "properties": {
+    "judges": {
+      "items": {
+        "$ref": "#/$defs/Judge"
+      },
+      "minItems": 1,
+      "title": "Judges",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "judges"
+  ],
+  "title": "DestinationModel",
+  "type": "object"
+}

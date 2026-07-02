@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "ContradictionEntry": {
+      "additionalProperties": false,
+      "description": "Two artifacts disagree on a fact. The detecting agent appends here instead\nof silently picking one; the verifier adjudicates (design \u00a76). Unresolved\nentries surface in the final report.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement_a": {
+          "$ref": "#/$defs/ContradictionStatement"
+        },
+        "statement_b": {
+          "$ref": "#/$defs/ContradictionStatement"
+        },
+        "detected_by": {
+          "description": "Role of the agent that noticed it.",
+          "minLength": 1,
+          "title": "Detected By",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ContradictionStatus",
+          "default": "open"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        }
+      },
+      "required": [
+        "id",
+        "statement_a",
+        "statement_b",
+        "detected_by"
+      ],
+      "title": "ContradictionEntry",
+      "type": "object"
+    },
+    "ContradictionStatement": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "description": "Workspace-relative path of the artifact making this statement.",
+          "minLength": 1,
+          "title": "Artifact",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact",
+        "statement"
+      ],
+      "title": "ContradictionStatement",
+      "type": "object"
+    },
+    "ContradictionStatus": {
+      "enum": [
+        "open",
+        "adjudicated"
+      ],
+      "title": "ContradictionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The ledger/contradictions file for a run.",
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/ContradictionEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    }
+  },
+  "title": "ContradictionLedger",
+  "type": "object"
+}

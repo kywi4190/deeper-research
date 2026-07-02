@@ -1,0 +1,176 @@
+{
+  "$defs": {
+    "GateName": {
+      "enum": [
+        "gate-a",
+        "gate-b",
+        "gate-c"
+      ],
+      "title": "GateName",
+      "type": "string"
+    },
+    "GateStatus": {
+      "enum": [
+        "not-reached",
+        "pending",
+        "approved",
+        "rerun-requested"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    },
+    "RunStatus": {
+      "enum": [
+        "running",
+        "gate-pending",
+        "paused-attention",
+        "done"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    },
+    "SpendEntry": {
+      "additionalProperties": false,
+      "description": "One agent invocation's cost \u2014 the audit trail behind every budget cap.\nAggregations are computed from the entries, so they cannot drift.",
+      "properties": {
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Angle or option this invocation worked on, if any.",
+          "title": "Context"
+        },
+        "usd": {
+          "minimum": 0,
+          "title": "Usd",
+          "type": "number"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "role",
+        "usd",
+        "input_tokens",
+        "output_tokens",
+        "at"
+      ],
+      "title": "SpendEntry",
+      "type": "object"
+    },
+    "Stage": {
+      "enum": [
+        "S0",
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "title": "Stage",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "state.json.",
+  "properties": {
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "profile": {
+      "description": "quick | standard | exhaustive (from config).",
+      "minLength": 1,
+      "title": "Profile",
+      "type": "string"
+    },
+    "stage": {
+      "$ref": "#/$defs/Stage"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    },
+    "pending_gate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GateName"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "gates": {
+      "additionalProperties": {
+        "$ref": "#/$defs/GateStatus"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/GateName"
+      },
+      "title": "Gates",
+      "type": "object"
+    },
+    "spend": {
+      "items": {
+        "$ref": "#/$defs/SpendEntry"
+      },
+      "title": "Spend",
+      "type": "array"
+    },
+    "retry_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "description": "Schema-retry counts keyed by agent invocation (max 2 before PAUSED_ATTENTION).",
+      "title": "Retry Counts",
+      "type": "object"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "profile",
+    "stage",
+    "status",
+    "updated_at"
+  ],
+  "title": "RunState",
+  "type": "object"
+}
