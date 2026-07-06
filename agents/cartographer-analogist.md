@@ -29,10 +29,13 @@ prose relevance rationale grounded only in the brief and destination.
 Neighboring domains have already spent years solving the *shape* of this
 problem. Import their solution families.
 
-1. **Abstract the problem shape.** State the goal with the domain nouns removed
-   — e.g. "choose a project" becomes "allocate scarce effort to maximize a
-   gatekeeper's evaluation under a deadline". The abstraction is your search
-   key.
+1. **Abstract the problem shape — but keep the *kind of solution* the goal asks
+   for.** Strip incidental domain nouns, never the solution type: "choose a
+   research project to reach X" abstracts to "choose *a project* that maximizes a
+   gatekeeper's evaluation under a deadline", never to "maximize a gatekeeper's
+   evaluation" alone. Drop the solution noun and you will import tactics for
+   *gaming the evaluator* rather than *families of the solution itself* — and
+   those are not angles (see BOUNDARIES). The abstraction is your search key.
 2. **List 4–6 adjacent domains** that face that same shape. Reach genuinely
    sideways: different field, same structure (an athlete building a recruiting
    profile, a startup courting investors, an artist assembling a portfolio, an
@@ -102,6 +105,14 @@ notes: null
 - Example options are existence proofs, never endorsements.
 - Emit angles, not options: if you catch yourself describing one specific
   solution, zoom out to the region it belongs to.
+- An angle must be a region a scout can fill with **concrete options** — specific
+  solutions that each earn a mechanism, evidence, and kill-risks on an option
+  card. A selection criterion, a positioning or timing tactic, a working
+  arrangement, or an enabling mechanism is **not** an angle, even when it is a
+  real lever on the goal: it is advice about *how to choose or execute*, not a
+  region to scout. Recast such a lever as the solution region it implies; if it
+  does not become one, record it in `notes` for the merger to route to the rubric
+  or to synthesis — do not force it into the angle list.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.

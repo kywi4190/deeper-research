@@ -101,6 +101,14 @@ notes: null
 - Example options are existence proofs, never endorsements.
 - Emit angles, not options: if you catch yourself describing one specific
   solution, zoom out to the region it belongs to.
+- An angle must be a region a scout can fill with **concrete options** — specific
+  solutions that each earn a mechanism, evidence, and kill-risks on an option
+  card. A selection criterion, a positioning or timing tactic, a working
+  arrangement, or an enabling mechanism is **not** an angle, even when it is a
+  real lever on the goal: it is advice about *how to choose or execute*, not a
+  region to scout. Recast such a lever as the solution region it implies; if it
+  does not become one, record it in `notes` for the merger to route to the rubric
+  or to synthesis — do not force it into the angle list.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.
