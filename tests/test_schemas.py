@@ -133,6 +133,21 @@ def _raw_angle(name: str) -> dict:
     }
 
 
+def _strategic_note(source_heuristics: list[str] | None = None) -> dict:
+    return {
+        "insight": (
+            "The letter-writer's community standing may outweigh the project topic "
+            "in the judge's actual reward function"
+        ),
+        "kind": "rubric-weight",
+        "rationale": (
+            "The destination model lists strong supervisor letters as a primary "
+            "reward signal; this belongs in the S4 rubric, not on the map."
+        ),
+        "source_heuristics": source_heuristics or [],
+    }
+
+
 def valid_cartographer_report() -> dict:
     return {
         "heuristic": "first-principles",
@@ -141,6 +156,7 @@ def valid_cartographer_report() -> dict:
             _raw_angle("Empirical benchmarking studies"),
             _raw_angle("Research infrastructure contributions"),
         ],
+        "strategic_notes": [_strategic_note()],
         "notes": None,
     }
 
@@ -234,6 +250,7 @@ def valid_coverage_report() -> dict:
             "taxonomist": ["ml-systems"],
         },
         "thin_areas": ["Theory-adjacent angles (learning theory, optimization) are unmapped"],
+        "strategic_notes": [_strategic_note(["first-principles", "practitioner"])],
         "notes": None,
     }
 
@@ -885,6 +902,30 @@ def _invalid_cases() -> list[tuple[type, dict, str]]:
         CartographerReport,
         _mutate(valid_cartographer_report, lambda p: p.update(angles=p["angles"][:2])),
         "too-few-angles",
+    )
+    add(
+        CartographerReport,
+        _mutate(
+            valid_cartographer_report,
+            lambda p: p["strategic_notes"][0].update(kind="vibe"),
+        ),
+        "strategic-note-bad-kind",
+    )
+    add(
+        CartographerReport,
+        _mutate(
+            valid_cartographer_report,
+            lambda p: p.update(strategic_notes=[_strategic_note() for _ in range(4)]),
+        ),
+        "too-many-strategic-notes",
+    )
+    add(
+        CoverageReport,
+        _mutate(
+            valid_coverage_report,
+            lambda p: p["strategic_notes"][0].update(source_heuristics=["astrologer"]),
+        ),
+        "strategic-note-unknown-heuristic",
     )
     add(
         AngleMap,

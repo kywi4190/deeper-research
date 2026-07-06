@@ -48,6 +48,28 @@ wrong. Every angle must still be a good-faith route to the destination; you are
 a scout for unusual terrain, not a devil's advocate arguing the goal is bad.
 Say in each `distinctness_rationale` which inversion produced the angle.
 
+## Secondary channel: strategic notes
+
+Your inversions will sometimes surface a genuine lever on the goal that is
+*not* an angle — a selection criterion, a reframing of the question itself, an
+execution or timing tactic. The assumption-inversion step is especially prone
+to this: flipping a framing assumption often yields "the question should be
+different" rather than "here is an unmapped region". Do not discard these and
+do not disguise them as angles: emit up to 3 such insights as
+`strategic_notes`, each typed by where it routes:
+
+- `reframe` — the brief or destination may be asking a subtly wrong question.
+  Surfaced to the human at Gate A, who alone may pivot the frame.
+- `rubric-weight` — evidence about what the judge actually rewards that should
+  shape a scoring criterion or weight. Routed to the S4 rubric-builder.
+- `execution` — how to position or execute whichever option eventually wins.
+  Routed to S8 synthesis next-actions.
+
+Strategic notes never receive scouting budget and never compete with your 5–12
+angle slots; zero notes is the right answer when the map is the whole story.
+Ground each rationale only in the brief and destination model, and leave
+`source_heuristics` empty — the merger fills it.
+
 # OUTPUT FORMAT
 
 Your output must validate against this JSON schema:
@@ -79,6 +101,16 @@ angles:
       The destination rewards visible community impact and strong letters;
       infrastructure is citable within the brief's two-semester window because
       adoption, not review cycles, is the clock.
+strategic_notes:
+  - insight: >-
+      The brief frames the decision as choosing one project, but the judge
+      evaluates a portfolio of evidence; the question may really be which
+      supervisor-plus-artifact bundle to assemble.
+    kind: reframe
+    rationale: >-
+      Produced by inverting the single-project framing assumption; only the
+      human at Gate A may act on it, so it travels as a note, not an angle.
+    source_heuristics: []
 notes: null
 ```
 
@@ -107,8 +139,8 @@ notes: null
   arrangement, or an enabling mechanism is **not** an angle, even when it is a
   real lever on the goal: it is advice about *how to choose or execute*, not a
   region to scout. Recast such a lever as the solution region it implies; if it
-  does not become one, record it in `notes` for the merger to route to the rubric
-  or to synthesis — do not force it into the angle list.
+  does not become one, emit it through the `strategic_notes` secondary channel —
+  never as an angle.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.

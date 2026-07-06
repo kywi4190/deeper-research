@@ -3,14 +3,56 @@
 The merger produces the map from the cartographer ensemble's raw angles. The
 dedup map is load-bearing: the orchestrator's saturation rule computes marginal
 novelty per cartographer from it (new distinct angles / total angles).
+
+Strategic notes are the quarantined side channel for meta-strategy insights
+(README "Design deviations"): real levers on the goal that are not scoutable
+solution regions. They surface at Gate A and route onward by kind; they never
+enter S2 allocation, S3 scouting, or S5 screening.
 """
 
 from __future__ import annotations
+
+from enum import StrEnum
 
 from pydantic import Field, model_validator
 
 from .base import ArtifactModel, NonEmptyStr, Probability, Slug
 from .common import Heuristic
+
+
+class StrategicNoteKind(StrEnum):
+    """Where a strategic note routes downstream."""
+
+    REFRAME = "reframe"  # the brief/destination may ask a subtly wrong question -> Gate A
+    RUBRIC_WEIGHT = "rubric-weight"  # what the judge actually rewards -> S4 rubric-builder
+    EXECUTION = "execution"  # how to execute/position whichever option wins -> S8 synthesis
+
+
+class StrategicNote(ArtifactModel):
+    """A meta-strategy insight that is deliberately NOT an angle.
+
+    Selection criteria, goal reframes, and execution/timing tactics are real
+    levers but not regions a scout can populate with option cards, so they
+    travel here instead of the angle list. The human at Gate A reads them (and
+    alone may enact a reframe, per P7/P8); rubric-weight notes feed the S4
+    rubric-builder; execution notes feed S8 next-actions. This channel never
+    receives scouting budget.
+    """
+
+    insight: NonEmptyStr
+    kind: StrategicNoteKind = Field(
+        description="Routing: 'reframe' -> Gate A frame review; 'rubric-weight' -> "
+        "S4 rubric-builder; 'execution' -> S8 synthesis next-actions."
+    )
+    rationale: NonEmptyStr = Field(
+        description="Why this lever matters, grounded only in the brief and "
+        "destination model — never in preferences."
+    )
+    source_heuristics: list[Heuristic] = Field(
+        default_factory=list,
+        description="Filled by the merger: which cartographer framings proposed or "
+        "corroborated this note. Cartographers leave it empty.",
+    )
 
 
 class RawAngle(ArtifactModel):
@@ -46,6 +88,12 @@ class CartographerReport(ArtifactModel):
         max_length=12,
         description="Target 5-12 candidate angles; fewer than 5 only when the "
         "heuristic genuinely yields a narrow harvest (say why in notes).",
+    )
+    strategic_notes: list[StrategicNote] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Secondary channel: up to 3 meta-strategy levers that are not "
+        "angles. Zero is the right answer when the map is the whole story.",
     )
     notes: str | None = None
 
@@ -128,5 +176,11 @@ class CoverageReport(ArtifactModel):
     thin_areas: list[NonEmptyStr] = Field(
         default_factory=list,
         description="Regions the merger suspects are under-mapped — Gate A review fodder.",
+    )
+    strategic_notes: list[StrategicNote] = Field(
+        default_factory=list,
+        description="Merger-deduplicated strategic notes from the ensemble, with "
+        "source_heuristics filled. Surfaced at Gate A; kind routes them onward "
+        "(rubric-weight -> S4, execution -> S8, reframe -> the human's call).",
     )
     notes: str | None = None

@@ -13,6 +13,8 @@ from .angles import (
     CoverageReport,
     DedupEntry,
     RawAngle,
+    StrategicNote,
+    StrategicNoteKind,
     SubAngle,
 )
 from .base import (
@@ -129,6 +131,8 @@ __all__ = [
     "CoverageReport",
     "DedupEntry",
     "RawAngle",
+    "StrategicNote",
+    "StrategicNoteKind",
     "SubAngle",
     # S2 allocation
     "AllocationKind",

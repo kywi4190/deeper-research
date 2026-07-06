@@ -12,6 +12,52 @@
       ],
       "title": "Heuristic",
       "type": "string"
+    },
+    "StrategicNote": {
+      "additionalProperties": false,
+      "description": "A meta-strategy insight that is deliberately NOT an angle.\n\nSelection criteria, goal reframes, and execution/timing tactics are real\nlevers but not regions a scout can populate with option cards, so they\ntravel here instead of the angle list. The human at Gate A reads them (and\nalone may enact a reframe, per P7/P8); rubric-weight notes feed the S4\nrubric-builder; execution notes feed S8 next-actions. This channel never\nreceives scouting budget.",
+      "properties": {
+        "insight": {
+          "minLength": 1,
+          "title": "Insight",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/StrategicNoteKind",
+          "description": "Routing: 'reframe' -> Gate A frame review; 'rubric-weight' -> S4 rubric-builder; 'execution' -> S8 synthesis next-actions."
+        },
+        "rationale": {
+          "description": "Why this lever matters, grounded only in the brief and destination model \u2014 never in preferences.",
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "source_heuristics": {
+          "description": "Filled by the merger: which cartographer framings proposed or corroborated this note. Cartographers leave it empty.",
+          "items": {
+            "$ref": "#/$defs/Heuristic"
+          },
+          "title": "Source Heuristics",
+          "type": "array"
+        }
+      },
+      "required": [
+        "insight",
+        "kind",
+        "rationale"
+      ],
+      "title": "StrategicNote",
+      "type": "object"
+    },
+    "StrategicNoteKind": {
+      "description": "Where a strategic note routes downstream.",
+      "enum": [
+        "reframe",
+        "rubric-weight",
+        "execution"
+      ],
+      "title": "StrategicNoteKind",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -39,6 +85,14 @@
         "type": "string"
       },
       "title": "Thin Areas",
+      "type": "array"
+    },
+    "strategic_notes": {
+      "description": "Merger-deduplicated strategic notes from the ensemble, with source_heuristics filled. Surfaced at Gate A; kind routes them onward (rubric-weight -> S4, execution -> S8, reframe -> the human's call).",
+      "items": {
+        "$ref": "#/$defs/StrategicNote"
+      },
+      "title": "Strategic Notes",
       "type": "array"
     },
     "notes": {

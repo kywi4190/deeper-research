@@ -35,7 +35,7 @@ state of a run.
 | `src/deeper/orchestrator/` | State machine, gates, CLI | stub (Prompt 6) |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema + prompt-library suites (175 tests) |
+| `tests/` | Pytest suite | schema + prompt-library suites (190 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -73,7 +73,7 @@ each model validates a single file.
 | `preferences.yaml` | `Preferences` | S0 interviewer | S5 screener, S8 synthesist (quarantined) |
 | `angles/raw/{heuristic}.yaml` | `CartographerReport` (`RawAngle`) | S1 cartographers | S1 merger, saturation rule |
 | `angles/map.yaml` | `AngleMap` (`Angle`, `DedupEntry`) | S1 merger | Gate A, S2, S7 frame-check |
-| `angles/map-report.md` | `CoverageReport` | S1 merger | Gate A, S7 frame-check |
+| `angles/map-report.md` | `CoverageReport` | S1 merger | Gate A, S4 rubric-builder + S7 frame-check + S8 (strategic notes, by kind) |
 | `allocation.yaml` | `AllocationTable` | S2 (pure code) | S3, report appendix |
 | `options/{angle}/cards.yaml` | `OptionCardSet` (`OptionCard`, `KillRisk`) | S3 scout | S4, S5, S6 |
 | `options/{angle}/critique.md` | `CardCritique` | S3 card-critic | S3 revision/reflow, S7 frame-check |
@@ -130,6 +130,13 @@ because the destination model anchors the whole run; card-critic/screener → so
 The six cartographers share a skeleton but carry genuinely distinct framing-heuristic
 sections — ensemble diversity is the breadth mechanism (design P3) — and a test
 asserts the sections differ.
+
+Cartographers also have a **strategic-notes secondary channel** (see Design
+deviations): typed meta-strategy insights (`reframe` / `rubric-weight` /
+`execution`) that are real levers on the goal but not scoutable angles. The merger
+dedups them into the coverage report with heuristic attribution; they surface at
+Gate A and route onward by kind, and are structurally quarantined from allocation,
+scouting, and screening.
 
 ## The prompt-lab (`deeper-lab`)
 
@@ -189,6 +196,20 @@ canonical `Makefile` is used wherever GNU make is available.
   raw angle deliberately has a prose `relevance_rationale` and *no* numeric prior
   (priors are the merger's job). The schema accepts 3–12 angles rather than hard 5–12,
   so a genuinely narrow heuristic harvest doesn't force retry-loop padding.
+- **Strategic-notes side channel (`StrategicNote`).** M0 live runs showed the
+  analogist/contrarian cartographers' sharpest insights for positioning-type goals
+  are often meta-strategies (selection criteria, goal reframes, execution timing) —
+  real levers, but not regions a scout can populate with option cards; as angles
+  they would break S3 scouting and S5's like-for-like scoring. Instead of
+  discarding them, `CartographerReport` and `CoverageReport` carry an optional
+  `strategic_notes` list (insight, kind: `reframe`|`rubric-weight`|`execution`,
+  rationale, merger-filled `source_heuristics`). Routing: all surface at Gate A;
+  rubric-weight → S4 rubric-builder as candidate judge-reward evidence; execution →
+  S8 next-actions; reframe → enacted only by the human at a gate (P7/P8 —
+  exploration agents propose, never redefine the goal). The channel never enters
+  S2 allocation, S3 scouting, or S5 screening. The design doc doesn't name this
+  artifact; it extends §11's notes-as-schema-inbox pattern into a typed field, and
+  the build guide's Prompts 7/8/11/12 now wire the routing.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's

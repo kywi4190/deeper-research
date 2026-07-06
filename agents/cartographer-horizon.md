@@ -50,6 +50,26 @@ trajectory says they may matter by the time this decision pays off.
    Screening will price the risk; your job is only that the map shows the
    frontier.
 
+## Secondary channel: strategic notes
+
+Trajectory scanning sometimes surfaces a genuine lever on the goal that is
+*not* an angle — a timing insight ("the window for X opens after the decision
+pays off"), a shift in what the judge will reward by evaluation time, a
+positioning tactic. Do not discard it and do not disguise it as an angle: emit
+up to 3 such insights as `strategic_notes`, each typed by where it routes:
+
+- `reframe` — the brief or destination may be asking a subtly wrong question.
+  Surfaced to the human at Gate A, who alone may pivot the frame.
+- `rubric-weight` — evidence about what the judge actually rewards that should
+  shape a scoring criterion or weight. Routed to the S4 rubric-builder.
+- `execution` — how to position or execute whichever option eventually wins.
+  Routed to S8 synthesis next-actions.
+
+Strategic notes never receive scouting budget and never compete with your 5–12
+angle slots; zero notes is the right answer when the map is the whole story.
+Ground each rationale only in the brief and destination model, and leave
+`source_heuristics` empty — the merger fills it.
+
 # OUTPUT FORMAT
 
 Your output must validate against this JSON schema:
@@ -81,6 +101,16 @@ angles:
       The destination's judges evaluate in ~18 months; the trajectory suggests
       reviewer demand will exceed supply by then, and the brief's compute cap
       fits evaluation-scale work today.
+strategic_notes:
+  - insight: >-
+      The judge evaluates in ~18 months; work released publicly before the
+      evaluation window compounds visibility, so release timing matters as much
+      as topic choice for rising areas.
+    kind: execution
+    rationale: >-
+      A trajectory observation about when the destination's judges look, not a
+      region of the solution space; applies to whichever option wins.
+    source_heuristics: []
 notes: null
 ```
 
@@ -111,8 +141,8 @@ notes: null
   arrangement, or an enabling mechanism is **not** an angle, even when it is a
   real lever on the goal: it is advice about *how to choose or execute*, not a
   region to scout. Recast such a lever as the solution region it implies; if it
-  does not become one, record it in `notes` for the merger to route to the rubric
-  or to synthesis — do not force it into the angle list.
+  does not become one, emit it through the `strategic_notes` secondary channel —
+  never as an angle.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.

@@ -21,8 +21,8 @@ From the raw cartographer reports plus the brief and destination model, produce:
 
 1. **angle-map** — deduplicated angles with a two-level taxonomy where
    warranted, a relevance prior per angle, and a complete dedup map.
-2. **coverage-report** — which heuristics contributed which angles, and where
-   the map feels thin.
+2. **coverage-report** — which heuristics contributed which angles, where the
+   map feels thin, and the ensemble's deduplicated strategic notes.
 
 ## Merging discipline
 
@@ -61,6 +61,18 @@ Report `contributions` (heuristic → merged angle ids it contributed) and
 varied, taxonomy categories nobody imported, judges in the destination model no
 angle serves. This is Gate A's checklist; honest thinness here is worth more
 than false completeness.
+
+## Strategic notes
+
+The raw reports may carry `strategic_notes` — meta-strategy levers that are
+deliberately not angles (reframes of the question, judge-reward evidence,
+execution tactics). Aggregate them into the coverage-report's
+`strategic_notes`: merge near-duplicates keeping the sharpest wording, fill
+`source_heuristics` with every framing that proposed or corroborated each note
+(independent corroboration is signal — preserve it), and keep the `kind` that
+best fits the merged wording. Two hard rules: never promote a note into an
+angle, and never remove or demote an angle because a note argues the frame is
+wrong — reframes are the human's call at Gate A, not yours.
 
 # OUTPUT FORMAT
 
@@ -113,6 +125,15 @@ contributions:
 thin_areas:
   - >-
     No angle serves the destination's second judge (letter writers) directly.
+strategic_notes:
+  - insight: >-
+      The letter-writer's community standing may outweigh the project topic in
+      the judge's actual reward function.
+    kind: rubric-weight
+    rationale: >-
+      Grounded in the destination's letters reward signal; proposed
+      independently by two framings, which strengthens it as rubric evidence.
+    source_heuristics: [analogist, contrarian]
 notes: null
 ```
 

@@ -47,6 +47,26 @@ categorization — your value is fidelity to published structure, not invention.
    map contain that mine misses?"** Run it once more against your own draft
    before emitting.
 
+## Secondary channel: strategic notes
+
+Reading published maps sometimes surfaces a genuine lever on the goal that is
+*not* an angle — a taxonomy's framing may reveal that the brief asks a subtly
+different question than the field does, or a survey may carry evidence about
+what the judge rewards. Do not discard it and do not disguise it as an angle:
+emit up to 3 such insights as `strategic_notes`, each typed by where it routes:
+
+- `reframe` — the brief or destination may be asking a subtly wrong question.
+  Surfaced to the human at Gate A, who alone may pivot the frame.
+- `rubric-weight` — evidence about what the judge actually rewards that should
+  shape a scoring criterion or weight. Routed to the S4 rubric-builder.
+- `execution` — how to position or execute whichever option eventually wins.
+  Routed to S8 synthesis next-actions.
+
+Strategic notes never receive scouting budget and never compete with your 5–12
+angle slots; zero notes is the right answer when the map is the whole story.
+Ground each rationale only in the brief and destination model, and leave
+`source_heuristics` empty — the merger fills it.
+
 # OUTPUT FORMAT
 
 Your output must validate against this JSON schema:
@@ -78,6 +98,15 @@ angles:
       The destination rewards publishable rigor; published taxonomies give this
       category its own venues and tracks, and the brief's compute cap fits
       evaluation-scale work.
+strategic_notes:
+  - insight: >-
+      Venue taxonomies separate contribution types the brief's framing merges;
+      the judge may reward a datasets-track paper as highly as a methods paper.
+    kind: rubric-weight
+    rationale: >-
+      Extracted from published venue track structures; shapes how the S4 rubric
+      should anchor publication potential, not where the map draws regions.
+    source_heuristics: []
 notes: null
 ```
 
@@ -108,8 +137,8 @@ notes: null
   arrangement, or an enabling mechanism is **not** an angle, even when it is a
   real lever on the goal: it is advice about *how to choose or execute*, not a
   region to scout. Recast such a lever as the solution region it implies; if it
-  does not become one, record it in `notes` for the merger to route to the rubric
-  or to synthesis — do not force it into the angle list.
+  does not become one, emit it through the `strategic_notes` secondary channel —
+  never as an angle.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.
