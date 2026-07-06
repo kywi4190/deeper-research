@@ -56,6 +56,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -63,16 +68,19 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: practitioner
 angles:
   - name: Join an established lab project
-    definition: Take a scoped slice of a faculty lab's ongoing research agenda
-      as the senior project — the observed default for admitted applicants.
-    distinctness_rationale: The largest observed cluster in admissions-forum
-      threads and faculty advice posts; distinct because ownership and topic
-      are inherited, not originated.
+    definition: >-
+      Take a scoped slice of a faculty lab's ongoing research agenda as the
+      senior project: the observed default for admitted applicants.
+    distinctness_rationale: >-
+      The largest observed cluster in admissions-forum threads and faculty
+      advice posts; distinct because ownership and topic are inherited, not
+      originated.
     example_options: [ablation study within an existing lab paper, extending a
         lab's benchmark to a new domain]
-    relevance_rationale: The destination rewards strong letters and publication
-      odds; practitioner reports consistently attribute both to embedded lab
-      work, and the brief's supervisor requirement points the same way.
+    relevance_rationale: >-
+      The destination rewards strong letters and publication odds; practitioner
+      reports consistently attribute both to embedded lab work, and the brief's
+      supervisor requirement points the same way.
 notes: null
 ```
 

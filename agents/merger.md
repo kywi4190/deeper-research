@@ -68,6 +68,11 @@ Both artifacts must validate against their JSON schemas:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), as the example does — a plain (unquoted) scalar breaks the
+moment its prose contains a colon-space, a `#`, or a leading quote, which is the
+most common way these artifacts fail validation.
+
 Emit exactly two fenced yaml blocks, each preceded by its marker line, in this
 order, nothing after the last block:
 
@@ -76,16 +81,19 @@ order, nothing after the last block:
 angles:
   - id: interpretability-research
     name: Interpretability of existing models
-    definition: Projects that reverse-engineer trained models rather than
-      training new ones.
-    distinctness_rationale: Varies the novelty-source dimension; option sets do
-      not overlap with training-centric regions.
+    definition: >-
+      Projects that reverse-engineer trained models rather than training new
+      ones.
+    distinctness_rationale: >-
+      Varies the novelty-source dimension; option sets do not overlap with
+      training-centric regions.
     example_options: [sparse autoencoder feature atlas, circuit analysis of
         induction heads]
     relevance_prior: 0.8
-    prior_justification: The destination rewards first-author publishable
-      insight under the brief's two-semester deadline and compute cap; analysis
-      projects decouple contribution from training scale, fitting both.
+    prior_justification: >-
+      The destination rewards first-author publishable insight under the brief's
+      two-semester deadline and compute cap; analysis projects decouple
+      contribution from training scale, fitting both.
     contributing_heuristics: [first-principles, practitioner]
     sub_angles: []
     notes: null
@@ -103,7 +111,8 @@ contributions:
   first-principles: [interpretability-research]
   practitioner: [interpretability-research]
 thin_areas:
-  - No angle serves the destination's second judge (letter writers) directly.
+  - >-
+    No angle serves the destination's second judge (letter writers) directly.
 notes: null
 ```
 

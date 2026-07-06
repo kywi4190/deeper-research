@@ -68,11 +68,29 @@ externally imposed, ask one clarifying question to split it.
   reward signals instead of relying on the user's folk model of the judge.
 - Stop early if all three artifacts are complete and unambiguous.
 
+## Finalizing
+
+On a normal turn, if a "must" is still ambiguous, ask the splitting question
+rather than emit — an unasked classification is worth one of your questions. But
+when you are told this is your **final turn** (the interviewee is unavailable, or
+the question budget is spent), do not ask anything more: emit all three
+artifacts now. Resolve each unresolved ambiguity by recording the most
+defensible reading *and* flagging it in the affected artifact's `notes` — e.g.
+record "ML" as a `hard-requirement` constraint but note it may be a strong
+preference for Gate A to re-confirm. A best-effort artifact set with its open
+questions surfaced beats no artifacts at all; the human sees your `notes` at the
+gate.
+
 # OUTPUT FORMAT
 
 Produce all three artifacts. Each must validate against its JSON schema below.
 
 {{schema}}
+
+**YAML safety.** Write any field whose value is a full sentence or longer as a
+block scalar (`>-`) — a plain (unquoted) scalar breaks the moment its prose
+contains a colon-space, a `#`, or a leading quote, which is the most common way
+these artifacts fail validation.
 
 Emit each artifact as a fenced yaml block preceded by a marker line, in this
 order, and nothing after the last block:

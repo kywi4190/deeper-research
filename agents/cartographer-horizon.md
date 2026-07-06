@@ -56,6 +56,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -63,16 +68,19 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: horizon-scanner
 angles:
   - name: Safety evaluations of agentic systems
-    definition: Projects that build or run evaluations of autonomous LLM-agent
-      behavior, an emerging subfield adjacent to mainstream benchmarking.
-    distinctness_rationale: Rising, not established — new dedicated workshops
-      and funder interest within the last two years, while survey taxonomies
-      do not yet list it as a standing category.
+    definition: >-
+      Projects that build or run evaluations of autonomous LLM-agent behavior,
+      an emerging subfield adjacent to mainstream benchmarking.
+    distinctness_rationale: >-
+      Rising, not established: new dedicated workshops and funder interest within
+      the last two years, while survey taxonomies do not yet list it as a
+      standing category.
     example_options: [red-team evaluation suite for tool-using agents, replication
         of a recent agent-benchmark paper with a new failure taxonomy]
-    relevance_rationale: The destination's judges evaluate in ~18 months; the
-      trajectory suggests reviewer demand will exceed supply by then, and the
-      brief's compute cap fits evaluation-scale work today.
+    relevance_rationale: >-
+      The destination's judges evaluate in ~18 months; the trajectory suggests
+      reviewer demand will exceed supply by then, and the brief's compute cap
+      fits evaluation-scale work today.
 notes: null
 ```
 

@@ -60,6 +60,12 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), as the example does — a plain (unquoted) scalar breaks the
+moment its prose contains a colon-space, a `#`, or a leading quote (this bites
+the anchored level descriptions and measurement methods especially), which is
+the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: rubric
@@ -67,11 +73,13 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 criteria:
   - id: publication-potential
     name: Publication potential
-    definition: Likelihood the project yields a first-author artifact accepted
-      at a venue the destination's judges recognize, within the deadline.
-    measurement_method: Check acceptance rates and review timelines of the
-      venues this option targets; find comparable published projects of similar
-      scope and count how many cleared review within two semesters.
+    definition: >-
+      Likelihood the project yields a first-author artifact accepted at a venue
+      the destination's judges recognize, within the deadline.
+    measurement_method: >-
+      Check acceptance rates and review timelines of the venues this option
+      targets; find comparable published projects of similar scope and count how
+      many cleared review within two semesters.
     levels:
       1: No plausible publishable artifact within the deadline.
       2: Workshop-note plausible only if everything goes right.
@@ -80,8 +88,9 @@ criteria:
       5: Multiple comparable projects of this exact shape published at top
         venues within the timeframe.
     weight: 0.35
-    justification: The destination's primary judge (admissions committees)
-      lists first-author publications as its strongest reward signal.
+    justification: >-
+      The destination's primary judge (admissions committees) lists first-author
+      publications as its strongest reward signal.
   # ... 4-8 more criteria; weights sum to exactly 1.0
 preference_slot:
   weight: 0.2

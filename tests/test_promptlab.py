@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 from deeper.promptlab import (
     AGENTS_DIR,
     SCHEMAS_DIR,
+    YAML_BLOCK_RE,
     app,
     assemble,
     parse_agent,
@@ -93,6 +94,21 @@ def test_contract_assembles_completely(path: Path) -> None:
     assert '"properties"' in contract  # a JSON schema actually got inlined
     assert "# INPUTS" in contract and "### input: brief" in contract
     assert "# BUDGET" in contract
+
+
+@pytest.mark.parametrize("path", AGENT_PATHS, ids=AGENT_IDS)
+def test_worked_examples_are_parseable_yaml(path: Path) -> None:
+    # A prompt that teaches unparseable YAML makes every agent fight the schema.
+    # (Regression guard from the M0 loop: the first live cartographer emitted an
+    # unquoted scalar with a colon, so the examples now model block scalars.)
+    _, body = parse_agent(path)
+    blocks = YAML_BLOCK_RE.findall(body)
+    assert blocks, f"{path.name} has no worked ```yaml example"
+    for i, block in enumerate(blocks):
+        try:
+            yaml.safe_load(block)
+        except yaml.YAMLError as err:  # pragma: no cover - failure message only
+            raise AssertionError(f"{path.name} example block {i} is not valid YAML: {err}") from err
 
 
 @pytest.mark.parametrize("path", AGENT_PATHS, ids=AGENT_IDS)

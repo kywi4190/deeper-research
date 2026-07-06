@@ -48,6 +48,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), as the example does — a plain (unquoted) scalar breaks the
+moment its prose contains a colon-space, a `#`, or a leading quote, which is the
+most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: card-critique
@@ -55,17 +60,20 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 angle_id: interpretability-research
 completeness_issues:
   - card_id: sae-feature-atlas
-    issue: The single evidence item is tiered T1 but points at a blog summary of
-      the paper, not the paper itself; and no kill-risk covers SAE training
-      compute exceeding the lab's cap, which is plausible and cheaply checkable.
+    issue: >-
+      The single evidence item is tiered T1 but points at a blog summary of the
+      paper, not the paper itself; and no kill-risk covers SAE training compute
+      exceeding the lab's cap, which is plausible and cheaply checkable.
 redundancy_pct: 20
 distinctness_issues:
   - card_ids: [sae-feature-atlas, sae-feature-browser]
-    rationale: Both reduce to "train SAEs on the same model and publish the
-      features"; a screener would score them identically on every criterion —
-      the browser is a presentation layer, not a different option.
+    rationale: >-
+      Both reduce to training SAEs on the same model and publishing the
+      features; a screener would score them identically on every criterion — the
+      browser is a presentation layer, not a different option.
 missed_options:
-  - Circuit-level analysis of a published model capability (distinct method
+  - >-
+    Circuit-level analysis of a published model capability (distinct method
     family with existing tooling, absent from the set)
 notes: null
 ```

@@ -54,6 +54,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -61,16 +66,19 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: contrarian
 angles:
   - name: Infrastructure contribution instead of a study
-    definition: Build a benchmark, dataset, or tool the target research community
-      adopts, rather than running a study of your own.
-    distinctness_rationale: Produced by the indirect-achievement inversion — the
-      judge rewards evidence of research ability, and adopted infrastructure
-      generates citations and letters without a hypothesis-driven project.
+    definition: >-
+      Build a benchmark, dataset, or tool the target research community adopts,
+      rather than running a study of your own.
+    distinctness_rationale: >-
+      Produced by the indirect-achievement inversion: the judge rewards evidence
+      of research ability, and adopted infrastructure generates citations and
+      letters without a hypothesis-driven project.
     example_options: [evaluation harness for a niche task family, curated dataset
         with a data statement]
-    relevance_rationale: The destination rewards visible community impact and
-      strong letters; infrastructure is citable within the brief's two-semester
-      window because adoption, not review cycles, is the clock.
+    relevance_rationale: >-
+      The destination rewards visible community impact and strong letters;
+      infrastructure is citable within the brief's two-semester window because
+      adoption, not review cycles, is the clock.
 notes: null
 ```
 

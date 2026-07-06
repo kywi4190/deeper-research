@@ -78,6 +78,12 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), as the example does — a plain (unquoted) scalar breaks the
+moment its prose contains a colon-space, a `#`, or a leading quote (evidence
+pointers and kill-risk facts especially), which is the most common way these
+artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: screening-result
@@ -89,16 +95,19 @@ options:
       - criterion_id: publication-potential
         score: 3.5
         band: {lo: 2.0, hi: 5.0}
-        evidence_pointer: Card's preliminary_evidence item 1 only — no external
-          confirmation of venue fit; band widened accordingly.
+        evidence_pointer: >-
+          Card's preliminary_evidence item 1 only — no external confirmation of
+          venue fit; band widened accordingly.
     preference_score:
       criterion_id: preference-slot
       score: 4.5
       band: {lo: 4.0, hi: 5.0}
-      evidence_pointer: preferences item 1 ("fascinated by mechanistic
-        interpretability", strength strong) matches the option directly.
+      evidence_pointer: >-
+        preferences item 1 (fascinated by mechanistic interpretability, strength
+        strong) matches the option directly.
     kill_risk_checks:
-      - fact: Target model's activations not accessible at needed hook points
+      - fact: >-
+          Target model's activations not accessible at needed hook points
         outcome: cleared
         evidence: {url: "https://docs.example.dev/hooks", tier: T1, title: Hook
             point reference}

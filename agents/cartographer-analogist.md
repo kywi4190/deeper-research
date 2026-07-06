@@ -55,6 +55,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -62,16 +67,19 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: analogist
 angles:
   - name: Portfolio-of-small-bets
-    definition: Several small, independent artifacts instead of one thesis-scale
-      project, assembled into a coherent research portfolio.
-    distinctness_rationale: Imported from early-stage investing and artistic
-      portfolios, where evaluators reward demonstrated range plus one spike;
-      no other framing varies the number of artifacts.
+    definition: >-
+      Several small, independent artifacts instead of one thesis-scale project,
+      assembled into a coherent research portfolio.
+    distinctness_rationale: >-
+      Imported from early-stage investing and artistic portfolios, where
+      evaluators reward demonstrated range plus one spike; no other framing
+      varies the number of artifacts.
     example_options: [three workshop-paper-sized studies, reproduction study plus
         an extension note]
-    relevance_rationale: The destination's judges read many applications quickly;
-      adjacent gatekeeper-evaluation domains show breadth-plus-spike portfolios
-      surviving that reading pattern, and the brief's deadline permits small bets.
+    relevance_rationale: >-
+      The destination's judges read many applications quickly; adjacent
+      gatekeeper-evaluation domains show breadth-plus-spike portfolios surviving
+      that reading pattern, and the brief's deadline permits small bets.
 notes: null
 ```
 

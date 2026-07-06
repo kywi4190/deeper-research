@@ -3,8 +3,11 @@
 # the interviewer should treat the transcript as the answers it has so far.
 description: S0 intake for the senior-project scenario, from a simulated transcript.
 budget: >-
-  You have at most 3 web searches, only to verify destination-facts. You have
-  already spent 5 of your 8 interview questions producing the transcript below.
+  You have at most 3 web searches, only to verify destination-facts. This is your
+  FINAL interview turn — the interviewee is unavailable for further questions, so
+  do not ask anything; finalize and emit all three artifacts now, recording any
+  unresolved ambiguity (such as whether "ML" is a hard constraint or a strong
+  preference) in the relevant artifact's notes.
 inputs:
   goal: |
     Which senior research project should I pick to best position myself for

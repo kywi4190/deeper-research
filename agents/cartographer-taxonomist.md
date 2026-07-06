@@ -53,6 +53,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -60,16 +65,19 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: taxonomist
 angles:
   - name: Empirical benchmarking studies
-    definition: Projects whose contribution is a controlled comparison of
-      existing methods on a shared task.
-    distinctness_rationale: A standing category in ML survey taxonomies (e.g.
-      "evaluation & benchmarking" tracks at major venues), separate from
-      method-development categories in every source consulted.
+    definition: >-
+      Projects whose contribution is a controlled comparison of existing methods
+      on a shared task.
+    distinctness_rationale: >-
+      A standing category in ML survey taxonomies (for example, evaluation and
+      benchmarking tracks at major venues), separate from method-development
+      categories in every source consulted.
     example_options: [reproducibility study across published baselines,
         systematic comparison of fine-tuning strategies on one task]
-    relevance_rationale: The destination rewards publishable rigor; published
-      taxonomies give this category its own venues and tracks, and the brief's
-      compute cap fits evaluation-scale work.
+    relevance_rationale: >-
+      The destination rewards publishable rigor; published taxonomies give this
+      category its own venues and tracks, and the brief's compute cap fits
+      evaluation-scale work.
 notes: null
 ```
 

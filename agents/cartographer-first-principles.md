@@ -53,6 +53,11 @@ Your output must validate against this JSON schema:
 
 {{schema}}
 
+**YAML safety.** Write every field whose value is a full sentence or longer as a
+block scalar (`>-`), exactly as the example does — a plain (unquoted) scalar
+breaks the moment its prose contains a colon-space, a `#`, or a leading quote,
+which is the most common way these artifacts fail validation.
+
 Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 
 ### artifact: cartographer-report
@@ -60,14 +65,17 @@ Emit exactly one fenced yaml block preceded by the marker line, nothing after:
 heuristic: first-principles
 angles:
   - name: Interpretability of existing models
-    definition: Projects that reverse-engineer the internals of trained models
-      rather than training new ones.
-    distinctness_rationale: Varies the "novelty source" dimension — insight into
-      existing artifacts vs construction of new ones — orthogonal to model scale.
+    definition: >-
+      Projects that reverse-engineer the internals of trained models rather than
+      training new ones.
+    distinctness_rationale: >-
+      Varies the novelty-source dimension: insight into existing artifacts vs
+      construction of new ones, orthogonal to model scale.
     example_options: [sparse autoencoder feature atlas for a small LM, circuit
         analysis of induction heads]
-    relevance_rationale: The destination rewards first-author publishable insight
-      under a two-semester deadline; analysis projects decouple contribution from
+    relevance_rationale: >-
+      The destination rewards first-author publishable insight under a
+      two-semester deadline; analysis projects decouple contribution from
       training compute, which the brief caps.
 notes: null
 ```
