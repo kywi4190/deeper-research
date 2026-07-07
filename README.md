@@ -13,12 +13,14 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Schema layer + agent prompt library + prompt-lab complete (Phase A, Prompts 2–3).**
+**Phase A complete; Phase B deterministic substrate built (Prompt 4).**
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an
-LLM-facing validation-error formatter, and a generated JSON Schema in `schemas/`. The
-versioned agent prompts for stages 0–5 live in `agents/`, and a throwaway-quality
-`deeper-lab` CLI assembles/runs single agent contracts against fixtures for prompt
-iteration (design-doc M0). No stages, orchestrator, or main CLI yet.
+LLM-facing validation-error formatter, and a generated JSON Schema in `schemas/`; the
+versioned agent prompts for stages 0–5 live in `agents/` with the `deeper-lab`
+prompt-iteration harness (design-doc M0). On top of that, the no-LLM substrate now
+exists: the git-backed run **workspace** (`workspace.py`), the **run profiles /
+config loader** (`config.py`), and the **S2 budget allocator + reflow**
+(`allocation.py`). No agent dispatch, stages, orchestrator, or main CLI yet.
 
 ## Architecture map
 
@@ -30,12 +32,15 @@ state of a run.
 |---|---|---|
 | `src/deeper/schemas/` | Pydantic artifact models — the stage-to-stage contracts | **built** |
 | `schemas/` | Generated JSON Schema exports (inlined into agent prompts); regenerate with `make schemas` | **generated** |
+| `src/deeper/workspace.py` | Run workspace: §7 directory tree, git audit trail, schema-checked artifact I/O, state resume | **built** |
+| `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
+| `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | stub (Prompt 5) |
 | `src/deeper/stages/` | Per-stage logic S0–S8 | stub (Prompts 7–12) |
 | `src/deeper/orchestrator/` | State machine, gates, CLI | stub (Prompt 6) |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema + prompt-library suites (190 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation suites (555 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -158,6 +163,51 @@ scenario: `interview-opening.yaml` (S0), `senior-project.yaml` (brief + destinat
 for cartographers/rubric), `angle-interpretability.yaml` (adds one angle + allocation,
 for scout/card-critic).
 
+## The run workspace
+
+`Workspace.create(root, config)` builds the design-§7 directory tree
+(`angles/raw`, `gates`, `options`, `screening`, `dossiers`, `tournament`, `report`,
+`sources`, `ledger`, `logs`), git-inits it with a run-local identity (so commits work
+regardless of machine git config), writes the materialized `config.yaml` and an initial
+`state.json`, and makes the first commit. Every stage completion and gate decision is
+one commit — `ws.commit(message)` or `write_artifact(..., commit_message=...)` — so
+"what changed after my Gate C feedback?" is a `git diff`, and `history()` is the audit
+trail. All artifact I/O goes through the schema layer: writes re-validate the model
+(catching post-construction mutation), dump by suffix (`.json` → JSON, else YAML), and
+land via atomic temp-file-replace; reads validate before a stage ever sees the content,
+so a corrupted file raises instead of propagating. `Workspace.open` re-validates
+`state.json`, which is the whole resumability check — state is files.
+
+## Run profiles and how budgets work
+
+`config.py` ships three profiles (design §8) as `RunConfig` defaults —
+**quick** (B=16, floor 1, 3 cartographers, shortlist 3), **standard** (B=40, floor 2,
+γ=1.0, 5 cartographers, shortlist 5), **exhaustive** (B=80, floor 3, γ=0.8, 6
+cartographers, shortlist 7) — plus the size-class table S/M/L → (model, max_searches,
+max_output_tokens) and every §12 hard cap as a number code can enforce (`HardCaps`).
+A run's `config.yaml` names a profile and overrides any field; `load_config` deep-merges
+and validates the whole thing (contradictions like a per-angle cap below the floor are
+rejected at load, not discovered mid-run).
+
+Budgets (S2, `allocation.py`, pure code per P8): given total budget **B** in units and
+per-angle relevance priors *rᵢ* from the Gate-A-approved angle map,
+
+```
+allocationᵢ = floor + (B − n·floor) · rᵢ^γ / Σⱼ rⱼ^γ
+```
+
+The **floor** is the exploration guarantee (no surviving angle gets zero attention);
+**γ** is the breadth dial (γ>1 concentrates on top angles, γ<1 flattens toward
+uniform); a **per-angle cap** (default 25% of B) keeps a dominant prior from starving
+the map, with capped angles' excess water-filled back onto the rest by the same
+proportional rule. Integer rounding is largest-remainder with deterministic
+tie-breaks, so rows always sum exactly to B (the `AllocationTable` schema re-asserts
+this). Infeasible combinations (B < n·floor, or n·cap < B) raise instead of silently
+bending a rule. `reflow()` redistributes units returned by early-stopped scouts over
+the angles whose critics flagged missed options — same formula, floor 0 (the guarantee
+was already spent) and cap 100% of the pool — and skips angles that tripped the
+redundancy stop.
+
 ## How to run
 
 There is no CLI yet — it arrives in Prompt 6 (`deeper new`, `status`, `resume`,
@@ -223,11 +273,12 @@ Following the phases in the build guide:
 
 - **Phase A — Foundation:** Prompt 1 (bootstrap) ✅ · Prompt 2 (schemas) ✅ · Prompt 3
   (agent prompts + prompt-lab) ✅.
-- **Phase B — Kernel happy path (M1):** workspace/config/allocation → dispatch layer →
-  orchestrator/CLI → stages S0–S5.
+- **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
+  dispatch layer → orchestrator/CLI → stages S0–S5.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 4 — workspace manager, config/profiles, budget allocator.**
+**Next: Phase B, Prompt 5 — SDK dispatch layer (contracts, mock mode, hooks, cost
+accounting).**
