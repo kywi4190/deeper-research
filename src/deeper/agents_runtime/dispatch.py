@@ -62,6 +62,36 @@ class _Invocation(NamedTuple):
     session_id: str | None
 
 
+class SpendCapExceeded(Exception):
+    """The run's ledger crossed config.max_spend_usd — the dispatcher refuses
+    new invocations and the orchestrator pauses the run (design §11 runaway-cost
+    mitigation). Raise the cap (config.yaml or `deeper resume --max-spend-usd`)
+    to continue; completed work is never lost."""
+
+    def __init__(self, contract: AgentContract, total_usd: float, cap_usd: float) -> None:
+        super().__init__(
+            f"spend cap crossed before dispatching '{contract.role}' "
+            f"({contract.stage.value}): ${total_usd:.4f} spent >= cap ${cap_usd:.2f}"
+        )
+        self.contract = contract
+        self.total_usd = total_usd
+        self.cap_usd = cap_usd
+
+
+class AgentDispatchFailed(Exception):
+    """The invocation itself failed (SDK/network/CLI error, missing mock
+    fixture) — an infrastructure problem, not invalid agent content. The
+    orchestrator pauses the run for human attention instead of crashing."""
+
+    def __init__(self, contract: AgentContract, cause: BaseException) -> None:
+        super().__init__(
+            f"agent '{contract.role}' ({contract.stage.value}) dispatch failed: "
+            f"{type(cause).__name__}: {cause}"
+        )
+        self.contract = contract
+        self.cause = cause
+
+
 class Dispatcher(Protocol):
     """The interface every stage codes against."""
 
@@ -94,6 +124,20 @@ class _BaseDispatcher:
             self._sem = asyncio.Semaphore(self.config.concurrency)
         return self._sem
 
+    async def _guarded_invoke(self, prompt: str, contract: AgentContract, attempt: int):
+        """Every raw invocation passes here: the spend guard runs first (an
+        in-flight batch may have crossed the cap since the stage started), then
+        the semaphore, then _invoke with infrastructure failures wrapped so the
+        orchestrator can pause instead of crash."""
+        total = self.ledger.total_usd()
+        if total >= self.config.max_spend_usd:
+            raise SpendCapExceeded(contract, total, self.config.max_spend_usd)
+        async with self._semaphore():
+            try:
+                return await self._invoke(prompt, contract, attempt)
+            except Exception as err:
+                raise AgentDispatchFailed(contract, err) from err
+
     async def run_agent(self, contract: AgentContract) -> AgentResult:
         prompt = assemble_prompt(contract)  # raises on drift before any spend
         retry_key = f"{contract.stage.value}:{contract.role}:{contract.context or '-'}"
@@ -105,8 +149,7 @@ class _BaseDispatcher:
                 if attempt == 0
                 else _RETRY_TEMPLATE.format(prompt=prompt, raw=raw, feedback=feedback)
             )
-            async with self._semaphore():
-                inv = await self._invoke(full, contract, attempt)
+            inv = await self._guarded_invoke(full, contract, attempt)
             # Every attempt is paid for, so every attempt is ledgered — before
             # validation, which may still reject the output.
             self.ledger.record(
@@ -171,8 +214,7 @@ class _BaseDispatcher:
                 raw=raw,
                 feedback=feedback,
             )
-            async with self._semaphore():
-                inv = await self._invoke(full, contract, retries)
+            inv = await self._guarded_invoke(full, contract, retries)
             self.ledger.record(
                 SpendEntry(
                     stage=contract.stage,

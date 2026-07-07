@@ -1,0 +1,215 @@
+"""M1 exit test (design §9): one full mock run through the real stage registry.
+
+A single test drives `deeper new`-equivalent state S0 → Gate A (approved with a
+prior adjustment) → S2 → S3 → S4 → Gate B (one weight override) → S5 → the S6
+stub, then surgically reruns one angle's scouting — asserting the workspace is
+exactly what the design promises at every step: validated artifacts, one commit
+per stage and gate, a populated spend ledger under the cap, resumable state,
+and precisely-scoped invalidation.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from deeper.allocation import allocate
+from deeper.orchestrator import Engine, Node
+from deeper.orchestrator.rerun import invalidate
+from deeper.schemas import (
+    AllocationTable,
+    AngleMap,
+    Brief,
+    CardCritique,
+    CartographerReport,
+    CoverageReport,
+    DestinationModel,
+    GateName,
+    GateStatus,
+    OptionCardSet,
+    Preferences,
+    Rubric,
+    RunState,
+    RunStatus,
+    ScreeningResult,
+    Shortlist,
+    Stage,
+)
+from deeper.workspace import Workspace
+
+from .helpers import make_workspace
+
+ADJUSTED_ANGLE = "evaluation-science"  # prior 0.7 in the merger fixture
+RERUN_ANGLE = "interpretability-research"
+
+GATE_A_DECISION = f"""\
+approved: true
+prior_adjustments:
+  - angle_id: {ADJUSTED_ANGLE}
+    new_prior: 0.9
+"""
+
+GATE_B_DECISION = """\
+approved: true
+preference_slot_weight: 0.25
+weight_overrides:
+  letter-strength: 0.35
+"""
+
+
+def spend_count(state: RunState, role: str, context: str | None) -> int:
+    return sum(1 for e in state.spend if e.role == role and e.context == context)
+
+
+async def test_full_mock_run_end_to_end(tmp_path):
+    ws = make_workspace(tmp_path)  # quick profile, senior-project goal, mode=mock
+    config = ws.load_config()
+    emitted: list[str] = []
+    engine = Engine(ws, emit=emitted.append)  # ask_user=None: non-interactive S0
+
+    # ---- S0 + S1 run to the first pause: Gate A -------------------------------
+    assert await engine.run() is Node.GATE_A
+    state = ws.load_state()
+    assert state.status is RunStatus.GATE_PENDING
+    assert state.pending_gate is GateName.A
+
+    # ---- Gate A: approve with one modification (a prior adjustment) -----------
+    ws.path("gates/gate-a.yaml").write_text(GATE_A_DECISION, encoding="utf-8")
+    assert await engine.run() is Node.GATE_B  # S2 → S3 → S4, pause at Gate B
+
+    angle_map = ws.read_artifact("angles/map.yaml", AngleMap)
+    priors = {a.id: a.relevance_prior for a in angle_map.angles}
+    assert priors[ADJUSTED_ANGLE] == 0.9  # the gate edit landed before S2
+
+    # S2's table is exactly the deterministic formula over the post-gate priors.
+    table = ws.read_artifact("allocation.yaml", AllocationTable)
+    expected = allocate(
+        priors,
+        total_budget_units=config.total_budget_units,
+        floor=config.floor,
+        gamma=config.gamma,
+        per_angle_cap_pct=config.per_angle_cap_pct,
+    )
+    assert table.model_dump() == expected.model_dump()
+
+    # ---- Gate B: approve with one weight adjusted ------------------------------
+    ws.path("gates/gate-b.yaml").write_text(GATE_B_DECISION, encoding="utf-8")
+    # S5 runs, then the machine parks cleanly before the unbuilt S6 (Gate C
+    # cannot become pending until S7 exists — S6/S7 arrive in Prompts 10/11).
+    assert await engine.run() is Node.S6
+
+    rubric = ws.read_artifact("rubric.yaml", Rubric)
+    weights = {c.id: c.weight for c in rubric.criteria}
+    assert weights["letter-strength"] == 0.35  # pinned by the override
+    # Untouched criteria rescaled proportionally: factor (1-0.35)/(1-0.25).
+    assert weights["publication-potential"] == pytest.approx(0.3 * 0.65 / 0.75)
+    assert sum(weights.values()) == pytest.approx(1.0)
+    assert rubric.preference_slot.weight == 0.25
+
+    # ---- every artifact in the workspace validates -----------------------------
+    ws.read_artifact("brief.md", Brief)
+    ws.read_artifact("destination.md", DestinationModel)
+    ws.read_artifact("preferences.yaml", Preferences)
+    ws.read_artifact("angles/map-report.md", CoverageReport)
+    raw_reports = sorted(ws.path("angles/raw").glob("*.yaml"))
+    assert len(raw_reports) >= config.initial_cartographers
+    for path in raw_reports:
+        ws.read_artifact(f"angles/raw/{path.name}", CartographerReport)
+    for row in table.rows:
+        assert row.units > 0  # quick profile floor=1: every angle got budget
+        ws.read_artifact(f"options/{row.angle_id}/cards.yaml", OptionCardSet)
+        ws.read_artifact(f"options/{row.angle_id}/critique.md", CardCritique)
+    ws.read_artifact("options/reflow.yaml", AllocationTable)  # reflow happened
+    ws.read_artifact("screening/scores.yaml", ScreeningResult)
+    shortlist = ws.read_artifact("screening/shortlist.md", Shortlist)
+    assert shortlist.finalist_ids  # the run produced an auditable shortlist
+
+    # ---- state.json: S5 done, gates recorded, spend ledger under the cap -------
+    state = ws.load_state()
+    assert state.stage is Stage.S6  # everything through S5 is complete
+    assert state.status is RunStatus.RUNNING  # parked, resumable when S6 lands
+    assert state.gates[GateName.A] is GateStatus.APPROVED
+    assert state.gates[GateName.B] is GateStatus.APPROVED
+    assert state.gates[GateName.C] is GateStatus.NOT_REACHED
+    assert any("not implemented yet" in m for m in emitted)
+
+    assert state.spend, "every agent invocation must land a SpendEntry"
+    roles = {e.role for e in state.spend}
+    assert {"interviewer", "merger", "scout", "card-critic", "rubric-builder", "screener"} <= roles
+    assert any(r.startswith("cartographer-") for r in roles)
+    assert not any(e.stage is Stage.S2 for e in state.spend)  # S2 is pure code
+    assert all(e.usd >= 0 and e.output_tokens > 0 for e in state.spend)
+    assert state.total_usd() <= config.max_spend_usd
+
+    # ---- git audit trail: one commit per stage completion + per gate -----------
+    subjects = ws.history()
+    for expected_subject in (
+        "run created (profile=quick)",
+        "S0 complete",
+        "S1 complete; gate-a pending",
+        "S2 complete",
+        "S3 complete",
+        "S4 complete; gate-b pending",
+        "S5 complete",
+    ):
+        assert expected_subject in subjects, f"missing commit {expected_subject!r}"
+    assert any(s.startswith("gate-a: approved") and "1 prior(s) adjusted" in s for s in subjects)
+    assert any(s.startswith("gate-b: approved") and "0.25" in s for s in subjects)
+
+    # ---- surgical rerun: --stage S3 --angle X invalidates exactly that subtree -
+    counts_before = {
+        (role, context): spend_count(state, role, context)
+        for role, context in {(e.role, e.context) for e in state.spend}
+    }
+    removed = invalidate(ws, Stage.S3, RERUN_ANGLE)
+    assert f"options/{RERUN_ANGLE}" in removed
+
+    gone = [
+        f"options/{RERUN_ANGLE}",
+        "rubric.yaml",
+        "rubric-rationale.md",
+        "screening/scores.yaml",
+        "screening/shortlist.md",
+        "gates/gate-b.yaml",
+    ]
+    for relpath in gone:
+        assert not ws.path(relpath).exists(), f"{relpath} should be invalidated"
+    survived = [
+        "brief.md",
+        "angles/map.yaml",
+        "allocation.yaml",
+        f"options/{ADJUSTED_ANGLE}/cards.yaml",
+        "options/reflow.yaml",  # the settled reflow decision is not S3-angle-scoped
+        "gates/gate-a.yaml",  # the kept Gate A decision is upstream
+    ]
+    for relpath in survived:
+        assert ws.path(relpath).exists(), f"{relpath} should survive an S3 angle rerun"
+    state = ws.load_state()
+    assert state.stage is Stage.S3
+    assert state.status is RunStatus.RUNNING
+    assert state.gates[GateName.A] is GateStatus.APPROVED  # upstream gate untouched
+    assert state.gates[GateName.B] is GateStatus.NOT_REACHED  # downstream gate reset
+    assert any(s.startswith(f"rerun S3 (angle: {RERUN_ANGLE})") for s in ws.history())
+
+    # ---- the machine walks forward again: only the invalidated angle re-scouts -
+    assert await engine.run() is Node.GATE_B
+    ws.path("gates/gate-b.yaml").write_text(
+        "approved: true\npreference_slot_weight: 0.25\n", encoding="utf-8"
+    )
+    assert await engine.run() is Node.S6
+
+    state = ws.load_state()
+    assert spend_count(state, "scout", RERUN_ANGLE) == counts_before[("scout", RERUN_ANGLE)] + 1
+    assert (
+        spend_count(state, "scout", ADJUSTED_ANGLE) == counts_before[("scout", ADJUSTED_ANGLE)]
+    ), "an angle-scoped rerun must not re-dispatch other angles' scouts"
+    assert spend_count(state, "interviewer", None) == counts_before[("interviewer", None)], (
+        "upstream stages must not re-execute on rerun"
+    )
+    ws.read_artifact(f"options/{RERUN_ANGLE}/cards.yaml", OptionCardSet)
+    ws.read_artifact("screening/shortlist.md", Shortlist)
+
+    # ---- terminal idempotency: re-running changes nothing ----------------------
+    history_before = ws.history()
+    assert await engine.run() is Node.S6
+    assert ws.history() == history_before
+    assert Workspace.open(ws.root).load_state().stage is Stage.S6

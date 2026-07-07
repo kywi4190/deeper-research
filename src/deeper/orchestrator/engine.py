@@ -21,6 +21,7 @@ One `run()` step per node:
 
 from __future__ import annotations
 
+import traceback
 from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -28,7 +29,12 @@ from enum import StrEnum
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentOutputInvalid, create_dispatcher
+from deeper.agents_runtime import (
+    AgentDispatchFailed,
+    AgentOutputInvalid,
+    SpendCapExceeded,
+    create_dispatcher,
+)
 from deeper.config import RunConfig
 from deeper.schemas import GateName, GateStatus, RunState, RunStatus, Stage
 from deeper.stages import STAGES, NotImplementedYet, StageBase, StageContext, StageInterrupted
@@ -168,7 +174,60 @@ class Engine:
                 self.emit(str(err))
                 return False
             except AgentOutputInvalid as err:
-                self._pause_attention(stage, err)
+                self._pause_attention(
+                    stage,
+                    role=err.contract.role,
+                    reason=f"agent '{err.contract.role}' output invalid after retries",
+                    detail=(
+                        f"agent '{err.contract.role}' failed schema validation "
+                        f"{self.config.caps.max_schema_retries + 1} times.\n"
+                        f"Last validation errors:\n{err.errors}\n"
+                        "Fix the cause (prompt, fixture, or schema), then resume."
+                    ),
+                    transcript=(
+                        f"# {stage.value} '{err.contract.role}' — schema retries exhausted\n\n"
+                        f"## Validation errors\n\n{err.errors}\n\n"
+                        f"## Last raw output\n\n{err.raw_output}\n"
+                    ),
+                )
+                return False
+            except AgentDispatchFailed as err:
+                tb = "".join(
+                    traceback.format_exception(type(err.cause), err.cause, err.cause.__traceback__)
+                )
+                self._pause_attention(
+                    stage,
+                    role=err.contract.role,
+                    reason=f"agent '{err.contract.role}' dispatch failed",
+                    detail=f"{err}\nInspect the saved transcript, fix the cause, then resume.",
+                    transcript=(
+                        f"# {stage.value} '{err.contract.role}' — dispatch failed\n\n"
+                        f"{err}\n\n## Traceback\n\n```\n{tb}```\n"
+                    ),
+                )
+                return False
+            except SpendCapExceeded as err:
+                self._pause_attention(
+                    stage,
+                    role=err.contract.role,
+                    reason=f"spend cap ${err.cap_usd:.2f} crossed",
+                    detail=(
+                        f"{err}\nCompleted work is saved. To continue, raise the cap "
+                        f"(`deeper resume {self.workspace.root} --max-spend-usd <usd>`, "
+                        "or edit max_spend_usd in config.yaml) — or accept the partial run."
+                    ),
+                    transcript=(
+                        f"# {stage.value} — spend cap crossed\n\n{err}\n\n"
+                        f"Spend by stage:\n"
+                        + "\n".join(
+                            f"- {s}: ${usd:.4f}"
+                            for s, usd in sorted(
+                                self.workspace.load_state().spend_by_stage().items()
+                            )
+                        )
+                        + "\n"
+                    ),
+                )
                 return False
             instance.evaluate_stop_rules(ctx)
             self._check_outputs(stage, instance, ctx)
@@ -188,22 +247,34 @@ class Engine:
                 "or invalid — this is a stage bug:\n" + "\n".join(problems)
             )
 
-    def _pause_attention(self, stage: Stage, err: AgentOutputInvalid) -> None:
+    def _pause_attention(
+        self, stage: Stage, *, role: str, reason: str, detail: str, transcript: str
+    ) -> None:
+        """Pause the run for a human: transcript saved to logs/ first so it
+        rides the pause commit, then one committed state transition. Every
+        agent-failure path funnels here — a failed live run must always be a
+        resumable pause, never a crash."""
+        log_relpath = self._write_attention_log(stage, role, transcript)
         state = self.workspace.load_state()
         state.status = RunStatus.PAUSED_ATTENTION
         state.pending_gate = None
         state.updated_at = datetime.now(UTC)
         self.workspace.save_state(state)
-        self.workspace.commit(
-            f"{stage.value} paused: agent '{err.contract.role}' output invalid after retries"
-        )
+        self.workspace.commit(f"{stage.value} paused: {reason}")
         self.emit(
-            f"{stage.value}: agent '{err.contract.role}' failed schema validation "
-            f"{self.config.caps.max_schema_retries + 1} times — run paused for human "
-            f"attention.\nLast validation errors:\n{err.errors}\n"
-            f"Fix the cause (prompt, fixture, or schema), then "
-            f"`deeper resume {self.workspace.root}`."
+            f"{stage.value}: {reason} — run paused for human attention.\n"
+            f"{detail}\n"
+            f"Transcript saved to {log_relpath}.\n"
+            f"Then: deeper resume {self.workspace.root}"
         )
+
+    def _write_attention_log(self, stage: Stage, role: str, transcript: str) -> str:
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        relpath = f"logs/attention-{stamp}-{stage.value}-{role}.md"
+        target = self.workspace.path(relpath)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(transcript, encoding="utf-8", newline="\n")
+        return relpath
 
     def _advance_past(self, completed: Stage) -> None:
         """One committed transition: into the following gate, the next stage,

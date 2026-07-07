@@ -146,22 +146,26 @@ class ScoutingStage(StageBase):
         }
         rows = [r for r in table.rows if r.units > 0]
         ctx.emit(f"S3: scouting {len(rows)} angles in parallel…")
-        await asyncio.gather(
+        fresh = await asyncio.gather(
             *(self._scout_angle(ctx, row, angles[row.angle_id], base_inputs) for row in rows)
         )
-        await self._reflow(ctx, table, angle_map, base_inputs)
+        rescouted = {row.angle_id for row, was_fresh in zip(rows, fresh, strict=True) if was_fresh}
+        await self._reflow(ctx, table, angle_map, base_inputs, rescouted)
         ctx.emit("S3: option cards + critiques written for every allocated angle")
 
     async def _scout_angle(
         self, ctx: StageContext, row, angle, base_inputs: dict[str, str]
-    ) -> None:
+    ) -> bool:
         """One angle's pipeline: scout → critic → (early stop | one revision).
-        critique.md is written LAST so its presence marks the angle settled."""
+        critique.md is written LAST so its presence marks the angle settled.
+        Returns True when the angle was freshly worked (not skipped) — an
+        angle-scoped rerun needs its share of an already-settled reflow
+        replayed."""
         angle_id = row.angle_id
         have_cards = self._try_read(ctx, cards_path(angle_id), OptionCardSet) is not None
         if have_cards and self._try_read(ctx, critique_path(angle_id), CardCritique) is not None:
             ctx.emit(f"S3: {angle_id} cards + critique already valid — skipping")
-            return
+            return False
         angle_yaml = angle.dump_yaml()
         if not have_cards:
             card_set = await self._dispatch_scout(
@@ -238,6 +242,7 @@ class ScoutingStage(StageBase):
             ctx.emit(f"S3: {angle_id} revision applied ({len(revised.cards)} cards)")
         ctx.workspace.write_artifact(critique_path(angle_id), critique)
         ctx.emit(f"S3: {angle_id} critique written (redundancy {critique.redundancy_pct:g}%)")
+        return True
 
     async def _dispatch_scout(
         self,
@@ -306,10 +311,32 @@ class ScoutingStage(StageBase):
         )
 
     async def _reflow(
-        self, ctx: StageContext, table: AllocationTable, angle_map: AngleMap, base_inputs
+        self,
+        ctx: StageContext,
+        table: AllocationTable,
+        angle_map: AngleMap,
+        base_inputs,
+        rescouted: set[str],
     ) -> None:
-        if self._try_read(ctx, REFLOW_PATH, AllocationTable) is not None:
-            ctx.emit("S3: reflow already settled — skipping")
+        settled = self._try_read(ctx, REFLOW_PATH, AllocationTable)
+        if settled is not None:
+            # The redistribution decision is already on disk; the only work left
+            # is REPLAYING it for angles an angle-scoped rerun just re-scouted —
+            # their earlier top-up merge was invalidated with their cards. The
+            # persisted table is the decision (never recomputed here), so the
+            # other angles' settled top-ups are not re-dispatched.
+            replay = [r for r in settled.rows if r.units > 0 and r.angle_id in rescouted]
+            if not replay:
+                ctx.emit("S3: reflow already settled — skipping")
+                return
+            angles = {a.id: a for a in angle_map.angles}
+            ctx.emit(
+                "S3: reflow settled — replaying top-up(s) for re-scouted angle(s): "
+                + ", ".join(f"{r.angle_id} +{r.units}" for r in replay)
+            )
+            await asyncio.gather(
+                *(self._top_up(ctx, row, angles[row.angle_id], base_inputs) for row in replay)
+            )
             return
         reflow_table = self._expected_reflow(ctx)
         if reflow_table is None:

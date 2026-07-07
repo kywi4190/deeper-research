@@ -16,7 +16,13 @@ from .contracts import (
     load_role,
     parse_artifacts,
 )
-from .dispatch import Dispatcher, LiveDispatcher, create_dispatcher
+from .dispatch import (
+    AgentDispatchFailed,
+    Dispatcher,
+    LiveDispatcher,
+    SpendCapExceeded,
+    create_dispatcher,
+)
 from .hooks import (
     PREFERENCE_READERS,
     build_hooks,
@@ -30,6 +36,7 @@ from .mock import DEFAULT_FIXTURES_DIR, MockDispatcher, MockFixtureMissing
 
 __all__ = [
     "AgentContract",
+    "AgentDispatchFailed",
     "AgentOutputInvalid",
     "AgentResult",
     "ArtifactParseError",
@@ -40,6 +47,7 @@ __all__ = [
     "MockDispatcher",
     "MockFixtureMissing",
     "PREFERENCE_READERS",
+    "SpendCapExceeded",
     "SpendLedger",
     "assemble_prompt",
     "build_hooks",

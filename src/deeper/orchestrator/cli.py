@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
@@ -103,6 +105,14 @@ def new(
     live: Annotated[
         bool, typer.Option("--live", help="Dispatch real agents (default: mock).")
     ] = False,
+    max_spend_usd: Annotated[
+        float | None,
+        typer.Option(
+            "--max-spend-usd",
+            help="USD spend guard: the run pauses when the ledger crosses this "
+            "(default: the profile's, e.g. 5.0 for quick).",
+        ),
+    ] = None,
 ) -> None:
     """Create a run, execute S0, and advance until the first gate."""
     try:
@@ -112,6 +122,8 @@ def new(
     data = base.model_dump(mode="json")
     data["goal"] = goal
     data["mode"] = "live" if live else "mock"
+    if max_spend_usd is not None:
+        data["max_spend_usd"] = max_spend_usd
     config = RunConfig.model_validate(data)
 
     slug = _slugify(goal)
@@ -170,9 +182,34 @@ def status(run: RunArg) -> None:
 
 
 @app.command()
-def resume(run: RunArg) -> None:
+def resume(
+    run: RunArg,
+    max_spend_usd: Annotated[
+        float | None,
+        typer.Option(
+            "--max-spend-usd",
+            help="Rewrite the run's USD spend guard before resuming (the way past "
+            "a spend-cap pause).",
+        ),
+    ] = None,
+) -> None:
     """Continue a run from wherever it paused (gate, attention, or crash)."""
-    _run_engine(_open_run(run), resume=True)
+    workspace = _open_run(run)
+    if max_spend_usd is not None:
+        old = workspace.load_config()
+        try:
+            config = RunConfig.model_validate(
+                {**old.model_dump(mode="json"), "max_spend_usd": max_spend_usd}
+            )
+        except ValidationError as err:
+            raise _fail(f"--max-spend-usd {max_spend_usd} is not a valid cap: {err}") from err
+        workspace.write_artifact(
+            "config.yaml",
+            config,
+            commit_message=f"spend cap {old.max_spend_usd:g} -> {max_spend_usd:g} USD",
+        )
+        console.print(f"spend cap: ${old.max_spend_usd:g} -> ${max_spend_usd:g}")
+    _run_engine(workspace, resume=True)
 
 
 @app.command()
@@ -198,6 +235,105 @@ def rerun(
         raise _fail(str(err)) from err
     console.print(f"invalidated: {', '.join(removed) if removed else 'nothing to remove'}")
     _run_engine(workspace)
+
+
+@app.command()
+def doctor() -> None:
+    """Preflight checks for a live run: API key, SDK, config, prompts, schemas.
+
+    Exit 1 only on a genuine failure; warnings (e.g. no ANTHROPIC_API_KEY but
+    the Claude Code CLI may hold credentials) exit 0.
+    """
+    import os
+
+    from deeper.agents_runtime.contracts import AGENTS_DIR, SCHEMAS_DIR, ContractError, load_role
+    from deeper.config import PROFILES
+    from deeper.schemas.export import ARTIFACT_REGISTRY
+    from deeper.schemas.export import check as check_schemas
+
+    rows: list[tuple[str, str, str]] = []  # (check, status, detail)
+
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if key:
+        rows.append(("API key", "ok", f"ANTHROPIC_API_KEY present ({len(key)} chars)"))
+    else:
+        rows.append(
+            (
+                "API key",
+                "warn",
+                "ANTHROPIC_API_KEY not set — live dispatch falls back to the "
+                "Claude Code CLI's own credentials (run `claude` once to log in)",
+            )
+        )
+
+    try:
+        import claude_agent_sdk  # noqa: F401 — importability is the check
+
+        try:
+            from importlib.metadata import version
+
+            sdk_version = version("claude-agent-sdk")
+        except Exception:  # noqa: BLE001 — version is cosmetic; import is the check
+            sdk_version = "unknown version"
+        rows.append(("Agent SDK", "ok", f"claude-agent-sdk {sdk_version} importable"))
+    except ImportError as err:
+        rows.append(("Agent SDK", "fail", f"claude_agent_sdk not importable: {err}"))
+
+    config_problems = []
+    for name in PROFILES:
+        try:
+            profile_config(name)
+        except (ConfigError, ValidationError) as err:
+            config_problems.append(f"{name}: {err}")
+    if config_problems:
+        rows.append(("Config profiles", "fail", "; ".join(config_problems)))
+    else:
+        rows.append(("Config profiles", "ok", f"{', '.join(PROFILES)} all validate"))
+
+    prompt_problems = []
+    prompt_files = sorted(AGENTS_DIR.glob("*.md")) if AGENTS_DIR.is_dir() else []
+    if not prompt_files:
+        prompt_problems.append(f"no prompt files found under {AGENTS_DIR}")
+    for path in prompt_files:
+        try:
+            meta, body = load_role(path.stem, AGENTS_DIR)
+        except (ContractError, yaml.YAMLError) as err:
+            prompt_problems.append(f"{path.name}: {err}")
+            continue
+        if meta.get("role") != path.stem:
+            prompt_problems.append(
+                f"{path.name}: frontmatter role {meta.get('role')!r} != filename"
+            )
+        if "{{schema}}" not in body:
+            prompt_problems.append(f"{path.name}: missing the {{{{schema}}}} placeholder")
+        for schema in meta.get("output_schemas") or []:
+            if schema not in ARTIFACT_REGISTRY:
+                prompt_problems.append(f"{path.name}: unknown output schema {schema!r}")
+            elif not (SCHEMAS_DIR / f"{schema}.schema.json").is_file():
+                prompt_problems.append(f"{path.name}: schema export {schema}.schema.json missing")
+    if prompt_problems:
+        rows.append(("Agent prompts", "fail", "; ".join(prompt_problems)))
+    else:
+        rows.append(("Agent prompts", "ok", f"{len(prompt_files)} prompts parse"))
+
+    schema_problems = check_schemas()
+    if schema_problems:
+        rows.append(
+            ("Schema exports", "fail", f"run `make schemas` — {'; '.join(schema_problems)}")
+        )
+    else:
+        rows.append(("Schema exports", "ok", f"{len(ARTIFACT_REGISTRY)} exports fresh"))
+
+    table = Table(title="deeper doctor")
+    table.add_column("check")
+    table.add_column("status")
+    table.add_column("detail", overflow="fold")
+    style = {"ok": "green", "warn": "yellow", "fail": "red"}
+    for name, status, detail in rows:
+        table.add_row(name, f"[{style[status]}]{status}[/{style[status]}]", detail)
+    console.print(table)
+    if any(status == "fail" for _, status, _ in rows):
+        raise typer.Exit(code=1)
 
 
 @app.command()

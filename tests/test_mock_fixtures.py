@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from deeper.agents_runtime import DEFAULT_FIXTURES_DIR, AgentContract, MockDispatcher
+from deeper.agents_runtime import (
+    DEFAULT_FIXTURES_DIR,
+    AgentContract,
+    AgentDispatchFailed,
+    MockDispatcher,
+)
 from deeper.agents_runtime.mock import MockFixtureMissing
 from deeper.config import SizeClass, profile_config
 from deeper.schemas import Stage
@@ -86,6 +91,9 @@ async def test_context_specific_fixture_beats_default(ws: Workspace, tmp_path: P
 
 
 async def test_missing_fixture_raises(ws: Workspace, tmp_path: Path) -> None:
+    """A missing fixture is an infrastructure failure: the dispatcher wraps it
+    in AgentDispatchFailed so the orchestrator pauses the run instead of
+    crashing (same discipline as a live SDK error)."""
     dispatcher = MockDispatcher(ws, ws.load_config(), fixtures_dir=tmp_path / "empty")
     contract = AgentContract(
         role="scout",
@@ -94,8 +102,9 @@ async def test_missing_fixture_raises(ws: Workspace, tmp_path: Path) -> None:
         size_class=SizeClass.M,
         budget_line="b",
     )
-    with pytest.raises(MockFixtureMissing):
+    with pytest.raises(AgentDispatchFailed) as excinfo:
         await dispatcher.run_agent(contract)
+    assert isinstance(excinfo.value.cause, MockFixtureMissing)
 
 
 def test_fixture_cross_references_cohere() -> None:

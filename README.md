@@ -13,26 +13,31 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Phase A complete; Phase B kernel through S5 real (Prompt 8).** Every pipeline
-artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an LLM-facing
-validation-error formatter, and a generated JSON Schema in `schemas/`; the versioned
-agent prompts for stages 0–5 live in `agents/` with the `deeper-lab` prompt-iteration
-harness (design-doc M0). The no-LLM substrate — git-backed run **workspace**, **run
-profiles / config loader**, **S2 budget allocator + reflow** — the **agent dispatch
-layer** (`agents_runtime/`), and the **deterministic orchestrator** (`orchestrator/`)
-are all built. Stages **S0–S5 are now real**: S0 is an interactive terminal interview
-with a confirm-before-write step; S1 runs the parallel cartographer ensemble plus the
-§5/S1 saturation rule; Gate A applies all five review actions to the map on resume;
-S2 prints the allocation table at the gate exit; S3 runs one scout per angle in
-parallel (budget line injected from allocation.yaml), a card-critic per angle, one
-revision round, the redundancy early-stop, and budget reflow onto critic-flagged
-misses; S4 derives the rubric from the destination model plus the cards (never
-preferences) and Gate B applies weight/criterion edits and the preference-slot weight
-on resume; S5 screens every card with uncertainty bands and pure code applies the
-shortlist rule (kill-risks first, advance on the upper confidence bound, angle cap,
-breadth guardrail) with a written reason per option. S6–S8 are registered stubs that
-report cleanly. A full mock run now walks `deeper new` → Gate A → Gate B → the
-shortlist in seconds, offline.
+**M1 complete — kernel S0–S5 runs end-to-end (mock + live-smoke).** The design-doc
+§9 M1 exit is proven by `tests/test_e2e_mock.py`: one test drives a full mock run
+S0 → Gate A (approved with a prior adjustment) → S2 → S3 → S4 → Gate B (weight
+override) → S5, asserting every artifact validates, the git log carries one commit
+per stage and gate, the spend ledger is populated and under the cap, and
+`rerun --stage S3 --angle X` invalidates exactly that subtree before reconverging.
+Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip,
+an LLM-facing validation-error formatter, and a generated JSON Schema in
+`schemas/`; the versioned agent prompts for stages 0–5 live in `agents/`. The
+kernel is live-run hardened: `deeper doctor` preflights the environment, every
+run carries a `max_spend_usd` guard the dispatcher enforces before each
+invocation, and every agent failure path (schema-retry exhaustion, SDK/network
+error, spend cap) lands in a resumable `PAUSED_ATTENTION` with a transcript in
+`logs/` — never a crash. The stages themselves: S0 is an interactive terminal
+interview with a confirm-before-write step; S1 runs the parallel cartographer
+ensemble plus the §5/S1 saturation rule; Gate A applies all five review actions
+to the map on resume; S2 prints the allocation table at the gate exit; S3 runs
+one scout per angle in parallel, a card-critic per angle, one revision round, the
+redundancy early-stop, and budget reflow onto critic-flagged misses; S4 derives
+the rubric from the destination model plus the cards (never preferences) and
+Gate B applies weight/criterion edits and the preference-slot weight on resume;
+S5 screens every card with uncertainty bands and pure code applies the shortlist
+rule with a written reason per option. S6–S8 are registered stubs that report
+cleanly. A full mock run walks `deeper new` → Gate A → Gate B → the shortlist in
+seconds, offline.
 
 ## Architecture map
 
@@ -52,7 +57,7 @@ state of a run.
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B) suites (738 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (751 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -218,6 +223,16 @@ sequences to exercise the retry loop.
 context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
 is what gates report and the orchestrator's cap checks read. Retry counts persist in
 `RunState.retry_counts` keyed `stage:role:context`.
+
+**The spend guard and the no-crash rule**: every raw invocation passes through one
+guarded chokepoint. Before dispatch, the ledger total is checked against
+`config.max_spend_usd` (quick 5.0 / standard 25.0 / exhaustive 60.0 by default;
+`--max-spend-usd` overrides at `deeper new`, and `deeper resume --max-spend-usd`
+rewrites it, committed) — crossing it raises `SpendCapExceeded`. Inside dispatch,
+any infrastructure exception (SDK/network/CLI error, missing mock fixture) is
+wrapped as `AgentDispatchFailed` with the cause attached. Both, like
+`AgentOutputInvalid`, pause the run as `PAUSED_ATTENTION` with a transcript in
+`logs/` — a live run always ends in a resumable pause, never a crash or lost work.
 
 ## The prompt-lab (`deeper-lab`)
 
@@ -398,9 +413,14 @@ still sum to 1.0; referential problems re-pause with nothing written.
 `rerun_hint` records the hint at `gates/gate-a-hint.txt` (where S1
 invalidation can't delete it), loops back through S1 via the same invalidation
 machinery as `rerun`, and the S1 pass injects it into every cartographer prompt
-then consumes the file — one pass, exactly. An agent that exhausts its schema
-retries (`AgentOutputInvalid`) pauses the run as `PAUSED_ATTENTION` with the
-validation errors; `deeper resume` re-enters the stage after you fix the cause.
+then consumes the file — one pass, exactly. **Every agent failure is a pause, not a crash**: schema-retry
+exhaustion (`AgentOutputInvalid`), a dispatch/SDK failure
+(`AgentDispatchFailed`), or the spend guard (`SpendCapExceeded`) all land the
+run in `PAUSED_ATTENTION` — the failure transcript (validation errors + raw
+output, or the traceback, or the spend table) is saved to
+`logs/attention-<timestamp>-<stage>-<role>.md` and rides the pause commit;
+`deeper resume` re-enters the stage after you fix the cause (for a spend-cap
+pause: `deeper resume <run> --max-spend-usd <higher>`).
 
 **Surgical rerun** (`deeper rerun <run> --stage S3 [--angle x]`) is git-tracked
 deletion: the target stage's output subtree (angle-scoped for S3) plus everything
@@ -488,6 +508,42 @@ hint injected into every cartographer prompt. `<run>` is a path or a name under
 `runs/`. Every command is safe to repeat: pauses exit 0 with instructions,
 `status`/`report` are read-only, and re-entering a run never re-executes completed
 work.
+
+## Running your first live run
+
+Mock mode is the default everywhere; live dispatch is opt-in per run. Before the
+first live run:
+
+```bash
+deeper doctor
+```
+
+checks the five things a live run needs: an `ANTHROPIC_API_KEY` (warning only —
+the Claude Code CLI's own login also works), `claude-agent-sdk` importable (its
+version is printed), the shipped config profiles validating, every `agents/*.md`
+prompt parsing (frontmatter, `{{schema}}` placeholder, declared schemas known and
+exported), and `schemas/` exports fresh. It exits 1 on genuine failures only.
+
+Then start small — the `quick` profile is sized as a sanity pass (3 cartographers,
+floor 1, shortlist 3, budget B=16) and carries a $5 spend guard by default:
+
+```bash
+deeper new "your mid-size question" --profile quick --live
+```
+
+`--max-spend-usd 3.0` tightens the guard at creation. The run behaves exactly like
+the mock walkthrough above — S0 interviews you in the terminal (live agents may
+also web-search), gates pause for your file edits — with two live-specific rails:
+
+- **The spend guard.** The dispatcher checks the ledger before every invocation;
+  crossing `max_spend_usd` pauses the run with the spend table saved to `logs/`.
+  Nothing is lost — raise the cap and continue:
+  `deeper resume <run> --max-spend-usd 8`.
+- **No crash on agent failure.** Schema-retry exhaustion, SDK/network errors, and
+  the spend cap all land in `PAUSED_ATTENTION` with a transcript at
+  `logs/attention-<timestamp>-<stage>-<role>.md`; `deeper status <run>` shows
+  where it stopped, and `deeper resume <run>` re-enters the stage once you've
+  fixed the cause.
 
 ## How to test
 
@@ -615,6 +671,20 @@ canonical `Makefile` is used wherever GNU make is available.
   `rubric` (the design's rationale file has no schema of its own); S4 renders
   the rationale markdown from the validated rubric's definitions, measurement
   methods, and weight justifications, so the two files cannot disagree.
+- **Run-level `max_spend_usd` guard.** Design §8 speaks of per-stage caps and
+  spend visible at gates; the runaway-cost mitigation here is (additionally) one
+  whole-run USD cap the dispatcher checks before every invocation, because a
+  single number the human sets at `deeper new` is the guard that actually
+  matches how a supervised live run is budgeted. Per-stage caps can layer on
+  later without changing the chokepoint.
+- **An angle-scoped S3 rerun replays the persisted reflow decision.** `rerun
+  --stage S3 --angle X` deletes `options/X/` but keeps `options/reflow.yaml`
+  (the settled redistribution decision, which is not angle-scoped). If that
+  table granted X units, X's top-up merge was invalidated with its cards — so
+  S3 re-entry re-dispatches the top-up for freshly re-scouted angles from the
+  persisted table (never recomputed), leaving other angles' settled top-ups
+  untouched. Without this, the re-scouted angle silently loses the coverage the
+  reflow decision bought it.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -631,11 +701,12 @@ Following the phases in the build guide:
 - **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
   Prompt 5 (dispatch layer) ✅ → Prompt 6 (orchestrator/CLI) ✅ → Prompt 7 (real
   S0–S2) ✅ → Prompt 8 (S3 scouts + critic + reflow, S4 rubric, Gate B applied
-  edits, S5 screening with the shortlist rule) ✅ → M1 exit.
+  edits, S5 screening with the shortlist rule) ✅ → Prompt 9 (M1 exit: end-to-end
+  integration test, `deeper doctor`, spend guard, live hardening) ✅. **M1 done.**
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 9 — M1 exit: end-to-end integration test, `deeper
-doctor`, spend guard, first live smoke run.**
+**Next: Phase C, Prompt 10 — S6 deep dives (analysts with the stability stopping
+rule) + verifier.**

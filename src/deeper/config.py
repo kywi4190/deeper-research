@@ -115,6 +115,13 @@ class RunConfig(ArtifactModel):
         description="Preference-slot weight S4 writes into the rubric (design §5/S4: "
         "default 15-25%); the human sets the final value at Gate B.",
     )
+    max_spend_usd: float = Field(
+        default=5.0,
+        gt=0,
+        description="USD spend guard: the dispatcher refuses new agent invocations "
+        "once the run's ledger crosses this, pausing the run for human attention "
+        "(design §11 runaway-cost mitigation). Raise it and resume to continue.",
+    )
     deep_dive_unit_cap: int = Field(ge=1, description="S6 per-option research budget in units.")
     concurrency: int = Field(ge=1, description="Max simultaneous agent invocations.")
     size_classes: dict[SizeClass, SizeClassSpec]
@@ -175,6 +182,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 3,
         "shortlist_size": 3,
         "shortlist_threshold": 3.5,
+        "max_spend_usd": 5.0,
         "deep_dive_unit_cap": 2,
         "concurrency": 4,
         "size_classes": _size_classes((2, 4000), (6, 8000), (12, 16000)),
@@ -188,6 +196,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 5,
         "shortlist_size": 5,
         "shortlist_threshold": 3.5,
+        "max_spend_usd": 25.0,
         "deep_dive_unit_cap": 4,
         "concurrency": 4,
         "size_classes": _size_classes((3, 4000), (12, 16000), (25, 32000)),
@@ -201,6 +210,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 6,
         "shortlist_size": 7,
         "shortlist_threshold": 3.25,
+        "max_spend_usd": 60.0,
         "deep_dive_unit_cap": 6,
         "concurrency": 4,
         "size_classes": _size_classes((4, 4000), (18, 24000), (35, 48000)),
