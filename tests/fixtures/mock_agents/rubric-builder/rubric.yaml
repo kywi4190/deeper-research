@@ -1,0 +1,82 @@
+# Mock S4 rubric — derived from the destination model (admissions committees),
+# never from preferences. Criterion weights sum to 1.0; the preference slot is
+# weighted separately (P9).
+criteria:
+  - id: publication-potential
+    name: Top-venue publication potential
+    definition: Likelihood the project yields a first-author paper submittable to a
+      top ML venue (or strong workshop) before the December application deadline.
+    measurement_method: Venue-track fit, precedent papers of comparable scope, and
+      whether a submission-sized result exists at the halfway point.
+    levels:
+      1: No plausible publishable unit within the timeline.
+      2: Workshop paper plausible only if everything goes right.
+      3: Workshop paper likely; main-venue submission possible but uncertain.
+      4: Workshop paper near-certain and a credible main-venue submission path exists.
+      5: Multiple publishable units with a clear main-venue target and precedent.
+    weight: 0.3
+    justification: First-author top-venue publications are the destination model's
+      first-listed committee reward.
+  - id: letter-strength
+    name: Recommendation-letter strength
+    definition: How much close, specific supervisor collaboration the project
+      structurally produces.
+    measurement_method: Supervisor meeting cadence the project requires, and whether
+      the supervisor co-owns the research question.
+    levels:
+      1: Supervisor is a formality; letter would be generic.
+      2: Occasional check-ins; letter covers diligence only.
+      3: Regular collaboration; letter can cite specific contributions.
+      4: Close collaboration on a shared question; letter cites judgment and initiative.
+      5: Supervisor invested in the result as their own agenda; strongest possible letter.
+    weight: 0.25
+    justification: Specific supervisor letters are an explicit destination reward and
+      the merger's rubric-weight strategic note flagged their high variance.
+  - id: feasibility
+    name: Two-semester feasibility under compute constraints
+    definition: Probability of completing the core result by the April 2027 thesis
+      deadline within the lab's shared 4x A100 node.
+    measurement_method: Compute budget estimate vs node capacity, dependency count,
+      and whether a de-risked fallback result exists.
+    levels:
+      1: Core result needs resources or time the constraints exclude.
+      2: Feasible only with an optimistic schedule and no failed experiments.
+      3: Feasible with buffer; fallback exists but is weak.
+      4: Comfortably feasible with a publishable fallback.
+      5: Core result plus extensions fit with slack; multiple fallbacks.
+    weight: 0.2
+    justification: The brief's deadline and compute caps are hard constraints; a
+      project that misses them produces nothing for any judge to reward.
+  - id: research-taste-signal
+    name: Independent research-taste signal
+    definition: How clearly the project demonstrates a self-framed question and
+      independent judgment rather than assigned execution.
+    measurement_method: Whether the student can articulate why this question, and how
+      much of the framing is theirs vs the supervisor's.
+    levels:
+      1: Pure execution of an assigned task.
+      2: Minor framing choices within an assigned agenda.
+      3: Student-chosen question inside a supervisor's area.
+      4: Student-framed question with an original methodological angle.
+      5: Field-noticed framing — the kind of question that gets cited as taste.
+    weight: 0.15
+    justification: The destination model explicitly rewards evidence of independent
+      research taste as a distinct signal from publications.
+  - id: momentum-by-deadline
+    name: Citable momentum by application time
+    definition: Whether the project produces a citable, committee-visible artifact
+      (preprint, workshop paper, adopted tool) by December 2026.
+    measurement_method: Planned milestone dates vs the application deadline; existence
+      of an intermediate publishable unit.
+    levels:
+      1: Nothing visible until after applications are read.
+      2: A repo or draft, not citable.
+      3: Preprint by December.
+      4: Workshop acceptance or under-review main-venue submission by December.
+      5: Accepted publication or adopted artifact by December.
+    weight: 0.1
+    justification: The practitioner execution note is destination-grounded — the
+      application deadline, not the thesis deadline, is when judges look.
+preference_slot:
+  weight: 0.2
+notes: null

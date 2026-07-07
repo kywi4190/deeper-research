@@ -1,0 +1,16 @@
+# Mock S0 destination model — who judges the outcome and what they reward.
+judges:
+  - description: PhD admissions committees at top-tier ML programs
+    rewards:
+      - description: First-author publications at top venues (NeurIPS, ICML, ICLR)
+        evidence:
+          - url: "https://transformer-circuits.pub/2023/monosemantic-features"
+            tier: T1
+            title: Towards Monosemanticity
+            content_hash: null
+      - description: Strong, specific recommendation letters from research supervisors
+        evidence: []
+      - description: Evidence of independent research taste — a problem the student chose
+          and framed themselves
+        evidence: []
+notes: null

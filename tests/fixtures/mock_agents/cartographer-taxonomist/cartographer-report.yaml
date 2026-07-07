@@ -1,0 +1,49 @@
+# Mock S1 raw report — taxonomist: partition the whole space by contribution type.
+heuristic: taxonomist
+angles:
+  - name: Understanding-type contributions
+    definition: Research whose deliverable is insight into how or why models behave —
+      interpretability, training dynamics, theoretical analysis.
+    distinctness_rationale: Partitions by contribution type; understanding-claims are
+      evaluated on explanatory power, not performance.
+    example_options:
+      - Sparse autoencoder feature study
+      - Loss-landscape analysis of fine-tuning
+    relevance_rationale: Matches the committee reward for research taste; several
+      sub-areas are tractable on 4x A100.
+    notes: null
+  - name: Measurement-type contributions
+    definition: Research whose deliverable is a better way to measure — benchmarks,
+      evals, metrics, datasets.
+    distinctness_rationale: Judged on validity and adoption rather than insight or
+      performance; complete partition cell alongside understanding and capability.
+    example_options:
+      - Contamination-robust reasoning benchmark
+      - Human-agreement study of an LLM-judge metric
+    relevance_rationale: Low compute floor and strong venue tracks; risk is
+      differentiation in a crowded eval space.
+    notes: null
+  - name: Capability-type contributions
+    definition: Research whose deliverable is a model or method that does something
+      better — architectures, training methods, efficiency.
+    distinctness_rationale: The classic performance-judged cell of the partition,
+      distinct from both understanding and measurement.
+    example_options:
+      - Parameter-efficient fine-tuning variant
+      - Small-scale mixture-of-experts training study
+    relevance_rationale: Highest committee legibility but weakest fit to the compute
+      constraint — competitive capability work usually needs more than the lab node.
+    notes: null
+  - name: Application-type contributions
+    definition: Research whose deliverable is ML solving a concrete external-domain
+      problem, judged partly by that domain.
+    distinctness_rationale: The remaining partition cell — external validity replaces
+      benchmark validity.
+    example_options:
+      - Clinical-notes information extraction with a med-school lab
+      - Materials-property prediction with a chemistry group
+    relevance_rationale: Real-data papers with domain co-authors are publishable and
+      demonstrate collaboration; depends on partner-lab availability.
+    notes: null
+strategic_notes: []
+notes: null

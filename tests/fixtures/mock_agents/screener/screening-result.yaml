@@ -1,0 +1,127 @@
+# Mock S5 screening — scores the scout's interpretability cards against the
+# rubric. The screener is the ONLY Phase-A role that reads preferences (P9):
+# tastes enter through preference_score alone.
+options:
+  - option_id: sae-feature-atlas
+    angle_id: interpretability-research
+    criterion_scores:
+      - criterion_id: publication-potential
+        score: 4.0
+        band: {lo: 3.5, hi: 4.5}
+        evidence_pointer: Card's T1 precedent (Towards Monosemanticity) shows the
+          method publishes at comparable scale; atlas artifacts have venue precedent.
+      - criterion_id: letter-strength
+        score: 3.5
+        band: {lo: 3.0, hi: 4.0}
+        evidence_pointer: Card implies supervisor owns the tooling but not the
+          question; collaboration cadence unstated.
+      - criterion_id: feasibility
+        score: 3.5
+        band: {lo: 2.5, hi: 4.5}
+        evidence_pointer: Card uncertainty about SAE sweep compute widens the band;
+          kill-risk on hook points is cheap to clear.
+      - criterion_id: research-taste-signal
+        score: 4.0
+        band: {lo: 3.5, hi: 4.5}
+        evidence_pointer: Atlas framing and validation methodology are student-framed
+          per the card description.
+      - criterion_id: momentum-by-deadline
+        score: 4.0
+        band: {lo: 3.0, hi: 4.5}
+        evidence_pointer: Feature-atlas releases are workshop-sized at semester one
+          per the card's mechanism section.
+    preference_score:
+      criterion_id: preference-slot
+      score: 4.5
+      band: {lo: 4.0, hi: 5.0}
+      evidence_pointer: Strong stated interest in interpretability; solo-scale work
+        matches the small-team preference.
+    kill_risk_checks:
+      - fact: The target model's activations are not accessible at the needed hook
+          points in the available tooling
+        outcome: cleared
+        evidence:
+          url: "https://github.com/TransformerLensOrg/TransformerLens"
+          tier: T2
+          title: TransformerLens hook-point documentation
+          content_hash: null
+    weighted_point: 3.8
+    weighted_ucb: 4.4
+    notes: null
+  - option_id: backdoor-probe-study
+    angle_id: interpretability-research
+    criterion_scores:
+      - criterion_id: publication-potential
+        score: 3.5
+        band: {lo: 3.0, hi: 4.5}
+        evidence_pointer: Safety-track fit is strong but the card's evidence gap on
+          probe-method viability keeps the band wide.
+      - criterion_id: letter-strength
+        score: 3.0
+        band: {lo: 2.5, hi: 3.5}
+        evidence_pointer: No supervisor-agenda link on the card.
+      - criterion_id: feasibility
+        score: 4.0
+        band: {lo: 3.5, hi: 4.5}
+        evidence_pointer: Probing is inference-scale; well within the node budget.
+      - criterion_id: research-taste-signal
+        score: 3.5
+        band: {lo: 3.0, hi: 4.0}
+        evidence_pointer: Question is timely though adjacent to published replications.
+      - criterion_id: momentum-by-deadline
+        score: 3.5
+        band: {lo: 3.0, hi: 4.0}
+        evidence_pointer: A probe-family comparison is preprintable by December.
+    preference_score:
+      criterion_id: preference-slot
+      score: 4.0
+      band: {lo: 3.5, hi: 4.5}
+      evidence_pointer: Interpretability-adjacent and solo-scale; slightly less core
+        to stated interests than the atlas.
+    kill_risk_checks:
+      - fact: No poisoned model checkpoints are publicly available at probe-able scale
+        outcome: cleared
+        evidence:
+          url: "https://huggingface.co/models?search=sleeper-agent"
+          tier: T2
+          title: Public sleeper-agent checkpoint search
+          content_hash: null
+    weighted_point: 3.5
+    weighted_ucb: 4.1
+    notes: null
+  - option_id: activation-patching-toolkit
+    angle_id: interpretability-research
+    criterion_scores:
+      - criterion_id: publication-potential
+        score: 3.0
+        band: {lo: 2.5, hi: 3.5}
+        evidence_pointer: Card itself flags uncertainty that a toolkit clears the
+          top-venue novelty bar; T2 evidence only.
+      - criterion_id: letter-strength
+        score: 3.0
+        band: {lo: 2.5, hi: 3.5}
+        evidence_pointer: Tool maintenance is solitary work; limited shared-question
+          collaboration implied.
+      - criterion_id: feasibility
+        score: 3.0
+        band: {lo: 2.5, hi: 4.0}
+        evidence_pointer: Card notes maintenance burden competing with thesis writing.
+      - criterion_id: research-taste-signal
+        score: 3.0
+        band: {lo: 2.5, hi: 3.5}
+        evidence_pointer: Engineering-forward framing signals craft more than taste.
+      - criterion_id: momentum-by-deadline
+        score: 4.0
+        band: {lo: 3.5, hi: 4.5}
+        evidence_pointer: A released tool plus case-study preprint is visible early.
+    preference_score:
+      criterion_id: preference-slot
+      score: 3.5
+      band: {lo: 3.0, hi: 4.0}
+      evidence_pointer: Interpretability-adjacent but tool-building is not the stated
+        core interest.
+    kill_risk_checks: []
+    weighted_point: 3.2
+    weighted_ucb: 3.7
+    notes: null
+notes: null

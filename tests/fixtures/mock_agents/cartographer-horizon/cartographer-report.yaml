@@ -1,0 +1,40 @@
+# Mock S1 raw report — horizon scanner: where will the field be at application time?
+heuristic: horizon-scanner
+angles:
+  - name: Agent-behavior evaluation
+    definition: Measurement and analysis of multi-step agentic model behavior — task
+      completion, tool use, failure modes over long horizons.
+    distinctness_rationale: Emerging judge criteria (agent reliability) that existing
+      benchmark work does not cover; new enough that small labs can contribute.
+    example_options:
+      - Failure-taxonomy study of open-source coding agents
+      - Long-horizon consistency benchmark for tool-using models
+    relevance_rationale: By the 2026 application cycle agent evaluation will be a
+      mainstream track; early first-author work positions ahead of the wave, and
+      inference-only studies fit the compute budget.
+    notes: null
+  - name: Interpretability for safety auditing
+    definition: Interpretability methods aimed specifically at detecting deception,
+      backdoors, or misalignment in model internals.
+    distinctness_rationale: Intersection of interpretability and safety with its own
+      growing venue tracks and funder interest — not just a sub-topic of either.
+    example_options:
+      - Backdoor-detection probe study on open models
+      - Sleeper-agent replication at small scale
+    relevance_rationale: Safety-flavored interpretability is where several top programs
+      are hiring faculty; alignment of thesis topic with a program's growth area is a
+      concrete admissions edge.
+    notes: null
+  - name: Synthetic-data science
+    definition: Study of how synthetic training data shapes model behavior — collapse,
+      diversity, curriculum effects at small scale.
+    distinctness_rationale: A data-generation-process focus distinct from dataset
+      curation or capability training; rapidly forming subfield.
+    example_options:
+      - Model-collapse dynamics under iterated synthetic training
+      - Synthetic-curriculum ablations for small LMs
+    relevance_rationale: Controllable at sub-1B scale on the lab node, and the open
+      questions are young enough for a student to own one.
+    notes: null
+strategic_notes: []
+notes: null

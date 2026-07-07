@@ -1,0 +1,46 @@
+# Mock S1 raw report — analogies from adjacent fields that admitted students used.
+heuristic: analogist
+angles:
+  - name: Interpretability as microscopy
+    definition: Treat trained models like biological specimens — build instruments
+      (probes, autoencoders, visualizations) that reveal internal structure.
+    distinctness_rationale: The instrument-building framing yields projects distinct from
+      capability work; the deliverable is a lens, not a model.
+    example_options:
+      - Feature atlas via sparse autoencoders
+      - Activation-patching toolkit for a model family
+    relevance_rationale: Mirrors how systems-biology students earned admits with
+      instrument papers; the analogy transfers because ML venues now have dedicated
+      interpretability tracks.
+    notes: null
+  - name: Domain-collaboration applied ML
+    definition: Partner with a non-CS lab (biology, astronomy, materials) and deliver an
+      ML method solving their concrete data problem.
+    distinctness_rationale: Success is judged partly by the partner domain, giving a
+      second judge and a distinct publication venue set.
+    example_options:
+      - Protein-function annotation with a domain lab
+      - ML-accelerated telescope-survey anomaly detection
+    relevance_rationale: Committees reward evidence of independent collaboration
+      management; applied papers with real data are defensible with limited compute.
+    notes: null
+  - name: Reproduction-then-extension studies
+    definition: Rigorously reproduce a high-profile result, then extend it one step
+      (new domain, new scale, ablation the authors skipped).
+    distinctness_rationale: The reproduction anchor de-risks the thesis; extension provides
+      the novelty claim — a different risk profile from greenfield research.
+    example_options:
+      - Reproduce a grokking result and map its phase boundary
+      - Reproduce an SAE paper on a different model family
+    relevance_rationale: Mirrors physics norms where careful replication earns respect;
+      ML reviewers increasingly value it, and feasibility under the deadline is high.
+    notes: null
+strategic_notes:
+  - insight: Pick the project whose supervisor writes the strongest specific letters,
+      even over a marginally better topic.
+    kind: rubric-weight
+    rationale: The destination model lists letters as a first-class reward; letter
+      strength varies more across supervisors than topic quality varies across these
+      angles.
+    source_heuristics: []
+notes: null

@@ -1,0 +1,12 @@
+# Mock S3 critique of the interpretability-research card set.
+angle_id: interpretability-research
+completeness_issues:
+  - card_id: backdoor-probe-study
+    issue: Preliminary evidence covers checkpoint availability but not probe-method
+      viability at the stated scale; one more T1/T2 ref would close it.
+redundancy_pct: 0.0
+distinctness_issues: []
+missed_options:
+  - A feature-steering intervention study (using found SAE features to causally edit
+    behavior) — distinct deliverable from the atlas itself.
+notes: Card set is honest about stopping at 3 distinct options; no padding detected.

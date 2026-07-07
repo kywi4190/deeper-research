@@ -1,0 +1,44 @@
+# Mock S1 raw report — contrarian: what would everyone else NOT apply with?
+heuristic: contrarian
+angles:
+  - name: Negative-results and failure-mode science
+    definition: Projects whose contribution is demonstrating rigorously that a popular
+      method fails, and characterizing when and why.
+    distinctness_rationale: Deliberately inverts the field's positive-result bias; the
+      artifact is a well-evidenced boundary, not an improvement.
+    example_options:
+      - Stress-test a popular interpretability method until it breaks
+      - Characterize where chain-of-thought hurts small-model accuracy
+    relevance_rationale: Memorable to committees precisely because it is rare; risk is
+      venue acceptance, mitigated by workshops and strong methodology.
+    notes: null
+  - name: Small-model science
+    definition: Deliberately study phenomena (memorization, phase transitions,
+      emergence) in sub-1B models where full experimental control is possible.
+    distinctness_rationale: Rejects the scale race rather than competing in it; the
+      compute constraint becomes the methodological point.
+    example_options:
+      - Grokking phase-boundary mapping in toy transformers
+      - Memorization-vs-generalization dynamics across seeds
+    relevance_rationale: The lab's 4x A100 node is a genuine advantage here — full
+      sweeps are possible, and controlled-science papers fit top-venue tracks.
+    notes: null
+  - name: Data-centric contributions
+    definition: The dataset, its documentation, and its measurement validity are the
+      research contribution.
+    distinctness_rationale: Everyone else submits models and methods; datasets-and-
+      benchmarks tracks judge on different criteria.
+    example_options:
+      - A carefully-audited multilingual eval set in an underserved language pair
+      - A longitudinal dataset of model behavior across checkpoint releases
+    relevance_rationale: NeurIPS D&B track offers a first-author path with near-zero
+      training compute, directly satisfying the budget constraint.
+    notes: null
+strategic_notes:
+  - insight: Frame the thesis around a question, not a method — committees read
+      hundreds of method-shaped applications.
+    kind: reframe
+    rationale: The brief asks which project; but admissions essays built on a
+      question-driven narrative differentiate more than the project topic itself.
+    source_heuristics: []
+notes: null

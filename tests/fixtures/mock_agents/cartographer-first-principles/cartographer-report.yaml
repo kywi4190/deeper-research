@@ -1,0 +1,39 @@
+# Mock S1 raw report — first-principles decomposition of "what do committees reward".
+heuristic: first-principles
+angles:
+  - name: Mechanistic interpretability research
+    definition: Projects that reverse-engineer the internal computations of trained
+      models — features, circuits, and causal structure.
+    distinctness_rationale: Optimizes for scientific insight into existing models rather
+      than building new capability or measuring performance.
+    example_options:
+      - Sparse autoencoder feature atlas for a small open LM
+      - Circuit-level case study of one emergent behavior
+    relevance_rationale: Committees reward first-author work at top venues; interpretability
+      has active publication tracks with feasible small-compute entry points, matching the
+      4x A100 constraint.
+    notes: null
+  - name: Empirical benchmarking and evaluation science
+    definition: Projects that design rigorous evaluations, datasets, or measurement
+      methodology for model capabilities.
+    distinctness_rationale: The contribution is the measurement instrument itself, not the
+      model or its explanation.
+    example_options:
+      - A contamination-controlled reasoning benchmark
+      - Systematic replication study of published capability claims
+    relevance_rationale: Evaluation papers are publishable at top venues with modest compute,
+      and methodology rigor signals research maturity to committees.
+    notes: null
+  - name: Training and systems efficiency
+    definition: Projects that make training or inference cheaper, faster, or more
+      memory-efficient at small scale.
+    distinctness_rationale: Optimizes an engineering objective with measurable speedups
+      rather than understanding or measurement.
+    example_options:
+      - Low-rank adaptation variants under a fixed compute budget
+      - Quantization-aware training study on a 1B model
+    relevance_rationale: Efficiency results are demonstrable on the lab's node and legible
+      to committees, though the space is crowded at small scale.
+    notes: null
+strategic_notes: []
+notes: null

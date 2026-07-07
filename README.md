@@ -13,14 +13,16 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Phase A complete; Phase B deterministic substrate built (Prompt 4).**
+**Phase A complete; Phase B substrate + dispatch layer built (Prompt 5).**
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an
 LLM-facing validation-error formatter, and a generated JSON Schema in `schemas/`; the
 versioned agent prompts for stages 0–5 live in `agents/` with the `deeper-lab`
-prompt-iteration harness (design-doc M0). On top of that, the no-LLM substrate now
-exists: the git-backed run **workspace** (`workspace.py`), the **run profiles /
-config loader** (`config.py`), and the **S2 budget allocator + reflow**
-(`allocation.py`). No agent dispatch, stages, orchestrator, or main CLI yet.
+prompt-iteration harness (design-doc M0). The no-LLM substrate exists — the git-backed
+run **workspace** (`workspace.py`), the **run profiles / config loader** (`config.py`),
+the **S2 budget allocator + reflow** (`allocation.py`) — and on top of it the **agent
+dispatch layer** (`agents_runtime/`): contracts, schema-retry, code-enforced
+quarantine/write-scope/source-hygiene hooks, a fully offline mock mode, and per-invocation
+spend accounting. No stages, orchestrator, or main CLI yet.
 
 ## Architecture map
 
@@ -35,12 +37,12 @@ state of a run.
 | `src/deeper/workspace.py` | Run workspace: §7 directory tree, git audit trail, schema-checked artifact I/O, state resume | **built** |
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
-| `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | stub (Prompt 5) |
+| `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
 | `src/deeper/stages/` | Per-stage logic S0–S8 | stub (Prompts 7–12) |
 | `src/deeper/orchestrator/` | State machine, gates, CLI | stub (Prompt 6) |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation suites (555 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime suites (627 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -142,6 +144,63 @@ deviations): typed meta-strategy insights (`reframe` / `rubric-weight` /
 dedups them into the coverage report with heuristic attribution; they surface at
 Gate A and route onward by kind, and are structurally quarantined from allocation,
 scouting, and screening.
+
+## The agent runtime (`src/deeper/agents_runtime/`)
+
+The single chokepoint through which every LLM invocation flows. An `AgentContract`
+names a role (→ `agents/<role>.md`), the stage, the declared output schemas, a size
+class, a budget line, the input artifacts *as content* (never paths — the prompt
+string is the only parent→child channel, which enforces artifact-as-contract), and
+the workspace subtrees the agent may write.
+
+```
+AgentContract
+     │ assemble_prompt(): role prompt + inlined JSON schema(s)
+     │                    + # TASK + # INPUTS + # BUDGET
+     │ (drift between contract and prompt frontmatter fails HERE, before any spend)
+     ▼
+┌ semaphore (config.concurrency) ┐
+│  _invoke():                    │   mode: live → claude_agent_sdk query()
+│    live SDK call | mock fixture│   mode: mock → tests/fixtures/mock_agents/<role>/
+└────────────────────────────────┘
+     │ SpendEntry → state.json          (EVERY attempt, success or not)
+     ▼
+parse `### artifact: <name>` markers → validate via ARTIFACT_REGISTRY
+     │ valid                                  │ invalid
+     ▼                                        ▼
+AgentResult                    re-invoke with format_validation_error()
+(validated models,             feedback appended, up to caps.max_schema_retries
+ cost, retries_used)           times → then raise AgentOutputInvalid
+                               (orchestrator pauses run: human-attention flag)
+```
+
+**The quarantine guarantee** (design §6): a `PreToolUse` hook denies any
+Read/Grep/Glob whose target *or search root* covers `preferences.yaml` unless the
+contract's role is in `{screener, synthesist}` — an allowlist in code, not prompt
+goodwill. A second hook fences writes to the contract's declared subtrees (and
+hard-denies `state.json`/`config.yaml`/`preferences.yaml` for every agent); a
+`PostToolUse` hook caches every WebFetch content-addressed into `sources/` (with a
+`SourceRecord` and a `logs/web-audit.jsonl` line) after `sanitize_source_text`
+strips tool-call-like and instruction-injection patterns. Sanitization protects
+*re-injection from the cache*; the fetching agent's own defense is the prompt-level
+untrusted-web rule. Live dispatch is additionally fenced by
+`permission_mode="dontAsk"` + per-role `allowed_tools` (research roles get
+WebSearch/WebFetch/Read/Write; no research agent gets Bash or subagents) +
+`setting_sources=[]` + `cwd` pinned to the run workspace.
+
+**Mock mode** (`config.yaml mode: mock`, the default) substitutes only the network
+call: `MockDispatcher` renders canned fixtures from
+`tests/fixtures/mock_agents/<role>/<schema>[.<context>].yaml` (a coherent
+senior-project scenario covering all 12 Phase-A roles) into the same marker+fenced-yaml
+text a live agent emits, then flows through the identical parse/validate/retry/ledger
+path — the whole pipeline runs offline with zero SDK imports (asserted by a
+fresh-interpreter test). `scripted_responses` lets tests inject invalid-then-valid
+sequences to exercise the retry loop.
+
+**Spend accounting**: every attempt lands a `SpendEntry` (stage, role, angle/option
+context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
+is what gates report and the orchestrator's caps will check. Retry counts persist in
+`RunState.retry_counts` keyed `stage:role:context`.
 
 ## The prompt-lab (`deeper-lab`)
 
@@ -260,6 +319,18 @@ canonical `Makefile` is used wherever GNU make is available.
   S2 allocation, S3 scouting, or S5 screening. The design doc doesn't name this
   artifact; it extends §11's notes-as-schema-inbox pattern into a typed field, and
   the build guide's Prompts 7/8/11/12 now wire the routing.
+- **Schema-retry count is config-driven, not the build guide's "once".** The build
+  guide's Prompt 5 says re-invoke once then fail; design §6 says "max 2 retries" and
+  `HardCaps.max_schema_retries` already defaults to 2. The design doc wins: the retry
+  loop runs up to `caps.max_schema_retries` re-invocations before raising
+  `AgentOutputInvalid`.
+- **Per-dispatcher semaphore, not module-level.** An `asyncio.Semaphore` binds to the
+  running event loop, so a literal module-level semaphore breaks across loops (pytest
+  creates one per test). The semaphore lives on the dispatcher instance, created
+  lazily; one dispatcher per run keeps the concurrency limit globally binding.
+- **Hook-written `SourceRecord.tier` defaults to T3.** The source-cache hook cannot
+  judge source quality, so it records the conservative floor; agents carry their own
+  tier judgments in per-claim `SourceRef`s and the verifier adjudicates later.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -274,11 +345,11 @@ Following the phases in the build guide:
 - **Phase A — Foundation:** Prompt 1 (bootstrap) ✅ · Prompt 2 (schemas) ✅ · Prompt 3
   (agent prompts + prompt-lab) ✅.
 - **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
-  dispatch layer → orchestrator/CLI → stages S0–S5.
+  Prompt 5 (dispatch layer) ✅ → orchestrator/CLI → stages S0–S5.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 5 — SDK dispatch layer (contracts, mock mode, hooks, cost
-accounting).**
+**Next: Phase B, Prompt 6 — orchestrator state machine + CLI (`deeper new`, `status`,
+`resume`, `rerun`, `report`).**

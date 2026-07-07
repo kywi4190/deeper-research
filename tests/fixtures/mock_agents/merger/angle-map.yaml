@@ -1,0 +1,125 @@
+# Mock S1 merged angle map — dedup of the six-cartographer ensemble.
+angles:
+  - id: interpretability-research
+    name: Mechanistic interpretability research
+    definition: Projects that reverse-engineer the internal computations of trained
+      models — features, circuits, causal structure — including safety-auditing uses.
+    distinctness_rationale: Optimizes for scientific insight into existing models; the
+      deliverable is an explanation or an instrument, never a capability or a metric.
+    example_options:
+      - Sparse autoencoder feature atlas for a small open LM
+      - Backdoor-detection probe study on open models
+    relevance_prior: 0.85
+    prior_justification: The destination model rewards first-author top-venue work and
+      research taste; interpretability has dedicated venue tracks, feasible small-compute
+      entry points on the 4x A100 node, and safety-flavored growth areas where top
+      programs are hiring.
+    contributing_heuristics: [first-principles, analogist, taxonomist, horizon-scanner]
+    sub_angles:
+      - name: Safety-auditing interpretability
+        definition: Interpretability aimed at detecting deception or backdoors.
+    notes: null
+  - id: evaluation-science
+    name: Evaluation and measurement science
+    definition: Benchmarks, datasets, metrics, and eval methodology — including
+      emerging agent-behavior evaluation.
+    distinctness_rationale: The measurement instrument is the contribution; judged on
+      validity and adoption, not insight or performance.
+    example_options:
+      - Contamination-robust reasoning benchmark
+      - Failure-taxonomy study of open-source coding agents
+    relevance_prior: 0.7
+    prior_justification: Low compute floor fits the budget constraint; datasets-and-
+      benchmarks tracks give a credible first-author path before the December
+      application deadline.
+    contributing_heuristics: [first-principles, contrarian, taxonomist, horizon-scanner]
+    sub_angles: []
+    notes: null
+  - id: small-model-science
+    name: Small-model controlled science
+    definition: Controlled studies of phenomena (grokking, memorization, synthetic-data
+      dynamics) in sub-1B models with full experimental sweeps.
+    distinctness_rationale: Makes the compute constraint the methodological point —
+      full experimental control replaces scale as the source of validity.
+    example_options:
+      - Grokking phase-boundary mapping in toy transformers
+      - Model-collapse dynamics under iterated synthetic training
+    relevance_prior: 0.6
+    prior_justification: The lab's 4x A100 node permits complete sweeps that scaled
+      labs skip; controlled-science papers fit top-venue tracks and reproduction norms
+      de-risk the deadline.
+    contributing_heuristics: [contrarian, analogist, horizon-scanner]
+    sub_angles: []
+    notes: null
+  - id: applied-domain-collaboration
+    name: Applied domain collaboration
+    definition: ML methods delivered against a partner domain's concrete data problem,
+      judged partly by that domain.
+    distinctness_rationale: External validity replaces benchmark validity; a second
+      judge (the partner domain) changes what counts as success.
+    example_options:
+      - Protein-function annotation with a domain lab
+      - Materials-property prediction with a chemistry group
+    relevance_prior: 0.45
+    prior_justification: Real-data papers with domain co-authors are publishable and
+      evidence collaboration skill, but depend on partner-lab availability the brief
+      cannot guarantee within two semesters.
+    contributing_heuristics: [analogist, taxonomist]
+    sub_angles: []
+    notes: null
+  - id: supervisor-pipeline
+    name: Supervisor-pipeline projects
+    definition: Ownership of an open question inside an existing faculty research
+      agenda with working infrastructure and publication cadence.
+    distinctness_rationale: Selects on execution certainty and letter strength rather
+      than topic; orthogonal to the topic-partition angles.
+    example_options:
+      - Extend the supervisor's current submission with a follow-up study
+      - Take over an existing lab codebase's open research question
+    relevance_prior: 0.65
+    prior_justification: The destination model lists specific supervisor letters as a
+      first-class reward, and publication odds are highest inside a working pipeline
+      given the December deadline.
+    contributing_heuristics: [practitioner]
+    sub_angles: []
+    notes: null
+dedup_map:
+  - heuristic: analogist
+    raw_name: Interpretability as microscopy
+    merged_into: interpretability-research
+  - heuristic: horizon-scanner
+    raw_name: Interpretability for safety auditing
+    merged_into: interpretability-research
+  - heuristic: taxonomist
+    raw_name: Understanding-type contributions
+    merged_into: interpretability-research
+  - heuristic: contrarian
+    raw_name: Data-centric contributions
+    merged_into: evaluation-science
+  - heuristic: horizon-scanner
+    raw_name: Agent-behavior evaluation
+    merged_into: evaluation-science
+  - heuristic: taxonomist
+    raw_name: Measurement-type contributions
+    merged_into: evaluation-science
+  - heuristic: contrarian
+    raw_name: Small-model science
+    merged_into: small-model-science
+  - heuristic: horizon-scanner
+    raw_name: Synthetic-data science
+    merged_into: small-model-science
+  - heuristic: analogist
+    raw_name: Reproduction-then-extension studies
+    merged_into: small-model-science
+  - heuristic: analogist
+    raw_name: Domain-collaboration applied ML
+    merged_into: applied-domain-collaboration
+  - heuristic: taxonomist
+    raw_name: Application-type contributions
+    merged_into: applied-domain-collaboration
+  - heuristic: practitioner
+    raw_name: Supervisor-pipeline projects
+    merged_into: supervisor-pipeline
+notes: Capability-type contributions and negative-results science were folded into
+  small-model-science where they survived the compute constraint; pure capability
+  work was dropped as infeasible on the lab node (see coverage report thin areas).

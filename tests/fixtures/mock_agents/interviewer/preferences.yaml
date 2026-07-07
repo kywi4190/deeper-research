@@ -1,0 +1,12 @@
+# Mock S0 preferences — QUARANTINED: only screener/synthesist may read this.
+items:
+  - statement: Finds interpretability and "understanding why models work" genuinely exciting
+    strength: strong
+  - statement: Prefers solo-authored or small-team work over large lab collaborations
+    strength: moderate
+  - statement: Mild aversion to pure benchmark-chasing projects
+    strength: mild
+risk_appetite: Moderate — willing to bet on a novel research direction if a publishable
+  fallback result exists, but not on projects where the whole thesis hinges on one
+  uncertain experiment.
+notes: null

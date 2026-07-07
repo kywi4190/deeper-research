@@ -1,0 +1,32 @@
+# Mock S1 coverage report — heuristic contributions and thin areas.
+contributions:
+  first-principles: [interpretability-research, evaluation-science]
+  analogist: [interpretability-research, applied-domain-collaboration, small-model-science]
+  contrarian: [small-model-science, evaluation-science]
+  practitioner: [supervisor-pipeline]
+  taxonomist: [interpretability-research, evaluation-science, applied-domain-collaboration]
+  horizon-scanner: [interpretability-research, evaluation-science, small-model-science]
+thin_areas:
+  - Capability/efficiency work was dropped for compute infeasibility, but a
+    parameter-efficient niche might survive scrutiny — Gate A should confirm the cut.
+  - Theory-only projects (no experiments) were never proposed by any heuristic.
+strategic_notes:
+  - insight: Pick the project whose supervisor writes the strongest specific letters,
+      even over a marginally better topic.
+    kind: rubric-weight
+    rationale: The destination model lists letters as a first-class reward; letter
+      strength varies more across supervisors than topic quality varies across these
+      angles.
+    source_heuristics: [analogist, practitioner]
+  - insight: Whatever project is chosen, submit something peer-reviewed before the
+      December application deadline.
+    kind: execution
+    rationale: An under-review first-author paper changes how committees read the file;
+      the April 2027 thesis deadline is not the binding one.
+    source_heuristics: [practitioner]
+  - insight: Frame the thesis around a question, not a method.
+    kind: reframe
+    rationale: Question-driven narratives differentiate applications more than topic
+      choice; the brief's "which project" framing may under-weight this.
+    source_heuristics: [contrarian]
+notes: null
