@@ -1,0 +1,177 @@
+"""CLI tests: the real stage registry walked in mock mode via typer's runner."""
+
+from __future__ import annotations
+
+import pytest
+from typer.testing import CliRunner
+
+from deeper.orchestrator import Engine, Node
+from deeper.orchestrator.cli import app
+from deeper.schemas import AllocationTable, AngleMap, Brief, RunStatus
+from deeper.workspace import Workspace
+
+runner = CliRunner()
+
+
+def new_run(tmp_path, goal="pick a senior research project"):
+    result = runner.invoke(
+        app, ["new", goal, "--profile", "quick", "--runs-dir", str(tmp_path / "runs")]
+    )
+    assert result.exit_code == 0, result.output
+    runs = list((tmp_path / "runs").iterdir())
+    assert len(runs) == 1
+    return result, runs[0]
+
+
+def approve_gate_a(run_dir) -> None:
+    (run_dir / "gates" / "gate-a.yaml").write_text("approved: true\n", encoding="utf-8")
+
+
+def test_new_reaches_gate_a_with_instructions(tmp_path):
+    result, run_dir = new_run(tmp_path)
+    assert "gate-a" in result.output
+    assert "gates/gate-a.yaml" in result.output  # tells the user exactly what to edit
+    ws = Workspace.open(run_dir)
+    assert ws.load_state().status is RunStatus.GATE_PENDING
+    ws.read_artifact("brief.md", Brief)  # S0 mock artifacts validate
+    ws.read_artifact("angles/map.yaml", AngleMap)
+    assert ws.load_config().goal == "pick a senior research project"
+
+
+def test_new_twice_same_day_gets_distinct_run_dirs(tmp_path):
+    runner.invoke(
+        app, ["new", "same goal", "--profile", "quick", "--runs-dir", str(tmp_path / "runs")]
+    )
+    result = runner.invoke(
+        app, ["new", "same goal", "--profile", "quick", "--runs-dir", str(tmp_path / "runs")]
+    )
+    assert result.exit_code == 0, result.output
+    assert len(list((tmp_path / "runs").iterdir())) == 2
+
+
+def test_new_unknown_profile_fails_cleanly(tmp_path):
+    result = runner.invoke(
+        app, ["new", "goal", "--profile", "nope", "--runs-dir", str(tmp_path / "runs")]
+    )
+    assert result.exit_code == 1
+    assert "unknown profile" in result.output
+
+
+def test_resume_past_approved_gate_runs_s2_then_reports_s3_unbuilt(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    approve_gate_a(run_dir)
+    result = runner.invoke(app, ["resume", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "allocation.yaml" in result.output
+    assert "not implemented yet" in result.output  # S3 stub reports cleanly
+    Workspace.open(run_dir).read_artifact("allocation.yaml", AllocationTable)
+    # Resuming again is safe and repeats the same clean report.
+    again = runner.invoke(app, ["resume", str(run_dir)])
+    assert again.exit_code == 0
+    assert "not implemented yet" in again.output
+
+
+def test_resume_with_undecided_gate_repauses(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    result = runner.invoke(app, ["resume", str(run_dir)])
+    assert result.exit_code == 0
+    assert "no decision yet" in result.output
+
+
+def test_status_shows_node_gates_and_spend(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    result = runner.invoke(app, ["status", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "gate-a" in result.output
+    assert "pending" in result.output
+    assert "total" in result.output  # spend table
+    # status is read-only: state unchanged after any number of calls.
+    before = (run_dir / "state.json").read_text(encoding="utf-8")
+    runner.invoke(app, ["status", str(run_dir)])
+    assert (run_dir / "state.json").read_text(encoding="utf-8") == before
+
+
+def test_status_missing_run_fails_cleanly(tmp_path):
+    result = runner.invoke(app, ["status", str(tmp_path / "nope")])
+    assert result.exit_code == 1
+    assert "no run found" in result.output
+
+
+def test_rerun_s1_invalidates_and_rewalks_to_gate_a(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    approve_gate_a(run_dir)
+    runner.invoke(app, ["resume", str(run_dir)])
+
+    result = runner.invoke(app, ["rerun", str(run_dir), "--stage", "S1"])
+    assert result.exit_code == 0, result.output
+    assert "invalidated" in result.output
+    assert "gate-a" in result.output  # walked S1 again and re-paused at the gate
+    ws = Workspace.open(run_dir)
+    assert ws.load_state().status is RunStatus.GATE_PENDING
+    assert not ws.path("allocation.yaml").exists()  # downstream stayed invalid
+    assert any(s.startswith("rerun S1") for s in ws.history())
+
+
+def test_rerun_s3_angle_scoped_via_cli(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    approve_gate_a(run_dir)
+    runner.invoke(app, ["resume", str(run_dir)])
+    ws = Workspace.open(run_dir)
+    angle_id = ws.read_artifact("angles/map.yaml", AngleMap).angles[0].id
+
+    result = runner.invoke(app, ["rerun", str(run_dir), "--stage", "S3", "--angle", angle_id])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(app, ["rerun", str(run_dir), "--stage", "S3", "--angle", "not-an-angle"])
+    assert result.exit_code == 1
+    assert "unknown angle" in result.output
+
+
+def test_rerun_unknown_stage_fails_cleanly(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    result = runner.invoke(app, ["rerun", str(run_dir), "--stage", "S99"])
+    assert result.exit_code == 1
+    assert "unknown stage" in result.output
+
+
+def test_report_stub(tmp_path):
+    _, run_dir = new_run(tmp_path)
+    result = runner.invoke(app, ["report", str(run_dir)])
+    assert result.exit_code == 0
+    assert "no report yet" in result.output
+    (run_dir / "report" / "decision-report.md").write_text("# report\n", encoding="utf-8")
+    result = runner.invoke(app, ["report", str(run_dir)])
+    assert "decision-report.md" in result.output
+
+
+async def test_schema_retry_exhaustion_pauses_run_for_attention(tmp_path):
+    """The real dispatcher path: an interviewer that never validates exhausts
+    caps.max_schema_retries and the engine lands in PAUSED_ATTENTION."""
+    from deeper.config import RunConfig, profile_config
+    from deeper.schemas import Stage
+
+    data = profile_config("quick").model_dump(mode="json")
+    data["goal"] = "retry exhaustion goal"
+    ws = Workspace.create(tmp_path / "run", RunConfig.model_validate(data))
+    retries = ws.load_config().caps.max_schema_retries
+    engine = Engine(
+        ws,
+        emit=lambda _line: None,
+        mock_kwargs={"scripted_responses": {"interviewer": ["not an artifact"] * (retries + 1)}},
+    )
+    assert await engine.run() is Node.PAUSED_ATTENTION
+    state = ws.load_state()
+    assert state.status is RunStatus.PAUSED_ATTENTION
+    assert state.stage is Stage.S0
+    # Every failed attempt was still ledgered (spend + retry counts persist).
+    assert len(state.spend) >= retries + 1
+    assert state.retry_counts.get("S0:interviewer:-") == retries
+
+
+@pytest.mark.parametrize("command", [["status"], ["resume"], ["report"]])
+def test_commands_resolve_run_names_under_runs_dir(tmp_path, monkeypatch, command):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["new", "cwd resolution goal", "--profile", "quick"])
+    assert result.exit_code == 0, result.output
+    run_name = next(p.name for p in (tmp_path / "runs").iterdir())
+    result = runner.invoke(app, [*command, run_name])
+    assert result.exit_code == 0, result.output

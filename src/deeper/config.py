@@ -85,6 +85,11 @@ class RunConfig(ArtifactModel):
     """config.yaml — the complete knob set for one run."""
 
     profile: NonEmptyStr = Field(description="quick | standard | exhaustive.")
+    goal: str | None = Field(
+        default=None,
+        description="The user's research question, verbatim — set by `deeper new` "
+        "before S0 exists to restate it into brief.md.",
+    )
     mode: Literal["mock", "live"] = Field(
         default="mock", description="Agent dispatch mode; mock runs the pipeline offline."
     )

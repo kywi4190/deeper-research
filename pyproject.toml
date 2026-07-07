@@ -21,6 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
+deeper = "deeper.orchestrator.cli:app"
 deeper-lab = "deeper.promptlab:app"
 
 [project.optional-dependencies]

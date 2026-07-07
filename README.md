@@ -13,16 +13,18 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Phase A complete; Phase B substrate + dispatch layer built (Prompt 5).**
-Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an
-LLM-facing validation-error formatter, and a generated JSON Schema in `schemas/`; the
-versioned agent prompts for stages 0–5 live in `agents/` with the `deeper-lab`
-prompt-iteration harness (design-doc M0). The no-LLM substrate exists — the git-backed
-run **workspace** (`workspace.py`), the **run profiles / config loader** (`config.py`),
-the **S2 budget allocator + reflow** (`allocation.py`) — and on top of it the **agent
-dispatch layer** (`agents_runtime/`): contracts, schema-retry, code-enforced
-quarantine/write-scope/source-hygiene hooks, a fully offline mock mode, and per-invocation
-spend accounting. No stages, orchestrator, or main CLI yet.
+**Phase A complete; Phase B substrate, dispatch layer, and orchestrator built
+(Prompt 6).** Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON
+round-trip, an LLM-facing validation-error formatter, and a generated JSON Schema in
+`schemas/`; the versioned agent prompts for stages 0–5 live in `agents/` with the
+`deeper-lab` prompt-iteration harness (design-doc M0). The no-LLM substrate exists —
+the git-backed run **workspace** (`workspace.py`), the **run profiles / config loader**
+(`config.py`), the **S2 budget allocator + reflow** (`allocation.py`) — plus the
+**agent dispatch layer** (`agents_runtime/`) and now the **deterministic orchestrator**
+(`orchestrator/`): an explicit state machine over S0–S8 with gates as file-edit pause
+states, crash-safe idempotent resume, surgical rerun invalidation, and the `deeper`
+CLI. Stages S0–S2 have provisional mock-walkable implementations (real versions arrive
+in Prompt 7); S3–S8 are registered stubs that report cleanly.
 
 ## Architecture map
 
@@ -38,11 +40,11 @@ state of a run.
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 | stub (Prompts 7–12) |
-| `src/deeper/orchestrator/` | State machine, gates, CLI | stub (Prompt 6) |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry) | S0–S2 provisional, S3–S8 stubs (Prompts 7–12) |
+| `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime suites (627 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator suites (658 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -199,7 +201,7 @@ sequences to exercise the retry loop.
 
 **Spend accounting**: every attempt lands a `SpendEntry` (stage, role, angle/option
 context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
-is what gates report and the orchestrator's caps will check. Retry counts persist in
+is what gates report and the orchestrator's cap checks read. Retry counts persist in
 `RunState.retry_counts` keyed `stage:role:context`.
 
 ## The prompt-lab (`deeper-lab`)
@@ -267,12 +269,57 @@ the angles whose critics flagged missed options — same formula, floor 0 (the g
 was already spent) and cap 100% of the pool — and skips angles that tripped the
 redundancy stop.
 
+## The orchestrator (`src/deeper/orchestrator/`)
+
+The deterministic spine (design P8, §8): code decides *process* — stage sequencing,
+budgets, stop rules, gates — and the only path to an LLM is a stage calling the
+dispatch layer. The state machine's nodes:
+
+```
+new ─► S0 ─► S1 ─► GATE_A ─► S2 ─► S3 ─► S4 ─► GATE_B ─► S5 ─► S6 ─► S7 ─► GATE_C ─► S8 ─► DONE
+              ▲      │ rerun_hint                                            │ (loops: Prompts 11/12)
+              └──────┘
+any stage ──AgentOutputInvalid──► PAUSED_ATTENTION ──resume──► same stage
+```
+
+Nothing new is persisted for the nodes: `RunState` already encodes every one as the
+`(stage, status, pending_gate)` triple, and `node_of()` derives the node from it. Each
+`Engine.run()` step loads state, dispatches on the node, and commits the transition —
+so **crash safety is free**: after any interruption, `deeper resume` re-derives where
+it was and re-enters. Idempotency has two levels: the engine skips a stage whose
+declared outputs all exist and validate, and each stage's `execute()` skips
+already-completed sub-work before dispatching (e.g. a per-cartographer raw report that
+validates is not re-run).
+
+**Stages** (`src/deeper/stages/`) are classes over a small protocol —
+`validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
+agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
+in `STAGES`. S0 (mock-only interview), S1 (fixed ensemble, no saturation rule yet),
+and S2 (real allocation math) are provisional; S3–S8 raise `NotImplementedYet`, which
+the engine reports cleanly, leaving state untouched and resumable.
+
+**Gates are file-edit pause states.** Entering a gate writes a commented template
+(`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
+decision (`approved: false`), prints what to review and edit, and exits. The template
+is never overwritten once it exists — a half-edited decision survives resume. On
+`deeper resume`, the file is validated: YAML/schema errors or a still-undecided body
+re-pause with the exact problem; `approved: true` advances (gate marked in
+`state.json`, one commit); Gate A's `rerun_hint` loops back through S1 via the same
+invalidation machinery as `rerun`. An agent that exhausts its schema retries
+(`AgentOutputInvalid`) pauses the run as `PAUSED_ATTENTION` with the validation
+errors; `deeper resume` re-enters the stage after you fix the cause.
+
+**Surgical rerun** (`deeper rerun <run> --stage S3 [--angle x]`) is git-tracked
+deletion: the target stage's output subtree (angle-scoped for S3) plus everything
+downstream — stage outputs, gate files, gate statuses — is removed in one commit, the
+run pointer moves back, and the machine walks forward again. Deletion (not a stale
+flag) is what keeps the idempotency checks honest; spend entries are never touched,
+and recovery is one `git revert` away.
+
 ## How to run
 
-There is no CLI yet — it arrives in Prompt 6 (`deeper new`, `status`, `resume`,
-`rerun`, `report`). For now the project is a library.
-
-Set up a virtual environment and install in editable mode:
+Set up a virtual environment and install in editable mode (registers the `deeper`
+and `deeper-lab` entry points):
 
 ```bash
 python -m venv .venv
@@ -280,6 +327,27 @@ python -m venv .venv
 # macOS/Linux:          source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+Then drive a run through the CLI (mock mode is the default — the whole pipeline runs
+offline against fixtures):
+
+```bash
+deeper new "which vector database should we adopt" --profile quick
+#   creates runs/<date>-<goal-slug>, executes S0+S1, pauses at Gate A telling you
+#   exactly what to review and which file to edit
+#   (--live dispatches real agents; S0's interactive interview arrives in Prompt 7)
+
+deeper status <run>          # node, gate statuses, spend by stage, pending-gate hint
+# edit runs/<...>/gates/gate-a.yaml -> approved: true
+deeper resume <run>          # validates the gate file, runs S2, continues to S3
+deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
+deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
+deeper report <run>          # decision-report path (S8, not built yet)
+```
+
+`<run>` is a path or a name under `runs/`. Every command is safe to repeat: pauses
+exit 0 with instructions, `status`/`report` are read-only, and re-entering a run never
+re-executes completed work.
 
 ## How to test
 
@@ -331,6 +399,20 @@ canonical `Makefile` is used wherever GNU make is available.
 - **Hook-written `SourceRecord.tier` defaults to T3.** The source-cache hook cannot
   judge source quality, so it records the conservative floor; agents carry their own
   tier judgments in per-claim `SourceRef`s and the verifier adjudicates later.
+- **The goal lives in `RunConfig`.** `deeper new` must persist the user's goal before
+  S0 exists to restate it into `brief.md`, so `RunConfig` carries an optional `goal`
+  field — `config.yaml` is the materialized per-run input record. The design doc
+  doesn't name a home for the raw goal text.
+- **Undecided-gate semantics.** The design says resume "re-validates the gate file and
+  continues" but doesn't define a not-yet-decided file. Here the written template
+  parses as a valid decision with `approved: false` and no actions; resume treats that
+  as "no decision recorded" and re-pauses, so an accidental resume can never advance a
+  gate. Gate templates are never overwritten once written.
+- **S0–S2 are provisional until Prompt 7.** So the state machine is walkable
+  end-to-end today (the build guide's Prompt 6 exit test), S0 dispatches the
+  interviewer non-interactively in mock mode only, S1 runs a fixed ensemble without
+  the saturation rule, and Gate A records but does not yet apply edit actions or
+  inject the rerun hint. S2's allocation is the real math.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -345,11 +427,11 @@ Following the phases in the build guide:
 - **Phase A — Foundation:** Prompt 1 (bootstrap) ✅ · Prompt 2 (schemas) ✅ · Prompt 3
   (agent prompts + prompt-lab) ✅.
 - **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
-  Prompt 5 (dispatch layer) ✅ → orchestrator/CLI → stages S0–S5.
+  Prompt 5 (dispatch layer) ✅ → Prompt 6 (orchestrator/CLI) ✅ → stages S0–S5.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 6 — orchestrator state machine + CLI (`deeper new`, `status`,
-`resume`, `rerun`, `report`).**
+**Next: Phase B, Prompt 7 — real S0–S2: interactive intake, cartography ensemble with
+the saturation rule, Gate A action application, allocation at the gate exit.**
