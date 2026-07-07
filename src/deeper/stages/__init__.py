@@ -12,15 +12,15 @@ from .base import (
 )
 from .not_yet import (
     DeepDiveStage,
-    RubricStage,
-    ScoutingStage,
-    ScreeningStage,
     SynthesisStage,
     TournamentStage,
 )
 from .s0_intake import IntakeStage
 from .s1_cartography import CartographyStage
 from .s2_allocation import AllocationStage
+from .s3_scouting import ScoutingStage
+from .s4_rubric import RubricStage
+from .s5_screening import ScreeningStage
 
 STAGES: dict[Stage, type[StageBase]] = {
     Stage.S0: IntakeStage,

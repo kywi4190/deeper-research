@@ -1,0 +1,50 @@
+# Mock S3 scout output — small-model-science. Neither card clears the UCB
+# threshold on its own; model-collapse-dynamics is the one the diversity
+# guardrail later adds (highest UCB in an unrepresented top-half angle).
+angle_id: small-model-science
+cards:
+  - id: model-collapse-dynamics
+    name: Model-collapse dynamics under iterated synthetic training
+    angle_id: small-model-science
+    description: Map the phase diagram of model collapse when sub-1B models are
+      iteratively trained on their own outputs, with full sweeps over mixing
+      ratios and generations.
+    mechanism: Complete experimental control at small scale turns the compute
+      constraint into the methodological point — every cell of the sweep is run,
+      not sampled.
+    preliminary_evidence:
+      - text: Collapse phenomena reproduce at sub-1B scale in published work, so the
+          full-sweep version is compute-feasible on a 4x A100 node.
+        source:
+          url: "https://www.nature.com/articles/s41586-024-07566-y"
+          tier: T1
+          title: AI models collapse when trained on recursively generated data
+          content_hash: null
+    uncertainties:
+      - Whether the phase boundaries are sharp enough to be a headline result
+      - Sensitivity of conclusions to the choice of synthetic-data generator
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+  - id: grokking-phase-map
+    name: Grokking phase-boundary mapping in toy transformers
+    angle_id: small-model-science
+    description: Chart the hyperparameter phase boundaries of grokking across
+      algorithmic tasks in toy transformers, with a reproducible sweep artifact.
+    mechanism: Dense hyperparameter sweeps locate the memorization-generalization
+      boundary; the map itself is the contribution.
+    preliminary_evidence:
+      - text: Grokking reproduces reliably in small transformers with single-GPU
+          budgets in multiple published replications.
+        source:
+          url: "https://arxiv.org/abs/2201.02177"
+          tier: T1
+          title: "Grokking: Generalization Beyond Overfitting"
+          content_hash: null
+    uncertainties:
+      - Whether another phase map is novel after the existing grokking literature
+      - Task-dependence of the boundary shapes
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: null

@@ -1,127 +1,1121 @@
-# Mock S5 screening — scores the scout's interpretability cards against the
-# rubric. The screener is the ONLY Phase-A role that reads preferences (P9):
-# tastes enter through preference_score alone.
+# Mock S5 screening — every card from the 8 per-angle scout fixtures (including
+# the two reflow top-up cards), scored against the rubric fixture with slot
+# weight 0.2. Scenario landmarks, all under threshold 3.5 (quick profile):
+#   - supervisor-submission-extension: highest scorer, CONFIRMED kill-risk -> cut
+#   - cot-hurts-small-models: DARK HORSE — point 3.1 < 3.5 <= ucb 4.2 (wide band)
+#   - interpretability has 4 options with ucb >= 3.5 -> the 4th trips the angle cap
+#   - top-3 finalists span 2 angles -> breadth guardrail adds the best option from
+#     each unrepresented top-half angle (supervisor-pipeline, small-model-science)
+# Aggregates assume preference-slot weight 0.2; S5 recomputes them in code anyway.
 options:
-  - option_id: sae-feature-atlas
-    angle_id: interpretability-research
-    criterion_scores:
-      - criterion_id: publication-potential
-        score: 4.0
-        band: {lo: 3.5, hi: 4.5}
-        evidence_pointer: Card's T1 precedent (Towards Monosemanticity) shows the
-          method publishes at comparable scale; atlas artifacts have venue precedent.
-      - criterion_id: letter-strength
-        score: 3.5
-        band: {lo: 3.0, hi: 4.0}
-        evidence_pointer: Card implies supervisor owns the tooling but not the
-          question; collaboration cadence unstated.
-      - criterion_id: feasibility
-        score: 3.5
-        band: {lo: 2.5, hi: 4.5}
-        evidence_pointer: Card uncertainty about SAE sweep compute widens the band;
-          kill-risk on hook points is cheap to clear.
-      - criterion_id: research-taste-signal
-        score: 4.0
-        band: {lo: 3.5, hi: 4.5}
-        evidence_pointer: Atlas framing and validation methodology are student-framed
-          per the card description.
-      - criterion_id: momentum-by-deadline
-        score: 4.0
-        band: {lo: 3.0, hi: 4.5}
-        evidence_pointer: Feature-atlas releases are workshop-sized at semester one
-          per the card's mechanism section.
-    preference_score:
-      criterion_id: preference-slot
-      score: 4.5
-      band: {lo: 4.0, hi: 5.0}
-      evidence_pointer: Strong stated interest in interpretability; solo-scale work
-        matches the small-team preference.
-    kill_risk_checks:
-      - fact: The target model's activations are not accessible at the needed hook
-          points in the available tooling
-        outcome: cleared
-        evidence:
-          url: "https://github.com/TransformerLensOrg/TransformerLens"
-          tier: T2
-          title: TransformerLens hook-point documentation
-          content_hash: null
-    weighted_point: 3.8
-    weighted_ucb: 4.4
-    notes: null
-  - option_id: backdoor-probe-study
-    angle_id: interpretability-research
-    criterion_scores:
-      - criterion_id: publication-potential
-        score: 3.5
-        band: {lo: 3.0, hi: 4.5}
-        evidence_pointer: Safety-track fit is strong but the card's evidence gap on
-          probe-method viability keeps the band wide.
-      - criterion_id: letter-strength
-        score: 3.0
-        band: {lo: 2.5, hi: 3.5}
-        evidence_pointer: No supervisor-agenda link on the card.
-      - criterion_id: feasibility
-        score: 4.0
-        band: {lo: 3.5, hi: 4.5}
-        evidence_pointer: Probing is inference-scale; well within the node budget.
-      - criterion_id: research-taste-signal
-        score: 3.5
-        band: {lo: 3.0, hi: 4.0}
-        evidence_pointer: Question is timely though adjacent to published replications.
-      - criterion_id: momentum-by-deadline
-        score: 3.5
-        band: {lo: 3.0, hi: 4.0}
-        evidence_pointer: A probe-family comparison is preprintable by December.
-    preference_score:
-      criterion_id: preference-slot
-      score: 4.0
-      band: {lo: 3.5, hi: 4.5}
-      evidence_pointer: Interpretability-adjacent and solo-scale; slightly less core
-        to stated interests than the atlas.
-    kill_risk_checks:
-      - fact: No poisoned model checkpoints are publicly available at probe-able scale
-        outcome: cleared
-        evidence:
-          url: "https://huggingface.co/models?search=sleeper-agent"
-          tier: T2
-          title: Public sleeper-agent checkpoint search
-          content_hash: null
-    weighted_point: 3.5
-    weighted_ucb: 4.1
-    notes: null
-  - option_id: activation-patching-toolkit
-    angle_id: interpretability-research
-    criterion_scores:
-      - criterion_id: publication-potential
-        score: 3.0
-        band: {lo: 2.5, hi: 3.5}
-        evidence_pointer: Card itself flags uncertainty that a toolkit clears the
-          top-venue novelty bar; T2 evidence only.
-      - criterion_id: letter-strength
-        score: 3.0
-        band: {lo: 2.5, hi: 3.5}
-        evidence_pointer: Tool maintenance is solitary work; limited shared-question
-          collaboration implied.
-      - criterion_id: feasibility
-        score: 3.0
-        band: {lo: 2.5, hi: 4.0}
-        evidence_pointer: Card notes maintenance burden competing with thesis writing.
-      - criterion_id: research-taste-signal
-        score: 3.0
-        band: {lo: 2.5, hi: 3.5}
-        evidence_pointer: Engineering-forward framing signals craft more than taste.
-      - criterion_id: momentum-by-deadline
-        score: 4.0
-        band: {lo: 3.5, hi: 4.5}
-        evidence_pointer: A released tool plus case-study preprint is visible early.
-    preference_score:
-      criterion_id: preference-slot
-      score: 3.5
-      band: {lo: 3.0, hi: 4.0}
-      evidence_pointer: Interpretability-adjacent but tool-building is not the stated
-        core interest.
-    kill_risk_checks: []
-    weighted_point: 3.2
-    weighted_ucb: 3.7
-    notes: null
+- option_id: sae-feature-atlas
+  angle_id: interpretability-research
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Top-venue publication potential: T1 precedent (Towards Monosemanticity) supports
+      every dimension at comparable scale.'
+  - criterion_id: letter-strength
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Recommendation-letter strength: T1 precedent (Towards Monosemanticity) supports
+      every dimension at comparable scale.'
+  - criterion_id: feasibility
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 precedent (Towards Monosemanticity)
+      supports every dimension at comparable scale.'
+  - criterion_id: research-taste-signal
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Independent research-taste signal: T1 precedent (Towards Monosemanticity) supports
+      every dimension at comparable scale.'
+  - criterion_id: momentum-by-deadline
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Citable momentum by application time: T1 precedent (Towards Monosemanticity) supports
+      every dimension at comparable scale.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 4.5
+    band:
+      lo: 4.0
+      hi: 5.0
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: The target model's activations are not accessible at the needed hook points in the available
+      tooling
+    outcome: cleared
+    evidence:
+      url: https://github.com/TransformerLensOrg/TransformerLens
+      tier: T2
+      title: TransformerLens hook-point documentation
+      content_hash: null
+  weighted_point: 4.1
+  weighted_ucb: 4.6
+  notes: null
+- option_id: backdoor-probe-study
+  angle_id: interpretability-research
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.25
+    evidence_pointer: 'Top-venue publication potential: two T1 refs after revision; venue fit strong,
+      generalization uncertainty keeps the top of the band open.'
+  - criterion_id: letter-strength
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.25
+    evidence_pointer: 'Recommendation-letter strength: two T1 refs after revision; venue fit strong, generalization
+      uncertainty keeps the top of the band open.'
+  - criterion_id: feasibility
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.25
+    evidence_pointer: 'Two-semester feasibility under compute constraints: two T1 refs after revision;
+      venue fit strong, generalization uncertainty keeps the top of the band open.'
+  - criterion_id: research-taste-signal
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.25
+    evidence_pointer: 'Independent research-taste signal: two T1 refs after revision; venue fit strong,
+      generalization uncertainty keeps the top of the band open.'
+  - criterion_id: momentum-by-deadline
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.25
+    evidence_pointer: 'Citable momentum by application time: two T1 refs after revision; venue fit strong,
+      generalization uncertainty keeps the top of the band open.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: No poisoned model checkpoints are publicly available at probe-able scale
+    outcome: cleared
+    evidence:
+      url: https://huggingface.co/models?search=sleeper-agent
+      tier: T2
+      title: Public sleeper-agent checkpoint search
+      content_hash: null
+  weighted_point: 3.6
+  weighted_ucb: 4.3
+  notes: null
+- option_id: activation-patching-toolkit
+  angle_id: interpretability-research
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Top-venue publication potential: card''s own novelty-bar uncertainty caps the central
+      estimate; T2 evidence only.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Recommendation-letter strength: card''s own novelty-bar uncertainty caps the central
+      estimate; T2 evidence only.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Two-semester feasibility under compute constraints: card''s own novelty-bar uncertainty
+      caps the central estimate; T2 evidence only.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Independent research-taste signal: card''s own novelty-bar uncertainty caps the
+      central estimate; T2 evidence only.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Citable momentum by application time: card''s own novelty-bar uncertainty caps
+      the central estimate; T2 evidence only.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.0
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.1
+  weighted_ucb: 3.6
+  notes: null
+- option_id: feature-steering-study
+  angle_id: interpretability-research
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Top-venue publication potential: T1 steering precedent but dependency on the atlas
+      card''s SAE training succeeding.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Recommendation-letter strength: T1 steering precedent but dependency on the atlas
+      card''s SAE training succeeding.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 steering precedent but dependency
+      on the atlas card''s SAE training succeeding.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Independent research-taste signal: T1 steering precedent but dependency on the
+      atlas card''s SAE training succeeding.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Citable momentum by application time: T1 steering precedent but dependency on the
+      atlas card''s SAE training succeeding.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.0
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.1
+  weighted_ucb: 3.56
+  notes: null
+- option_id: circuit-case-study
+  angle_id: interpretability-research
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Top-venue publication potential: strong T1 genre precedent but the card''s own
+      unclaimed-capability uncertainty dominates.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Recommendation-letter strength: strong T1 genre precedent but the card''s own unclaimed-capability
+      uncertainty dominates.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Two-semester feasibility under compute constraints: strong T1 genre precedent but
+      the card''s own unclaimed-capability uncertainty dominates.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Independent research-taste signal: strong T1 genre precedent but the card''s own
+      unclaimed-capability uncertainty dominates.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Citable momentum by application time: strong T1 genre precedent but the card''s
+      own unclaimed-capability uncertainty dominates.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.8
+  weighted_ucb: 3.3
+  notes: null
+- option_id: contamination-robust-benchmark
+  angle_id: evaluation-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.75
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Top-venue publication potential: T1 venue precedent for functional benchmarks;
+      difficulty-ceiling uncertainty holds the band open upward.'
+  - criterion_id: letter-strength
+    score: 3.75
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Recommendation-letter strength: T1 venue precedent for functional benchmarks; difficulty-ceiling
+      uncertainty holds the band open upward.'
+  - criterion_id: feasibility
+    score: 3.75
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 venue precedent for functional
+      benchmarks; difficulty-ceiling uncertainty holds the band open upward.'
+  - criterion_id: research-taste-signal
+    score: 3.75
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Independent research-taste signal: T1 venue precedent for functional benchmarks;
+      difficulty-ceiling uncertainty holds the band open upward.'
+  - criterion_id: momentum-by-deadline
+    score: 3.75
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: 'Citable momentum by application time: T1 venue precedent for functional benchmarks;
+      difficulty-ceiling uncertainty holds the band open upward.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: A functionally identical contamination-robust benchmark already covers the same reasoning domain
+    outcome: cleared
+    evidence:
+      url: https://paperswithcode.com/datasets?q=functional+reasoning
+      tier: T2
+      title: Benchmark listing search
+      content_hash: null
+  weighted_point: 3.8
+  weighted_ucb: 4.5
+  notes: null
+- option_id: agent-failure-taxonomy
+  angle_id: evaluation-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Top-venue publication potential: T2 evidence; annotation-budget uncertainty and
+      version drift cap the upside.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Recommendation-letter strength: T2 evidence; annotation-budget uncertainty and
+      version drift cap the upside.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T2 evidence; annotation-budget
+      uncertainty and version drift cap the upside.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Independent research-taste signal: T2 evidence; annotation-budget uncertainty and
+      version drift cap the upside.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Citable momentum by application time: T2 evidence; annotation-budget uncertainty
+      and version drift cap the upside.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.0
+  weighted_ucb: 3.42
+  notes: null
+- option_id: long-horizon-eval-harness
+  angle_id: evaluation-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Top-venue publication potential: T2 survey evidence names the gap; measurability
+      at open-model capability untested.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Recommendation-letter strength: T2 survey evidence names the gap; measurability
+      at open-model capability untested.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T2 survey evidence names the
+      gap; measurability at open-model capability untested.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Independent research-taste signal: T2 survey evidence names the gap; measurability
+      at open-model capability untested.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.45
+    evidence_pointer: 'Citable momentum by application time: T2 survey evidence names the gap; measurability
+      at open-model capability untested.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.0
+  weighted_ucb: 3.46
+  notes: null
+- option_id: supervisor-submission-extension
+  angle_id: supervisor-pipeline
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 4.25
+    band:
+      lo: 4.0
+      hi: 4.75
+    evidence_pointer: 'Top-venue publication potential: lab publication record is direct evidence on every
+      criterion; scoring abbreviated after the confirmed kill.'
+  - criterion_id: letter-strength
+    score: 4.25
+    band:
+      lo: 4.0
+      hi: 4.75
+    evidence_pointer: 'Recommendation-letter strength: lab publication record is direct evidence on every
+      criterion; scoring abbreviated after the confirmed kill.'
+  - criterion_id: feasibility
+    score: 4.25
+    band:
+      lo: 4.0
+      hi: 4.75
+    evidence_pointer: 'Two-semester feasibility under compute constraints: lab publication record is direct
+      evidence on every criterion; scoring abbreviated after the confirmed kill.'
+  - criterion_id: research-taste-signal
+    score: 4.25
+    band:
+      lo: 4.0
+      hi: 4.75
+    evidence_pointer: 'Independent research-taste signal: lab publication record is direct evidence on
+      every criterion; scoring abbreviated after the confirmed kill.'
+  - criterion_id: momentum-by-deadline
+    score: 4.25
+    band:
+      lo: 4.0
+      hi: 4.75
+    evidence_pointer: 'Citable momentum by application time: lab publication record is direct evidence
+      on every criterion; scoring abbreviated after the confirmed kill.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.0
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: The follow-up study is already committed to the lab's incoming postdoc
+    outcome: confirmed
+    evidence:
+      url: https://github.example.edu/lab/project-board
+      tier: T3
+      title: 'Lab project board: follow-up assigned'
+      content_hash: null
+  weighted_point: 4.1
+  weighted_ucb: 4.6
+  notes: 'Scoring abbreviated: kill-risk confirmed, scored cheaply from the card alone.'
+- option_id: lab-codebase-takeover
+  angle_id: supervisor-pipeline
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Top-venue publication potential: T3 issue-tracker evidence; publishability of the
+      open questions is the live doubt.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Recommendation-letter strength: T3 issue-tracker evidence; publishability of the
+      open questions is the live doubt.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T3 issue-tracker evidence;
+      publishability of the open questions is the live doubt.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Independent research-taste signal: T3 issue-tracker evidence; publishability of
+      the open questions is the live doubt.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Citable momentum by application time: T3 issue-tracker evidence; publishability
+      of the open questions is the live doubt.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.25
+    band:
+      lo: 2.75
+      hi: 3.75
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.05
+  weighted_ucb: 3.47
+  notes: null
+- option_id: model-collapse-dynamics
+  angle_id: small-model-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Top-venue publication potential: T1 phenomenon precedent, but headline-sharpness
+      of the phase boundaries is unknown.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Recommendation-letter strength: T1 phenomenon precedent, but headline-sharpness
+      of the phase boundaries is unknown.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 phenomenon precedent, but
+      headline-sharpness of the phase boundaries is unknown.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Independent research-taste signal: T1 phenomenon precedent, but headline-sharpness
+      of the phase boundaries is unknown.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: 'Citable momentum by application time: T1 phenomenon precedent, but headline-sharpness
+      of the phase boundaries is unknown.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.0
+  weighted_ucb: 3.48
+  notes: null
+- option_id: grokking-phase-map
+  angle_id: small-model-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Top-venue publication potential: T1 reproductions exist; novelty after the existing
+      grokking literature is the cap.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Recommendation-letter strength: T1 reproductions exist; novelty after the existing
+      grokking literature is the cap.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 reproductions exist; novelty
+      after the existing grokking literature is the cap.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Independent research-taste signal: T1 reproductions exist; novelty after the existing
+      grokking literature is the cap.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Citable momentum by application time: T1 reproductions exist; novelty after the
+      existing grokking literature is the cap.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.8
+  weighted_ucb: 3.32
+  notes: null
+- option_id: activation-caching-lib
+  angle_id: research-tooling
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Top-venue publication potential: T3 pain-point evidence; adoption-by-deadline risk
+      caps the band.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Recommendation-letter strength: T3 pain-point evidence; adoption-by-deadline risk
+      caps the band.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T3 pain-point evidence; adoption-by-deadline
+      risk caps the band.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Independent research-taste signal: T3 pain-point evidence; adoption-by-deadline
+      risk caps the band.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Citable momentum by application time: T3 pain-point evidence; adoption-by-deadline
+      risk caps the band.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.75
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.1
+  weighted_ucb: 3.47
+  notes: null
+- option_id: repro-eval-harness
+  angle_id: research-tooling
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Top-venue publication potential: T2 need evidence but adoption timing and roadmap
+      overlap cap the upside.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Recommendation-letter strength: T2 need evidence but adoption timing and roadmap
+      overlap cap the upside.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T2 need evidence but adoption
+      timing and roadmap overlap cap the upside.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Independent research-taste signal: T2 need evidence but adoption timing and roadmap
+      overlap cap the upside.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Citable momentum by application time: T2 need evidence but adoption timing and
+      roadmap overlap cap the upside.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.25
+    band:
+      lo: 2.75
+      hi: 3.6
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.85
+  weighted_ucb: 3.32
+  notes: null
+- option_id: protein-annotation-partnership
+  angle_id: applied-domain-collaboration
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Top-venue publication potential: T1 method precedent; partner commitment unresolved
+      (kill-risk check inconclusive).'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Recommendation-letter strength: T1 method precedent; partner commitment unresolved
+      (kill-risk check inconclusive).'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 method precedent; partner
+      commitment unresolved (kill-risk check inconclusive).'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Independent research-taste signal: T1 method precedent; partner commitment unresolved
+      (kill-risk check inconclusive).'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Citable momentum by application time: T1 method precedent; partner commitment unresolved
+      (kill-risk check inconclusive).'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: No partner lab has committed data access this academic year
+    outcome: unresolved
+    evidence: null
+  weighted_point: 3.0
+  weighted_ucb: 3.42
+  notes: null
+- option_id: protein-annotation-transfer
+  angle_id: applied-domain-collaboration
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Top-venue publication potential: duplicate of the partnership pipeline per the
+      critique; scored from the same evidence.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Recommendation-letter strength: duplicate of the partnership pipeline per the critique;
+      scored from the same evidence.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Two-semester feasibility under compute constraints: duplicate of the partnership
+      pipeline per the critique; scored from the same evidence.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Independent research-taste signal: duplicate of the partnership pipeline per the
+      critique; scored from the same evidence.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: 'Citable momentum by application time: duplicate of the partnership pipeline per
+      the critique; scored from the same evidence.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.8
+  weighted_ucb: 3.3
+  notes: null
+- option_id: materials-property-prediction
+  angle_id: applied-domain-collaboration
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Top-venue publication potential: T2 method precedent; dataset-size and dual-venue
+      risks cap the estimate.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Recommendation-letter strength: T2 method precedent; dataset-size and dual-venue
+      risks cap the estimate.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T2 method precedent; dataset-size
+      and dual-venue risks cap the estimate.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Independent research-taste signal: T2 method precedent; dataset-size and dual-venue
+      risks cap the estimate.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Citable momentum by application time: T2 method precedent; dataset-size and dual-venue
+      risks cap the estimate.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.75
+  weighted_ucb: 3.29
+  notes: null
+- option_id: lora-budget-study
+  angle_id: training-efficiency
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Top-venue publication potential: T1 base method, but the crowded comparison literature
+      caps distinctiveness.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Recommendation-letter strength: T1 base method, but the crowded comparison literature
+      caps distinctiveness.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 base method, but the crowded
+      comparison literature caps distinctiveness.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Independent research-taste signal: T1 base method, but the crowded comparison literature
+      caps distinctiveness.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.4
+    evidence_pointer: 'Citable momentum by application time: T1 base method, but the crowded comparison
+      literature caps distinctiveness.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.95
+  weighted_ucb: 3.37
+  notes: null
+- option_id: lora-rank-schedule
+  angle_id: training-efficiency
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.2
+    evidence_pointer: 'Top-venue publication potential: variant of the budget study per the critique;
+      scored from the same evidence.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.2
+    evidence_pointer: 'Recommendation-letter strength: variant of the budget study per the critique; scored
+      from the same evidence.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.2
+    evidence_pointer: 'Two-semester feasibility under compute constraints: variant of the budget study
+      per the critique; scored from the same evidence.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.2
+    evidence_pointer: 'Independent research-taste signal: variant of the budget study per the critique;
+      scored from the same evidence.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.2
+    evidence_pointer: 'Citable momentum by application time: variant of the budget study per the critique;
+      scored from the same evidence.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.75
+  weighted_ucb: 3.21
+  notes: null
+- option_id: quantization-aware-study
+  angle_id: training-efficiency
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Top-venue publication potential: T2 feasibility evidence; knee-point novelty against
+      published curves uncertain.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Recommendation-letter strength: T2 feasibility evidence; knee-point novelty against
+      published curves uncertain.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T2 feasibility evidence; knee-point
+      novelty against published curves uncertain.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Independent research-taste signal: T2 feasibility evidence; knee-point novelty
+      against published curves uncertain.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Citable momentum by application time: T2 feasibility evidence; knee-point novelty
+      against published curves uncertain.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.25
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.75
+  weighted_ucb: 3.29
+  notes: null
+- option_id: cot-hurts-small-models
+  angle_id: negative-results-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.0
+      hi: 4.25
+    evidence_pointer: 'Top-venue publication potential: single T3 source — genuinely cannot rule out a
+      strong or a null result, so the band spans both.'
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.0
+      hi: 4.25
+    evidence_pointer: 'Recommendation-letter strength: single T3 source — genuinely cannot rule out a
+      strong or a null result, so the band spans both.'
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.0
+      hi: 4.25
+    evidence_pointer: 'Two-semester feasibility under compute constraints: single T3 source — genuinely
+      cannot rule out a strong or a null result, so the band spans both.'
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.0
+      hi: 4.25
+    evidence_pointer: 'Independent research-taste signal: single T3 source — genuinely cannot rule out
+      a strong or a null result, so the band spans both.'
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.0
+      hi: 4.25
+    evidence_pointer: 'Citable momentum by application time: single T3 source — genuinely cannot rule
+      out a strong or a null result, so the band spans both.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 4.0
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.1
+  weighted_ucb: 4.2
+  notes: null
+- option_id: interp-method-stress-test
+  angle_id: negative-results-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Top-venue publication potential: T1 genre precedent but incremental-after-sanity-checks
+      risk caps the estimate.'
+  - criterion_id: letter-strength
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Recommendation-letter strength: T1 genre precedent but incremental-after-sanity-checks
+      risk caps the estimate.'
+  - criterion_id: feasibility
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Two-semester feasibility under compute constraints: T1 genre precedent but incremental-after-sanity-checks
+      risk caps the estimate.'
+  - criterion_id: research-taste-signal
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Independent research-taste signal: T1 genre precedent but incremental-after-sanity-checks
+      risk caps the estimate.'
+  - criterion_id: momentum-by-deadline
+    score: 2.75
+    band:
+      lo: 2.25
+      hi: 3.3
+    evidence_pointer: 'Citable momentum by application time: T1 genre precedent but incremental-after-sanity-checks
+      risk caps the estimate.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.0
+    band:
+      lo: 2.5
+      hi: 3.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 2.8
+  weighted_ucb: 3.34
+  notes: null
 notes: null

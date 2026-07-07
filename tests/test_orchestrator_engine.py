@@ -12,7 +12,16 @@ import pytest
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
 from deeper.config import RunConfig, SizeClass, profile_config
 from deeper.orchestrator import Engine, Node, node_of
-from deeper.schemas import GateADecision, GateName, GateStatus, RunStatus, Stage
+from deeper.schemas import (
+    Criterion,
+    GateADecision,
+    GateName,
+    GateStatus,
+    PreferenceSlot,
+    Rubric,
+    RunStatus,
+    Stage,
+)
 from deeper.stages import NotImplementedYet, StageBase
 from deeper.workspace import Workspace
 
@@ -30,6 +39,23 @@ FAKE_OUTPUT: dict[Stage, str] = {
 }
 
 DUMMY = GateADecision(approved=False)
+# S4's fake must write a REAL rubric: Gate B's apply step reads rubric.yaml to
+# record the preference-slot weight, even on a bare approval.
+DUMMY_RUBRIC = Rubric(
+    criteria=[
+        Criterion(
+            id=f"crit-{i}",
+            name=f"Criterion {i}",
+            definition="what it measures",
+            measurement_method="what evidence moves it",
+            levels={n: f"level {n}" for n in range(1, 6)},
+            weight=0.2,
+            justification="traceable to the destination model",
+        )
+        for i in range(1, 6)
+    ],
+    preference_slot=PreferenceSlot(weight=0.2),
+)
 
 
 def fake_registry(record: list[str], failures: dict[Stage, list[Exception]] | None = None):
@@ -38,16 +64,18 @@ def fake_registry(record: list[str], failures: dict[Stage, list[Exception]] | No
     failures = failures or {}
 
     def make(stage: Stage) -> type[StageBase]:
+        artifact = DUMMY_RUBRIC if stage is Stage.S4 else DUMMY
+
         class Fake(StageBase):
             async def execute(self, ctx):
                 record.append(stage.value)
                 queue = failures.get(stage)
                 if queue:
                     raise queue.pop(0)
-                ctx.workspace.write_artifact(FAKE_OUTPUT[stage], DUMMY)
+                ctx.workspace.write_artifact(FAKE_OUTPUT[stage], artifact)
 
             def outputs(self, ctx):
-                return [(FAKE_OUTPUT[stage], GateADecision)]
+                return [(FAKE_OUTPUT[stage], type(artifact))]
 
         Fake.stage = stage
         Fake.__name__ = f"Fake{stage.value}"

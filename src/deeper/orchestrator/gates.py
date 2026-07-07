@@ -31,10 +31,12 @@ from deeper.schemas import (
     GateName,
     GateStatus,
     Heuristic,
+    PreferenceSlot,
+    Rubric,
     Stage,
     format_validation_error,
 )
-from deeper.workspace import Workspace
+from deeper.workspace import Workspace, WorkspaceError
 
 # Where the Gate A "another pass" hint survives S1 invalidation (angles/ is
 # wiped; gates/ keeps everything but the decision file). S1 consumes it.
@@ -197,26 +199,118 @@ def _interpret_a(decision: GateADecision) -> GateOutcome:
     )
 
 
+def apply_gate_b_actions(workspace: Workspace, decision: GateBDecision) -> ApplyResult:
+    """Apply an approved Gate B decision to rubric.yaml (design §5 Gate B):
+    criterion edits are full replacements, weight overrides pin the named
+    criteria, and the criteria the human left untouched rescale proportionally
+    so criterion weights still sum to 1.0 (design P9 — the alternative is
+    forcing the human to hand-normalize the whole vector). The preference-slot
+    weight is always written: it is the decision this gate exists to record.
+    All referential problems are reported together and nothing is written when
+    any action cannot be applied."""
+    try:
+        rubric = workspace.read_artifact("rubric.yaml", Rubric)
+    except (WorkspaceError, ValidationError, yaml.YAMLError) as err:
+        return [], f"gate-b decision cannot be applied: rubric.yaml is missing or invalid: {err}"
+
+    ids = {c.id for c in rubric.criteria}
+    problems: list[str] = []
+    edited_ids: set[str] = set()
+    for crit in decision.edited_criteria:
+        if crit.id not in ids:
+            problems.append(f"edited_criteria: no criterion '{crit.id}' in the rubric")
+        elif crit.id in edited_ids:
+            problems.append(f"edited_criteria: criterion '{crit.id}' is edited twice")
+        edited_ids.add(crit.id)
+    for cid, weight in decision.weight_overrides.items():
+        if cid not in ids:
+            problems.append(f"weight_overrides: no criterion '{cid}' in the rubric")
+        elif cid in edited_ids:
+            problems.append(
+                f"weight_overrides: '{cid}' is also in edited_criteria — the edit "
+                "already carries a weight; drop one of the two"
+            )
+        if not 0 < weight <= 1:
+            problems.append(f"weight_overrides: '{cid}' weight {weight} must be in (0, 1]")
+
+    replacements = {c.id: c for c in decision.edited_criteria}
+    criteria = [replacements.get(c.id, c) for c in rubric.criteria]
+    pinned = edited_ids | set(decision.weight_overrides)
+    new_weights = {c.id: decision.weight_overrides.get(c.id, c.weight) for c in criteria}
+    pinned_sum = sum(w for cid, w in new_weights.items() if cid in pinned)
+    free = [c.id for c in criteria if c.id not in pinned]
+    factor = 1.0
+    if not problems and pinned:
+        if not free:
+            if abs(pinned_sum - 1.0) > 1e-6:
+                problems.append(
+                    f"every criterion weight is pinned but they sum to {pinned_sum:g}, "
+                    "not 1.0 — adjust the values so the total is exactly 1.0"
+                )
+        elif pinned_sum >= 1.0 - 1e-9:
+            problems.append(
+                f"pinned weights sum to {pinned_sum:g}, leaving nothing for the "
+                f"{len(free)} untouched criteria (weights must stay > 0)"
+            )
+        else:
+            free_sum = sum(new_weights[cid] for cid in free)
+            factor = (1.0 - pinned_sum) / free_sum
+            for cid in free:
+                new_weights[cid] *= factor
+    if problems:
+        return [], (
+            "gate-b decision cannot be applied:\n- "
+            + "\n- ".join(problems)
+            + "\nFix gates/gate-b.yaml, then `deeper resume` again."
+        )
+
+    messages = [
+        f"gate-b: preference-slot weight set to {decision.preference_slot_weight:g} — "
+        "the one number that says how much your tastes may bend the "
+        "destination-optimal answer"
+    ]
+    for cid in sorted(edited_ids):
+        messages.append(f"gate-b: criterion '{cid}' replaced")
+    for cid, weight in decision.weight_overrides.items():
+        old = next(c.weight for c in rubric.criteria if c.id == cid)
+        messages.append(f"gate-b: weight of '{cid}' {old:g} -> {weight:g}")
+    if pinned and free and abs(factor - 1.0) > 1e-9:
+        messages.append(
+            f"gate-b: rescaled {len(free)} untouched criterion weight(s) by "
+            f"{factor:.4g} so criterion weights still sum to 1.0"
+        )
+    workspace.write_artifact(
+        "rubric.yaml",
+        Rubric(
+            criteria=[c.model_copy(update={"weight": new_weights[c.id]}) for c in criteria],
+            preference_slot=PreferenceSlot(weight=decision.preference_slot_weight),
+            notes=rubric.notes,
+        ),
+    )
+    return messages, None
+
+
 def _interpret_b(decision: GateBDecision) -> GateOutcome:
     if decision.approved:
-        messages: tuple[str, ...] = ()
-        if decision.weight_overrides or decision.edited_criteria:
-            messages = (
-                "note: Gate B weight/criteria edits are recorded but not applied yet — "
-                "application arrives with the S4/S5 implementation (Prompt 8).",
-            )
+        n_over = len(decision.weight_overrides)
+        n_edit = len(decision.edited_criteria)
+        label = f"approved (preference-slot weight {decision.preference_slot_weight:g}"
+        if n_over or n_edit:
+            label += f", {n_over} weight override(s), {n_edit} criterion edit(s)"
+        label += ")"
         return GateOutcome(
             advanced=True,
             next_stage=Stage.S5,
             gate_status=GateStatus.APPROVED,
-            commit_label="approved",
-            messages=messages,
+            commit_label=label,
+            apply=partial(apply_gate_b_actions, decision=decision),
         )
     return GateOutcome(
         advanced=False,
         messages=(
-            "gates/gate-b.yaml holds no decision yet: review rubric.yaml, set "
-            "`preference_slot_weight`, then set `approved: true`.",
+            "gates/gate-b.yaml holds no decision yet: review rubric.yaml (and "
+            "rubric-rationale.md), set `preference_slot_weight`, then set "
+            "`approved: true`.",
         ),
     )
 
@@ -280,21 +374,26 @@ approved: false
 _TEMPLATE_B = """\
 # Gate B — values review (design §5).
 #
-# Review: rubric.yaml. Adjust criterion weights if needed and — critically — set
-# preference_slot_weight: the one number that says how much your tastes may bend
-# the destination-optimal answer (0-0.4; the report sweeps this range).
-#
-# Record your decision below, then run `deeper resume <run>`.
+# THE PREFERENCE-SLOT WEIGHT — set this first. It is the one number that says
+# how much your tastes may bend the destination-optimal answer: 0.0 scores every
+# option on the destination model alone; 0.4 (the maximum) lets your stated
+# preferences claim 40% of every combined score. The final report shows how the
+# ranking shifts as this weight sweeps 0 -> 0.4, so you will see exactly what
+# your setting did.
+preference_slot_weight: 0.2          # design default range 0.15-0.25
+
+# Review rubric.yaml (rubric-rationale.md explains each weight), record your
+# decision below, then run `deeper resume <run>`. Edits are APPLIED on resume:
+# they land in rubric.yaml before S5 scores anything against it.
 #
 #   approved: true
-#   preference_slot_weight: 0.2      # design default range 0.15-0.25
-#   weight_overrides:                # criterion id -> new weight
-#     some-criterion-id: 0.3
+#   weight_overrides:                # criterion id -> new weight; criteria you
+#     some-criterion-id: 0.3         #   leave untouched rescale proportionally
+#                                    #   so criterion weights still sum to 1.0
 #   edited_criteria: []              # full replacement Criterion objects
 #   notes: "anything else"
 
 approved: false
-preference_slot_weight: 0.2
 """
 
 _TEMPLATE_C = """\
@@ -350,7 +449,7 @@ GATE_SPECS: dict[GateName, GateSpec] = {
         name=GateName.B,
         relpath="gates/gate-b.yaml",
         model=GateBDecision,
-        review_paths=("rubric.yaml",),
+        review_paths=("rubric.yaml", "rubric-rationale.md"),
         template=_TEMPLATE_B,
         interpret=_interpret_b,
     ),

@@ -3,7 +3,7 @@ role: rubric-builder
 stage: S4
 model_class: opus
 output_schemas: [rubric]
-inputs: [destination, all-cards]
+inputs: [destination, all-cards, strategic-notes]
 research: false
 ---
 
@@ -53,6 +53,12 @@ Design pressure to apply:
   weight 0.20 unless the design of the space argues otherwise; the human sets
   the final value at Gate B. You never fill it with content — it is a weight
   reservation, not a criterion.
+- **Strategic notes.** Your inputs may include rubric-weight strategic notes
+  from the cartography ensemble — candidate evidence about what the judge
+  actually rewards. Treat each as a claim to accept or reject with a stated
+  reason (in the affected criterion's justification, or in `notes` if
+  rejected). The destination model stays the anchor: a note can sharpen a
+  weight it supports, never introduce a reward the destination model lacks.
 
 # OUTPUT FORMAT
 

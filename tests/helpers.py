@@ -52,6 +52,32 @@ def write_s0_artifacts(ws: Workspace) -> None:
     )
 
 
+def write_s1_s2_artifacts(ws: Workspace) -> None:
+    """Materialize the merger fixtures as S1 output and run the real S2 formula
+    over them, so S3+ tests start from the canonical post-Gate-A state."""
+    from deeper.allocation import allocate
+
+    ws.write_artifact(
+        "angles/map.yaml", AngleMap.from_yaml_file(FIXTURES / "merger" / "angle-map.yaml")
+    )
+    ws.write_artifact(
+        "angles/map-report.md",
+        CoverageReport.from_yaml_file(FIXTURES / "merger" / "coverage-report.yaml"),
+    )
+    config = ws.load_config()
+    angle_map = ws.read_artifact("angles/map.yaml", AngleMap)
+    ws.write_artifact(
+        "allocation.yaml",
+        allocate(
+            {a.id: a.relevance_prior for a in angle_map.angles},
+            total_budget_units=config.total_budget_units,
+            floor=config.floor,
+            gamma=config.gamma,
+            per_angle_cap_pct=config.per_angle_cap_pct,
+        ),
+    )
+
+
 def make_ctx(
     ws: Workspace,
     dispatcher=None,

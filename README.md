@@ -13,19 +13,26 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Phase A complete; Phase B kernel through S2 real (Prompt 7).** Every pipeline
+**Phase A complete; Phase B kernel through S5 real (Prompt 8).** Every pipeline
 artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an LLM-facing
 validation-error formatter, and a generated JSON Schema in `schemas/`; the versioned
 agent prompts for stages 0–5 live in `agents/` with the `deeper-lab` prompt-iteration
 harness (design-doc M0). The no-LLM substrate — git-backed run **workspace**, **run
 profiles / config loader**, **S2 budget allocator + reflow** — the **agent dispatch
 layer** (`agents_runtime/`), and the **deterministic orchestrator** (`orchestrator/`)
-are all built. Stages **S0–S2 are now real**: S0 is an interactive terminal interview
-with a confirm-before-write step, S1 runs the parallel cartographer ensemble plus the
-§5/S1 saturation rule (marginal novelty from the merger's dedup map, expansion passes,
-hard cap 8), Gate A applies all five review actions to the map on resume, and S2
-prints the allocation table at the gate exit. S3–S8 are registered stubs that report
-cleanly.
+are all built. Stages **S0–S5 are now real**: S0 is an interactive terminal interview
+with a confirm-before-write step; S1 runs the parallel cartographer ensemble plus the
+§5/S1 saturation rule; Gate A applies all five review actions to the map on resume;
+S2 prints the allocation table at the gate exit; S3 runs one scout per angle in
+parallel (budget line injected from allocation.yaml), a card-critic per angle, one
+revision round, the redundancy early-stop, and budget reflow onto critic-flagged
+misses; S4 derives the rubric from the destination model plus the cards (never
+preferences) and Gate B applies weight/criterion edits and the preference-slot weight
+on resume; S5 screens every card with uncertainty bands and pure code applies the
+shortlist rule (kill-risks first, advance on the upper confidence bound, angle cap,
+breadth guardrail) with a written reason per option. S6–S8 are registered stubs that
+report cleanly. A full mock run now walks `deeper new` → Gate A → Gate B → the
+shortlist in seconds, offline.
 
 ## Architecture map
 
@@ -41,11 +48,11 @@ state of a run.
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` is the S1 rule's pure math | **S0–S2 built**, S3–S8 stubs (Prompts 8–12) |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule) and `shortlist.py` (S5 rule + screening arithmetic) are pure math | **S0–S5 built**, S6–S8 stubs (Prompts 10–12) |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/saturation/Gate A) suites (691 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B) suites (738 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -302,7 +309,7 @@ validates is not re-run).
 **Stages** (`src/deeper/stages/`) are classes over a small protocol —
 `validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
 agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
-in `STAGES`. S3–S8 raise `NotImplementedYet`, which the engine reports cleanly,
+in `STAGES`. S6–S8 raise `NotImplementedYet`, which the engine reports cleanly,
 leaving state untouched and resumable. The built stages:
 
 - **S0 Intake** drives the interviewer through the dispatch layer's
@@ -333,6 +340,39 @@ leaving state untouched and resumable. The built stages:
 - **S2 Allocation** runs the budget formula over the post-Gate-A map and prints
   the full table (angle, prior, units, share) at the gate exit — the user sees
   where budget will go before S3 spends any of it.
+- **S3 Scouting** runs one pipeline per allocated angle, angles in parallel:
+  scout (contract carries "you have ~N units ≈ target 2N option cards" from
+  allocation.yaml) → card-critic → one revision round against the critique when
+  it reports completeness/distinctness issues. If the critic's `redundancy_pct`
+  exceeds `caps.scout_redundancy_stop_pct` (40), the angle stops early — no
+  revision — and its unused units return to a global pool. After all angles
+  finish, `reflow()` redistributes the pool over angles whose critics named
+  `missed_options` (redundancy-stopped angles excluded), a top-up scout per
+  target angle is dispatched with those specific misses as its task, and new
+  cards merge into `options/{angle}/cards.yaml`. Within an angle, critique.md is
+  written after any revision (its presence marks the angle settled), and
+  `options/reflow.yaml` is written after the top-ups merge — so `is_complete`
+  can replay the deterministic pool computation against the files on disk.
+- **S4 Rubric** dispatches the rubric-builder (Opus-class) with the destination
+  model, every angle's cards, and the coverage report's rubric-weight strategic
+  notes — never preferences (structurally: the file is not in the contract, and
+  the quarantine hook denies tool access). Code then overwrites the preference
+  slot with `preference_slot_default_weight` (0.2) — the weight is a process
+  knob, not agent content — and renders `rubric-rationale.md` from the
+  validated rubric.
+- **S5 Screening** dispatches the screener once with the Gate-B-approved
+  rubric, all cards, and — uniquely in the pipeline — `preferences.yaml`. The
+  result is integrity-checked against the rubric and cards (every card scored
+  on every criterion, ids resolvable; incoherence pauses the run), its weighted
+  aggregates are recomputed in code from the rubric weights, and then pure code
+  (`stages/shortlist.py`) applies the §5/S5 shortlist rule exactly: a confirmed
+  kill-risk eliminates regardless of score; survivors advance when their
+  weighted **upper confidence bound** clears `shortlist_threshold` (dark horses
+  with wide bands advance by design); at most `caps.max_finalists_per_angle`
+  (3) finalists per angle; and if the top-k finalists span ≤ 2 angles, the
+  highest-UCB option from each unrepresented top-half angle (by prior) is
+  added. Every option gets a one-paragraph advanced/cut reason in
+  `screening/shortlist.md` — cuts are auditable.
 
 **Gates are file-edit pause states.** Entering a gate writes a commented template
 (`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
@@ -348,7 +388,14 @@ the map as `human`-provenance angles with prior 0.5 (adjustable in the same
 decision via the name's kebab-case slug), which queues them for allocation and a
 scout; prior adjustments overwrite priors; referential mistakes (unknown angle id,
 colliding addition) re-pause the gate with every problem listed and nothing
-written. `rerun_hint` records the hint at `gates/gate-a-hint.txt` (where S1
+written. **Gate B's edits are applied the same way**: its template puts
+`preference_slot_weight` at the very top — the one number that says how much your
+tastes may bend the destination-optimal answer (0–0.4, the report's sensitivity
+sweep range) — and on approval the slot weight is always written into
+rubric.yaml, criterion edits are full replacements, and weight overrides pin the
+named criteria while untouched ones rescale proportionally so criterion weights
+still sum to 1.0; referential problems re-pause with nothing written.
+`rerun_hint` records the hint at `gates/gate-a-hint.txt` (where S1
 invalidation can't delete it), loops back through S1 via the same invalidation
 machinery as `rerun`, and the S1 pass injects it into every cartographer prompt
 then consumes the file — one pass, exactly. An agent that exhausts its schema
@@ -398,21 +445,38 @@ deeper status <run>          # node, gate statuses, spend by stage, pending-gate
 
 # edit runs/<...>/gates/gate-a.yaml — approve, optionally with actions:
 #   approved: true
-#   added_angles:      [{name: "Graph-native retrieval", note: "scout graph hybrids"}]
-#   removed_angles:    [{angle_id: training-efficiency, reason: "crowded space"}]
 #   prior_adjustments: [{angle_id: evaluation-science, new_prior: 0.9}]
+# (other actions: added_angles [{name, note}] queues a human-added angle for
+#  scouting; removed_angles [{angle_id, reason}] drops one, reason logged)
 
 deeper resume <run>
-#   applies your edits to angles/map.yaml (echoing each action), then S2 prints
-#   the allocation table before S3 would spend anything:
-#     gate-a: added angle 'graph-native-retrieval' (prior 0.5) — queued for scouting
+#   applies your edits to angles/map.yaml (echoing each action), S2 prints the
+#   allocation table before S3 spends anything:
 #     gate-a: prior of 'evaluation-science' 0.7 -> 0.9
-#     S2: allocation — 16 units over 9 angles (floor 1, gamma 1.0, cap 25%):
+#     S2: allocation — 16 units over 8 angles (floor 1, gamma 1.0, cap 25%):
 #       angle                         prior  units  share
-#       evaluation-science             0.90      2  12.5%
-#       graph-native-retrieval         0.50      2  12.5%
 #       ...
-#   then reports that S3 is not built yet (arrives in Prompt 8) and exits cleanly
+#   then S3 scouts every angle in parallel, critiques, revises, and reflows:
+#     S3: interpretability-research scout done (4 cards)
+#     S3: interpretability-research critique found issues — one scout revision round
+#     S3: training-efficiency redundancy 55% > 40% — early stop, returning 1 unit(s)…
+#     S3: reflow — 2 returned unit(s) over 2 angle(s) whose critics named missed
+#         options: interpretability-research +1, evaluation-science +1
+#   S4 writes rubric.yaml + rubric-rationale.md and pauses at Gate B
+
+# edit runs/<...>/gates/gate-b.yaml — the preference-slot weight sits at the top:
+#   preference_slot_weight: 0.2
+#   approved: true
+#   weight_overrides: {letter-strength: 0.35}   # untouched criteria rescale to sum 1.0
+
+deeper resume <run>
+#   applies the rubric edits, then S5 screens every card and pure code applies
+#   the shortlist rule — every advance/cut gets a written reason:
+#     S5 shortlist (UCB threshold 3.5): 7 finalists, 15 cut
+#     S5:   finalist cot-hurts-small-models        <- dark horse: wide band, UCB-only
+#     S5:   finalist model-collapse-dynamics [breadth-guardrail add]
+#     S5:   cut (kill-risk-confirmed): 1           <- the top scorer, killed anyway
+#   then reports that S6 is not built yet (arrives in Prompt 10) and exits cleanly
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
@@ -507,6 +571,50 @@ canonical `Makefile` is used wherever GNU make is available.
   expansion output lands at `angles/raw/{heuristic}-{n}.yaml` and dedup entries are
   attributed to a pass by (heuristic, raw angle name). "Novelty across the last two"
   is read as the mean over the trailing window (`cartography_novelty_window`).
+- **Returned-units currency for the S3 early stop.** Design §5/S3 says an
+  early-stopped scout's "unused units return to a global pool" without
+  quantifying "unused". Here (pure code): distinct cards = `n − floor(n·pct/100)`,
+  units consumed = `ceil(distinct / 2)` (the allocation's own 1-unit ≈ 2-cards
+  currency), returned = allocated − consumed, floored at 0. Only
+  redundancy-stopped angles return units — those angles never receive revisions
+  or top-ups, so the pool computation is stable across crash re-entry.
+- **The revision round is conditional, and misses don't trigger it.** Design
+  §5/S3 grants "one revision round against the critique"; here it runs only
+  when the critique reports completeness or distinctness issues, and never for
+  a redundancy-stopped angle (early stop trumps revision). `missed_options`
+  route to the reflow pool, not the revising scout — a revision fixes defects,
+  reflow buys new coverage.
+- **The reflow table persists at `options/reflow.yaml`.** The design doesn't
+  name a home for the redistribution decision; it is an allocation artifact
+  like any other, so it is written (kind `reflow`) after the top-up cards
+  merge, making the redistribution auditable and marking the stage settled.
+- **The preference-slot weight is code-owned end to end.** Design §5/S4 has
+  the rubric-builder emit the slot "default weight 15–25%, set at Gate B"; here
+  the number is process, not content (P8): S4 overwrites whatever the agent
+  emitted with `RunConfig.preference_slot_default_weight` (0.2), and Gate B's
+  decision always rewrites it.
+- **Gate B weight edits renormalize the untouched criteria.** The design says
+  "adjust weights" but the schema requires criterion weights to sum to exactly
+  1.0. Rather than forcing the human to hand-normalize the whole vector,
+  overridden/edited criteria are pinned at their stated weights and the
+  untouched ones rescale proportionally (with the factor echoed); pinning
+  everything requires an exact sum, and infeasible combinations re-pause the
+  gate with nothing written.
+- **S5 recomputes the screener's aggregates.** The screener stores
+  `weighted_point`/`weighted_ucb`, but code re-derives both from the criterion
+  scores and the Gate-B-approved rubric weights before persisting (drift beyond
+  0.05 is reported) — arithmetic is the orchestrator's job (P8), and the gate
+  may have changed the weights after the fixture-or-agent computed its numbers.
+- **Shortlist-rule readings.** "Clears the threshold" is `ucb >= threshold`;
+  "top-half angle" means the top `ceil(n/2)` map angles by relevance prior;
+  the "top-k" the guardrail inspects is the profile's `shortlist_size` highest-UCB
+  finalists. Nothing truncates the finalist list to k — the cut causes the
+  design enumerates (kill, below-threshold, angle-cap) are exactly the causes
+  the schema admits, so the threshold + guardrails ARE the rule.
+- **`rubric-rationale.md` is a rendered view.** The rubric-builder emits only
+  `rubric` (the design's rationale file has no schema of its own); S4 renders
+  the rationale markdown from the validated rubric's definitions, measurement
+  methods, and weight justifications, so the two files cannot disagree.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -522,12 +630,12 @@ Following the phases in the build guide:
   (agent prompts + prompt-lab) ✅.
 - **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
   Prompt 5 (dispatch layer) ✅ → Prompt 6 (orchestrator/CLI) ✅ → Prompt 7 (real
-  S0–S2: interactive intake, saturation-rule cartography, Gate A actions, allocation
-  at the gate exit) ✅ → stages S3–S5.
+  S0–S2) ✅ → Prompt 8 (S3 scouts + critic + reflow, S4 rubric, Gate B applied
+  edits, S5 screening with the shortlist rule) ✅ → M1 exit.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 8 — S3 scouts + critic + reflow, S4 rubric, Gate B, S5
-screening with the shortlist rule.**
+**Next: Phase B, Prompt 9 — M1 exit: end-to-end integration test, `deeper
+doctor`, spend guard, first live smoke run.**

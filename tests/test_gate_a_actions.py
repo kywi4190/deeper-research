@@ -15,11 +15,23 @@ from deeper.schemas import (
     Heuristic,
     PriorAdjustment,
     RunStatus,
+    Stage,
 )
+from deeper.stages import STAGES, NotImplementedYet, StageBase
 
 from .helpers import FIXTURES, make_workspace
 
 MAP_FIXTURE = FIXTURES / "merger" / "angle-map.yaml"
+
+
+class _StubS3(StageBase):
+    """Halts the walk after S2: human-added angles have no mock fixtures, and
+    these tests are about Gate A's edits, not scouting."""
+
+    stage = Stage.S3
+
+    async def execute(self, ctx):
+        raise NotImplementedYet("S3 halted for this test")
 
 
 def ws_with_map(tmp_path):
@@ -142,7 +154,7 @@ def test_record_rerun_hint_survives_under_gates(tmp_path):
 async def walk_to_gate_a(tmp_path, **caps):
     ws = make_workspace(tmp_path, profile="quick", caps=caps or None)
     emitted: list[str] = []
-    engine = Engine(ws, emit=emitted.append)
+    engine = Engine(ws, stages={**STAGES, Stage.S3: _StubS3}, emit=emitted.append)
     assert await engine.run() is Node.GATE_A
     return ws, engine, emitted
 

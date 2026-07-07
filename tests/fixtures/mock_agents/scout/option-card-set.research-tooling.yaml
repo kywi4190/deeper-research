@@ -1,0 +1,49 @@
+# Mock S3 scout output — research-tooling. Both cards land just under the UCB
+# threshold; the angle is UNREPRESENTED in the finalists but sits in the bottom
+# half of the map by prior, so the diversity guardrail must NOT add it.
+angle_id: research-tooling
+cards:
+  - id: activation-caching-lib
+    name: Activation-caching library for interpretability workflows
+    angle_id: research-tooling
+    description: Build and maintain a content-addressed activation-caching library
+      that removes redundant forward passes from interpretability experiments,
+      with a systems-track paper describing it.
+    mechanism: Content-addressed caching of intermediate activations makes repeated
+      probing/patching experiments near-free; adoption is the validity metric.
+    preliminary_evidence:
+      - text: Interpretability workflows visibly recompute activations today, and
+          systems tracks publish adopted research infrastructure.
+        source:
+          url: "https://github.com/TransformerLensOrg/TransformerLens/issues"
+          tier: T3
+          title: Recomputation pain points in tooling issue trackers
+          content_hash: null
+    uncertainties:
+      - Whether adoption arrives fast enough to evidence the paper by the deadline
+      - Storage economics on shared lab infrastructure
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+  - id: repro-eval-harness
+    name: Reproducible-eval harness adopted by other labs
+    angle_id: research-tooling
+    description: A pinned-environment evaluation harness that makes eval runs
+      bit-reproducible across machines, aimed at labs burned by eval drift.
+    mechanism: Deterministic seeding, pinned tokenizers, and environment capture
+      remove the variance that makes published eval numbers unreproducible.
+    preliminary_evidence:
+      - text: Eval-reproducibility failures are documented across published model
+          comparisons, evidencing the need.
+        source:
+          url: "https://arxiv.org/abs/2405.14782"
+          tier: T2
+          title: Lessons from the Trenches on Reproducible Evaluation
+          content_hash: null
+    uncertainties:
+      - Whether other labs adopt within the visible window
+      - Overlap with existing harness projects' roadmaps
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: null

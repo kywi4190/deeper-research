@@ -1,0 +1,66 @@
+# Mock S3 scout output — training-efficiency. The crowded space shows: the two
+# LoRA cards are minor variants, so the critique trips the early-stop rule and
+# this angle returns a unit to the reflow pool.
+angle_id: training-efficiency
+cards:
+  - id: lora-budget-study
+    name: LoRA variants under a fixed compute budget
+    angle_id: training-efficiency
+    description: A controlled comparison of low-rank adaptation variants where every
+      run is normalized to an identical compute budget, isolating the efficiency
+      claim each variant actually makes.
+    mechanism: Budget-normalized sweeps separate genuine efficiency gains from
+      quietly increased spend; the deliverable is the corrected comparison.
+    preliminary_evidence:
+      - text: LoRA-variant papers publish at small scale and their budget accounting
+          is a documented criticism, so the corrective study has an audience.
+        source:
+          url: "https://arxiv.org/abs/2106.09685"
+          tier: T1
+          title: "LoRA: Low-Rank Adaptation"
+          content_hash: null
+    uncertainties:
+      - Whether the corrected comparison changes any published conclusion
+      - Crowdedness of the efficiency-comparison literature
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+  - id: lora-rank-schedule
+    name: Rank-scheduled LoRA under the same fixed budget
+    angle_id: training-efficiency
+    description: The same budget-normalized LoRA comparison with a dynamic rank
+      schedule added as one more arm.
+    mechanism: Identical sweep infrastructure and budget normalization as the
+      budget-study card; the schedule is an additional treatment, not a new question.
+    preliminary_evidence:
+      - text: Dynamic-rank adaptation papers exist, making the arm implementable.
+        source:
+          url: "https://arxiv.org/abs/2303.10512"
+          tier: T2
+          title: AdaLoRA
+          content_hash: null
+    uncertainties:
+      - Same crowdedness risk as the budget-study card
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+  - id: quantization-aware-study
+    name: Quantization-aware training study on a 1B model
+    angle_id: training-efficiency
+    description: Characterize accuracy-versus-bitwidth trade-offs of
+      quantization-aware training on a 1B model across downstream tasks.
+    mechanism: QAT sweeps across bitwidths on a fixed model expose where the
+      trade-off curve knees; the curve is the contribution.
+    preliminary_evidence:
+      - text: QAT at 1B scale runs on single-node budgets in published replications.
+        source:
+          url: "https://arxiv.org/abs/2305.17888"
+          tier: T2
+          title: LLM-QAT
+          content_hash: null
+    uncertainties:
+      - Whether the knee points differ enough from published curves to matter
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: null

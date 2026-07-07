@@ -57,14 +57,26 @@ def test_new_unknown_profile_fails_cleanly(tmp_path):
     assert "unknown profile" in result.output
 
 
-def test_resume_past_approved_gate_runs_s2_then_reports_s3_unbuilt(tmp_path):
+def test_resume_past_gate_a_walks_s2_to_gate_b_then_s5_to_s6_stub(tmp_path):
     _, run_dir = new_run(tmp_path)
     approve_gate_a(run_dir)
     result = runner.invoke(app, ["resume", str(run_dir)])
     assert result.exit_code == 0, result.output
-    assert "allocation.yaml" in result.output
-    assert "not implemented yet" in result.output  # S3 stub reports cleanly
-    Workspace.open(run_dir).read_artifact("allocation.yaml", AllocationTable)
+    assert "allocation.yaml" in result.output  # S2 table printed at the gate exit
+    assert "reflow" in result.output  # S3 redistributed early-stopped units
+    assert "gate-b" in result.output  # paused at the values review
+    ws = Workspace.open(run_dir)
+    ws.read_artifact("allocation.yaml", AllocationTable)
+    assert ws.load_state().status is RunStatus.GATE_PENDING
+
+    (run_dir / "gates" / "gate-b.yaml").write_text(
+        "approved: true\npreference_slot_weight: 0.25\n", encoding="utf-8"
+    )
+    result = runner.invoke(app, ["resume", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "preference-slot weight set to 0.25" in result.output
+    assert "finalists" in result.output  # S5 shortlist reported
+    assert "not implemented yet" in result.output  # S6 stub reports cleanly
     # Resuming again is safe and repeats the same clean report.
     again = runner.invoke(app, ["resume", str(run_dir)])
     assert again.exit_code == 0

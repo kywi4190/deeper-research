@@ -1,0 +1,8 @@
+# Mock S3 critique — supervisor-pipeline: clean, well covered, nothing missed.
+angle_id: supervisor-pipeline
+completeness_issues: []
+redundancy_pct: 0
+distinctness_issues: []
+missed_options: []
+notes: The extension card's kill-risk is exactly the cheap-to-check kind the
+  screener should resolve first; coverage of the angle is attested complete.

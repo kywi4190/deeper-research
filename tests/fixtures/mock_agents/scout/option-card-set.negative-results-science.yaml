@@ -1,0 +1,49 @@
+# Mock S3 scout output — negative-results-science. The CoT card is the
+# scenario's DARK HORSE: evidence so thin the screener must band it wide, and
+# it advances on its upper confidence bound alone.
+angle_id: negative-results-science
+cards:
+  - id: cot-hurts-small-models
+    name: Characterize where chain-of-thought hurts small-model accuracy
+    angle_id: negative-results-science
+    description: Rigorously map the task and scale regimes where chain-of-thought
+      prompting reduces small-model accuracy, and characterize why.
+    mechanism: Matched prompting sweeps across task families and model sizes isolate
+      the regimes where reasoning tokens hurt; error analysis explains the boundary.
+    preliminary_evidence:
+      - text: Scattered practitioner reports of CoT degrading small-model accuracy
+          exist, but no systematic characterization does.
+        source:
+          url: "https://forum.example.org/t/cot-hurts-below-7b"
+          tier: T3
+          title: Practitioner thread on CoT degradation
+          content_hash: null
+    uncertainties:
+      - Whether the effect survives careful prompt controls
+      - Whether the boundary is stable across model families
+      - Venue appetite for a negative result at main-track standards
+    kill_risks: []
+    misplaced_flag: null
+    notes: Evidence is thin (single T3 source) — this is exactly the
+      under-researched kind of option screening should band widely.
+  - id: interp-method-stress-test
+    name: Stress-test a popular interpretability method until it breaks
+    angle_id: negative-results-science
+    description: Push one widely used interpretability method to failure across
+      adversarially chosen settings and characterize the boundary of its validity.
+    mechanism: Systematic perturbation of the method's assumptions locates where its
+      explanations stop being causal; the boundary is the contribution.
+    preliminary_evidence:
+      - text: Published sanity-check papers demonstrate the genre's venue viability.
+        source:
+          url: "https://arxiv.org/abs/1810.03292"
+          tier: T1
+          title: Sanity Checks for Saliency Maps
+          content_hash: null
+    uncertainties:
+      - Whether the chosen method still has an undocumented failure boundary
+      - Risk of the result reading as incremental after existing sanity-check work
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: null

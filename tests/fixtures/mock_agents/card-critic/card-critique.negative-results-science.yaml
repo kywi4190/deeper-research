@@ -1,0 +1,10 @@
+# Mock S3 critique — negative-results-science: clean; the CoT card's thin
+# sourcing is honestly tiered T3, which is a banding matter for the screener,
+# not a completeness defect.
+angle_id: negative-results-science
+completeness_issues: []
+redundancy_pct: 0
+distinctness_issues: []
+missed_options: []
+notes: The CoT card's single T3 source is tiered honestly; the right response is
+  a wide screening band, not a rejection.

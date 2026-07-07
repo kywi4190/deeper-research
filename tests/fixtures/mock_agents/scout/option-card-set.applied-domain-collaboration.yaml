@@ -1,0 +1,73 @@
+# Mock S3 scout output — applied-domain-collaboration. Deliberately padded:
+# two of the three cards are one option wearing two names, so the critique's
+# redundancy estimate trips the early-stop rule and returns a unit to the pool.
+angle_id: applied-domain-collaboration
+cards:
+  - id: protein-annotation-partnership
+    name: Protein-function annotation with a domain lab
+    angle_id: applied-domain-collaboration
+    description: Deliver ML-based protein-function annotation against a partner
+      biology lab's unpublished dataset, with the domain lab as co-author and
+      second judge.
+    mechanism: Fine-tuned protein language models annotate the partner's dataset;
+      wet-lab spot checks provide the external validity benchmarks cannot.
+    preliminary_evidence:
+      - text: Protein-LM annotation pipelines are published with domain co-authors
+          at small-lab compute budgets.
+        source:
+          url: "https://www.pnas.org/doi/10.1073/pnas.2016239118"
+          tier: T1
+          title: ESM protein language models
+          content_hash: null
+    uncertainties:
+      - Partner lab commitment inside the two-semester window
+      - Data-sharing agreements clearing in time
+    kill_risks:
+      - fact: No partner lab has committed data access this academic year
+        check_hint: Confirm with the department's collaboration office which labs
+          have active data-sharing agreements.
+    misplaced_flag: null
+    notes: null
+  - id: protein-annotation-transfer
+    name: Transfer-learning protein annotation for the same partner dataset
+    angle_id: applied-domain-collaboration
+    description: The same partner-lab annotation deliverable, framed as a transfer
+      learning study over pretrained protein language models.
+    mechanism: Identical pipeline to the partnership card; the transfer-learning
+      framing changes the paper's methods section, not the deliverable.
+    preliminary_evidence:
+      - text: Transfer-learning framings of protein-LM annotation appear in the same
+          venues as the base pipeline papers.
+        source:
+          url: "https://www.pnas.org/doi/10.1073/pnas.2016239118"
+          tier: T1
+          title: ESM protein language models
+          content_hash: null
+    uncertainties:
+      - Same partner and data dependencies as the partnership card
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+  - id: materials-property-prediction
+    name: Materials-property prediction with a chemistry group
+    angle_id: applied-domain-collaboration
+    description: Graph-network property prediction on a chemistry group's crystal
+      dataset, judged by held-out synthesis outcomes.
+    mechanism: Graph neural networks over crystal structures predict properties the
+      partner group can verify against synthesis records.
+    preliminary_evidence:
+      - text: Crystal-property GNN studies with domain co-authors publish at both ML
+          and domain venues.
+        source:
+          url: "https://arxiv.org/abs/1710.10324"
+          tier: T2
+          title: Crystal graph convolutional networks
+          content_hash: null
+    uncertainties:
+      - Whether the chemistry group's dataset is large enough for a credible split
+      - Dual-venue framing risk (neither community fully satisfied)
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: The space kept collapsing onto the same partner-dependent pipeline; stopped
+  rather than emit further variants.

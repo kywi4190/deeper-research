@@ -1,0 +1,108 @@
+# Mock S3 scout REVISION output — interpretability-research after the critique.
+# Identical roster; the backdoor card's evidence gap (the critique's
+# completeness issue) is closed with a second sourced item.
+angle_id: interpretability-research
+cards:
+  - id: sae-feature-atlas
+    name: Sparse autoencoder feature atlas for a small LM
+    angle_id: interpretability-research
+    description: Train sparse autoencoders on a small open model's activations and
+      publish an annotated, validated atlas of the recovered features as a reusable
+      community artifact.
+    mechanism: SAEs decompose activations into sparse, near-monosemantic features;
+      annotating and validating them yields a reusable interpretive map of the model.
+    preliminary_evidence:
+      - text: Published SAE work demonstrates the method end-to-end on comparable
+          model sizes with modest compute.
+        source:
+          url: "https://transformer-circuits.pub/2023/monosemantic-features"
+          tier: T1
+          title: Towards Monosemanticity
+          content_hash: null
+    uncertainties:
+      - Whether the lab's compute cap allows sufficient SAE training sweeps
+      - Whether annotation quality is achievable without a second rater
+    kill_risks:
+      - fact: The target model's activations are not accessible at the needed hook
+          points in the available tooling
+        check_hint: Check the tooling's documented hook-point list for the model.
+    misplaced_flag: null
+    notes: null
+  - id: backdoor-probe-study
+    name: Backdoor-detection probe study on open models
+    angle_id: interpretability-research
+    description: Train linear and nonlinear probes to detect planted backdoor triggers
+      in openly released poisoned models, characterizing which probe families detect
+      which trigger classes.
+    mechanism: Backdoored behavior leaves separable traces in intermediate activations;
+      probes trained on clean/poisoned pairs quantify how detectable each trigger is.
+    preliminary_evidence:
+      - text: Public sleeper-agent replications ship poisoned checkpoints small enough
+          for single-node probing studies.
+        source:
+          url: "https://arxiv.org/abs/2401.05566"
+          tier: T1
+          title: Sleeper Agents
+          content_hash: null
+      - text: Linear probes recover deception-relevant directions at high accuracy on
+          models of the target scale, evidencing probe-method viability.
+        source:
+          url: "https://arxiv.org/abs/2310.06824"
+          tier: T1
+          title: The Geometry of Truth
+          content_hash: null
+    uncertainties:
+      - Whether enough public poisoned checkpoints exist for a systematic study
+      - Whether results generalize beyond the specific trigger families tested
+    kill_risks:
+      - fact: No poisoned model checkpoints are publicly available at probe-able scale
+        check_hint: Search HuggingFace for released sleeper-agent/backdoor checkpoints.
+    misplaced_flag: null
+    notes: null
+  - id: activation-patching-toolkit
+    name: Activation-patching toolkit with a circuits case study
+    angle_id: interpretability-research
+    description: Build a rigorously tested activation-patching library for one open
+      model family and demonstrate it with a complete circuit-level case study of a
+      single emergent behavior.
+    mechanism: Causal interventions on internal activations localize which components
+      implement a behavior; packaging them as a toolkit makes the case study reproducible.
+    preliminary_evidence:
+      - text: Existing patching libraries have visible adoption, and systems-track
+          papers describing research tooling are an established venue path.
+        source:
+          url: "https://github.com/TransformerLensOrg/TransformerLens"
+          tier: T2
+          title: TransformerLens
+          content_hash: null
+    uncertainties:
+      - Whether a toolkit contribution alone clears the top-venue novelty bar
+      - Maintenance burden competing with thesis writing in semester two
+    kill_risks: []
+    misplaced_flag: null
+    notes: Toolkit adoption dynamics overlap the open-source-tooling angle; kept here
+      because the case study is the primary contribution.
+  - id: circuit-case-study
+    name: Circuit-level analysis of one published model capability
+    angle_id: interpretability-research
+    description: Reverse-engineer the circuit implementing a single documented
+      capability of a small open model, with causal validation of every claimed
+      component.
+    mechanism: Path patching and ablation isolate the attention heads and MLP
+      neurons implementing the behavior; causal scrubbing validates the hypothesis.
+    preliminary_evidence:
+      - text: Published circuit papers of this exact shape exist at small-model scale
+          with single-GPU budgets.
+        source:
+          url: "https://arxiv.org/abs/2211.00593"
+          tier: T1
+          title: Interpretability in the Wild (IOI circuit)
+          content_hash: null
+    uncertainties:
+      - Whether an unclaimed capability of suitable difficulty remains
+      - Whether causal scrubbing scales to the chosen behavior within budget
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: Revision round against the critique — added probe-method viability evidence to
+  the backdoor card; roster unchanged.

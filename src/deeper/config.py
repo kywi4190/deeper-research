@@ -108,6 +108,13 @@ class RunConfig(ArtifactModel):
         description="An option advances when its upper confidence bound clears this "
         "(1–5 rubric scale).",
     )
+    preference_slot_default_weight: float = Field(
+        default=0.20,
+        ge=0,
+        le=0.4,
+        description="Preference-slot weight S4 writes into the rubric (design §5/S4: "
+        "default 15-25%); the human sets the final value at Gate B.",
+    )
     deep_dive_unit_cap: int = Field(ge=1, description="S6 per-option research budget in units.")
     concurrency: int = Field(ge=1, description="Max simultaneous agent invocations.")
     size_classes: dict[SizeClass, SizeClassSpec]

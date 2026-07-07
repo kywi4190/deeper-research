@@ -1,0 +1,17 @@
+# Mock S3 critique — training-efficiency: SATURATED. Redundancy above the 40%
+# stop rule (the LoRA cards are variants); the angle stops early and returns
+# budget. Its missed option is excluded from reflow by the redundancy stop.
+angle_id: training-efficiency
+completeness_issues: []
+redundancy_pct: 55
+distinctness_issues:
+  - card_ids: [lora-budget-study, lora-rank-schedule]
+    rationale: >-
+      The rank schedule is one more arm in the same budget-normalized sweep —
+      identical infrastructure, question, and audience; not a distinct option.
+missed_options:
+  - >-
+    A data-movement profiling study of small-scale training (I/O and memory
+    bandwidth, not FLOPs) — a distinct efficiency axis absent from the set.
+notes: The crowded-space worry in the angle's own prior justification shows up as
+  padding pressure; stopping early is correct here.

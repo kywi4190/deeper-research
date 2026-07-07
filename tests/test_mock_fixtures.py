@@ -99,27 +99,35 @@ async def test_missing_fixture_raises(ws: Workspace, tmp_path: Path) -> None:
 
 
 def test_fixture_cross_references_cohere() -> None:
-    """screener ↔ rubric ↔ scout ↔ merger fixtures form one consistent scenario."""
+    """screener ↔ rubric ↔ scout ↔ critic ↔ merger fixtures form one consistent
+    multi-angle scenario: every screening option maps to a card in a per-angle
+    scout fixture (initial, revision, or top-up), every angle in the map has a
+    scout and a critic fixture, and every criterion id lives in the rubric."""
     load = lambda role, schema: ARTIFACT_REGISTRY[schema].from_yaml_file(  # noqa: E731
         DEFAULT_FIXTURES_DIR / role / f"{schema}.yaml"
     )
     angle_map = load("merger", "angle-map")
-    cards = load("scout", "option-card-set")
-    critique = load("card-critic", "card-critique")
     rubric = load("rubric-builder", "rubric")
     screening = load("screener", "screening-result")
-
     angle_ids = {a.id for a in angle_map.angles}
-    assert cards.angle_id in angle_ids
-    assert critique.angle_id == cards.angle_id
 
-    card_ids = {c.id for c in cards.cards}
+    card_angle: dict[str, str] = {}
+    for path in sorted((DEFAULT_FIXTURES_DIR / "scout").glob("option-card-set.*.yaml")):
+        card_set = ARTIFACT_REGISTRY["option-card-set"].from_yaml_file(path)
+        assert card_set.angle_id in angle_ids, f"{path.name} names an unmapped angle"
+        for card in card_set.cards:
+            card_angle[card.id] = card_set.angle_id
+    for angle_id in angle_ids:
+        assert (DEFAULT_FIXTURES_DIR / "scout" / f"option-card-set.{angle_id}.yaml").is_file()
+        critique_path = DEFAULT_FIXTURES_DIR / "card-critic" / f"card-critique.{angle_id}.yaml"
+        critique = ARTIFACT_REGISTRY["card-critique"].from_yaml_file(critique_path)
+        assert critique.angle_id == angle_id
+
     criterion_ids = {c.id for c in rubric.criteria}
     for option in screening.options:
-        assert option.option_id in card_ids
-        assert option.angle_id == cards.angle_id
-        for score in option.criterion_scores:
-            assert score.criterion_id in criterion_ids
+        assert option.option_id in card_angle, f"screened option {option.option_id} has no card"
+        assert option.angle_id == card_angle[option.option_id]
+        assert {s.criterion_id for s in option.criterion_scores} == criterion_ids
 
     # Coverage-report contributions point at real angle ids.
     coverage = load("merger", "coverage-report")

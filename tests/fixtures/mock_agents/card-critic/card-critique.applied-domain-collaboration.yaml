@@ -1,0 +1,19 @@
+# Mock S3 critique — applied-domain-collaboration: SATURATED. Redundancy above
+# the 40% stop rule (the two protein cards are one option), so the angle stops
+# early and returns budget. Its missed option must NOT receive reflow (the
+# redundancy stop excludes it) — it becomes frame-check input instead.
+angle_id: applied-domain-collaboration
+completeness_issues: []
+redundancy_pct: 60
+distinctness_issues:
+  - card_ids: [protein-annotation-partnership, protein-annotation-transfer]
+    rationale: >-
+      Identical partner, dataset, pipeline, and deliverable; the transfer-learning
+      framing changes the methods section, not the option. A screener would score
+      them identically on every criterion.
+notes: The angle keeps collapsing onto partner-dependent pipelines; further
+  scouting would produce more variants, not more options.
+missed_options:
+  - >-
+    A clinical-imaging collaboration with the university hospital's radiology
+    dataset — a genuinely different partner domain and judge.

@@ -1,0 +1,29 @@
+# Mock S3 reflow TOP-UP output — interpretability-research. Scouts only the
+# critique's missed option; the stage merges this card into cards.yaml.
+angle_id: interpretability-research
+cards:
+  - id: feature-steering-study
+    name: Feature-steering intervention study with SAE features
+    angle_id: interpretability-research
+    description: Use features recovered by sparse autoencoders to causally steer
+      model behavior, quantifying which feature families support reliable edits —
+      a distinct deliverable from the atlas itself.
+    mechanism: Clamping identified feature activations at inference time causally
+      edits behavior; steering success rates measure how load-bearing the
+      recovered features are.
+    preliminary_evidence:
+      - text: Published steering demonstrations show SAE features support causal
+          interventions at comparable scale.
+        source:
+          url: "https://transformer-circuits.pub/2024/scaling-monosemanticity"
+          tier: T1
+          title: Scaling Monosemanticity
+          content_hash: null
+    uncertainties:
+      - Whether steering reliability is high enough to quantify within budget
+      - Dependence on the atlas card's SAE training succeeding first
+    kill_risks: []
+    misplaced_flag: null
+    notes: Scouted from the critique's missed-options list under reflowed budget.
+notes: One reflowed unit spent on the critique's named miss; no other distinct
+  option surfaced.

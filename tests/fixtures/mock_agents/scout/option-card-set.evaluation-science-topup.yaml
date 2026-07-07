@@ -1,0 +1,27 @@
+# Mock S3 reflow TOP-UP output — evaluation-science. Scouts only the critique's
+# missed option; the stage merges this card into cards.yaml.
+angle_id: evaluation-science
+cards:
+  - id: long-horizon-eval-harness
+    name: Long-horizon agent-behavior evaluation harness
+    angle_id: evaluation-science
+    description: An evaluation harness measuring multi-step agent behavior over
+      long horizons — persistence, recovery, and goal drift — with a seed task
+      suite and a validity study.
+    mechanism: Scripted long-horizon scenarios with checkpointed state expose
+      behaviors single-turn benchmarks structurally cannot measure.
+    preliminary_evidence:
+      - text: Agent-evaluation workshops name long-horizon measurement as an open
+          gap, and checkpointed-scenario harnesses exist to build on.
+        source:
+          url: "https://arxiv.org/abs/2404.07972"
+          tier: T2
+          title: Long-horizon agent benchmarks survey
+          content_hash: null
+    uncertainties:
+      - Whether horizon effects are measurable at open-model capability levels
+      - Scenario-design cost per validated task
+    kill_risks: []
+    misplaced_flag: null
+    notes: Scouted from the critique's missed-options list under reflowed budget.
+notes: One reflowed unit spent on the critique's named miss.

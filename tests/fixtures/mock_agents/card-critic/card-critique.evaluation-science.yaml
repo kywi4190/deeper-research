@@ -1,0 +1,12 @@
+# Mock S3 critique — evaluation-science: clean cards (no revision) but a named
+# missed option, so the angle is a reflow target.
+angle_id: evaluation-science
+completeness_issues: []
+redundancy_pct: 0
+distinctness_issues: []
+missed_options:
+  - >-
+    A long-horizon agent-behavior evaluation harness — the map's own sub-angle
+    names this region and no card covers it.
+notes: Both cards are complete and honestly tiered; stopping at 2 distinct
+  instruments was the right call.

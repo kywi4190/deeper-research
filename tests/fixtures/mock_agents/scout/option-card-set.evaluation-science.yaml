@@ -1,0 +1,55 @@
+# Mock S3 scout output — evaluation-science (2 units => target 4 cards; scout
+# found 2 genuinely distinct options and said so). The critique names a missed
+# option, which the reflow top-up scouts (see the -topup fixture).
+angle_id: evaluation-science
+cards:
+  - id: contamination-robust-benchmark
+    name: Contamination-robust reasoning benchmark
+    angle_id: evaluation-science
+    description: Build a reasoning benchmark whose items are generated from a
+      seeded template family so train-set contamination is detectable and
+      correctable by construction, with a public leaderboard.
+    mechanism: Template-generated items with held-back seeds let contamination be
+      measured as the accuracy gap between released and freshly generated splits.
+    preliminary_evidence:
+      - text: Datasets-and-benchmarks tracks publish functional-generation benchmarks
+          of this shape, and contamination is a documented open problem.
+        source:
+          url: "https://arxiv.org/abs/2405.00332"
+          tier: T1
+          title: Functional benchmarks for robust evaluation
+          content_hash: null
+    uncertainties:
+      - Whether template families can reach the difficulty ceiling reviewers expect
+      - Leaderboard maintenance cost after the thesis ends
+    kill_risks:
+      - fact: A functionally identical contamination-robust benchmark already covers
+          the same reasoning domain
+        check_hint: Search HELM/PapersWithCode listings for functional reasoning benchmarks.
+    misplaced_flag: null
+    notes: null
+  - id: agent-failure-taxonomy
+    name: Failure taxonomy of open-source coding agents
+    angle_id: evaluation-science
+    description: Systematically harvest and categorize failure trajectories of
+      open-source coding agents into a validated taxonomy with an annotated
+      dataset release.
+    mechanism: Large-sample trajectory collection plus double-annotated failure
+      coding yields a taxonomy whose inter-rater reliability is itself the
+      validity evidence.
+    preliminary_evidence:
+      - text: Agent-evaluation workshops explicitly solicit failure-analysis datasets
+          and the trajectory tooling is public.
+        source:
+          url: "https://arxiv.org/abs/2310.06770"
+          tier: T2
+          title: SWE-bench
+          content_hash: null
+    uncertainties:
+      - Whether failure modes are stable enough across agent versions to taxonomize
+      - Annotation budget for double coding at credible sample size
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: Target was 4 cards; only 2 clearly distinct instruments found — a third
+  candidate (benchmark-of-benchmarks meta-eval) lacked an existence proof.

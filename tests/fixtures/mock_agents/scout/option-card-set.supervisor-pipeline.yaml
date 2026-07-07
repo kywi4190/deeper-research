@@ -1,0 +1,52 @@
+# Mock S3 scout output — supervisor-pipeline. The extension card carries the
+# scenario's CONFIRMED kill-risk: it screens highest of every option, and the
+# shortlist rule must cut it anyway.
+angle_id: supervisor-pipeline
+cards:
+  - id: supervisor-submission-extension
+    name: Follow-up study extending the supervisor's current submission
+    angle_id: supervisor-pipeline
+    description: Take first-author ownership of the natural follow-up experiment to
+      the supervisor's under-review paper, inside working infrastructure with an
+      established publication cadence.
+    mechanism: The parent paper's reviews and open questions define a scoped,
+      pre-validated research question; existing code and data shortcut months of setup.
+    preliminary_evidence:
+      - text: The lab's last three follow-up studies each produced a first-author
+          venue paper within two semesters.
+        source:
+          url: "https://scholar.example.edu/lab-publications"
+          tier: T2
+          title: Lab publication record
+          content_hash: null
+    uncertainties:
+      - Whether the follow-up question survives the parent paper's review cycle
+      - How much of the framing the student can honestly claim as their own
+    kill_risks:
+      - fact: The follow-up study is already committed to the lab's incoming postdoc
+        check_hint: Ask the supervisor (or check the lab's project board) who owns
+          the follow-up.
+    misplaced_flag: null
+    notes: null
+  - id: lab-codebase-takeover
+    name: Take over an open research question in the lab codebase
+    angle_id: supervisor-pipeline
+    description: Adopt the lab's maintained experimental codebase and pursue one of
+      its documented open research questions end to end.
+    mechanism: A working pipeline removes engineering risk, so the two semesters go
+      to the science; the supervisor co-owns the question by construction.
+    preliminary_evidence:
+      - text: The codebase's issue tracker lists research questions marked
+          thesis-scale by the maintainers.
+        source:
+          url: "https://github.example.edu/lab/framework/issues"
+          tier: T3
+          title: Lab framework issue tracker
+          content_hash: null
+    uncertainties:
+      - Whether the open questions are publishable results or engineering chores
+      - Dependence on one maintainer's availability
+    kill_risks: []
+    misplaced_flag: null
+    notes: null
+notes: null
