@@ -1,4 +1,6 @@
 # Mock S1 raw report — first-principles decomposition of "what do committees reward".
+# Dispatched first, so every region it derives is novel; later heuristics overlap
+# with it heavily, which is what exercises the dedup/novelty math.
 heuristic: first-principles
 angles:
   - name: Mechanistic interpretability research
@@ -34,6 +36,41 @@ angles:
       - Quantization-aware training study on a 1B model
     relevance_rationale: Efficiency results are demonstrable on the lab's node and legible
       to committees, though the space is crowded at small scale.
+    notes: null
+  - name: Small-model controlled science
+    definition: Controlled studies of training phenomena (grokking, memorization,
+      synthetic-data dynamics) in sub-1B models with complete experimental sweeps.
+    distinctness_rationale: Varies the evidence-type dimension — full experimental control
+      replaces scale as the source of validity, turning the compute constraint into the
+      methodological point.
+    example_options:
+      - Grokking phase-boundary mapping in toy transformers
+      - Memorization-vs-generalization dynamics across seeds
+    relevance_rationale: The lab's 4x A100 node permits complete sweeps that scaled labs
+      skip; controlled-science papers fit top-venue tracks under the deadline.
+    notes: null
+  - name: Applied domain collaboration
+    definition: ML methods delivered against a partner domain's concrete data problem,
+      judged partly by that domain.
+    distinctness_rationale: Varies the judge dimension — external validity replaces
+      benchmark validity, and a second judge changes what counts as success.
+    example_options:
+      - Protein-function annotation with a domain lab
+      - Materials-property prediction with a chemistry group
+    relevance_rationale: Real-data papers with domain co-authors are publishable with
+      modest compute and evidence collaboration skill, though partner availability is
+      uncertain within two semesters.
+    notes: null
+  - name: Open research tooling
+    definition: Build and maintain a research instrument or library the community
+      adopts, with a systems-track paper describing it.
+    distinctness_rationale: Varies the artifact dimension — the deliverable is adopted
+      infrastructure judged by use, not a result judged by novelty.
+    example_options:
+      - An activation-caching library for interpretability workflows
+      - A reproducible-eval harness other labs adopt
+    relevance_rationale: Visible artifacts with real users give recommenders concrete
+      material, and users bring their own compute.
     notes: null
 strategic_notes: []
 notes: null

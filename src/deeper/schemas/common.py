@@ -39,7 +39,8 @@ class Verdict(StrEnum):
 
 class Heuristic(StrEnum):
     """The cartographer framing personas — ensemble diversity is the breadth
-    mechanism (design P3, §5/S1)."""
+    mechanism (design P3, §5/S1). HUMAN is not a cartographer: it marks angles
+    the human added at Gate A, so provenance survives into the map."""
 
     FIRST_PRINCIPLES = "first-principles"
     ANALOGIST = "analogist"
@@ -47,6 +48,7 @@ class Heuristic(StrEnum):
     PRACTITIONER = "practitioner"
     TAXONOMIST = "taxonomist"
     HORIZON_SCANNER = "horizon-scanner"
+    HUMAN = "human"
 
 
 class SourceRef(ArtifactModel):

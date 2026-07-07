@@ -8,6 +8,7 @@ from .base import (
     StageBase,
     StageContext,
     StageInputsMissing,
+    StageInterrupted,
 )
 from .not_yet import (
     DeepDiveStage,
@@ -46,6 +47,7 @@ __all__ = [
     "StageBase",
     "StageContext",
     "StageInputsMissing",
+    "StageInterrupted",
     "SynthesisStage",
     "TournamentStage",
 ]

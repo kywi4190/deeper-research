@@ -13,18 +13,19 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**Phase A complete; Phase B substrate, dispatch layer, and orchestrator built
-(Prompt 6).** Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON
-round-trip, an LLM-facing validation-error formatter, and a generated JSON Schema in
-`schemas/`; the versioned agent prompts for stages 0–5 live in `agents/` with the
-`deeper-lab` prompt-iteration harness (design-doc M0). The no-LLM substrate exists —
-the git-backed run **workspace** (`workspace.py`), the **run profiles / config loader**
-(`config.py`), the **S2 budget allocator + reflow** (`allocation.py`) — plus the
-**agent dispatch layer** (`agents_runtime/`) and now the **deterministic orchestrator**
-(`orchestrator/`): an explicit state machine over S0–S8 with gates as file-edit pause
-states, crash-safe idempotent resume, surgical rerun invalidation, and the `deeper`
-CLI. Stages S0–S2 have provisional mock-walkable implementations (real versions arrive
-in Prompt 7); S3–S8 are registered stubs that report cleanly.
+**Phase A complete; Phase B kernel through S2 real (Prompt 7).** Every pipeline
+artifact has a strict Pydantic v2 model with YAML/JSON round-trip, an LLM-facing
+validation-error formatter, and a generated JSON Schema in `schemas/`; the versioned
+agent prompts for stages 0–5 live in `agents/` with the `deeper-lab` prompt-iteration
+harness (design-doc M0). The no-LLM substrate — git-backed run **workspace**, **run
+profiles / config loader**, **S2 budget allocator + reflow** — the **agent dispatch
+layer** (`agents_runtime/`), and the **deterministic orchestrator** (`orchestrator/`)
+are all built. Stages **S0–S2 are now real**: S0 is an interactive terminal interview
+with a confirm-before-write step, S1 runs the parallel cartographer ensemble plus the
+§5/S1 saturation rule (marginal novelty from the merger's dedup map, expansion passes,
+hard cap 8), Gate A applies all five review actions to the map on resume, and S2
+prints the allocation table at the gate exit. S3–S8 are registered stubs that report
+cleanly.
 
 ## Architecture map
 
@@ -40,11 +41,11 @@ state of a run.
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry) | S0–S2 provisional, S3–S8 stubs (Prompts 7–12) |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` is the S1 rule's pure math | **S0–S2 built**, S3–S8 stubs (Prompts 8–12) |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator suites (658 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/saturation/Gate A) suites (691 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -190,6 +191,13 @@ untrusted-web rule. Live dispatch is additionally fenced by
 WebSearch/WebFetch/Read/Write; no research agent gets Bash or subagents) +
 `setting_sources=[]` + `cwd` pinned to the run workspace.
 
+Besides one-shot `run_agent`, the dispatcher exposes `run_interview` — the S0
+conversational loop (the design's single conversational agent). It shares the same
+semaphore, ledger, and schema-retry discipline; only the turn protocol differs: a
+reply without artifact markers is a question routed to the terminal, and the
+question budget is enforced by code (an over-budget question is fed back as a
+violation, like a schema failure).
+
 **Mock mode** (`config.yaml mode: mock`, the default) substitutes only the network
 call: `MockDispatcher` renders canned fixtures from
 `tests/fixtures/mock_agents/<role>/<schema>[.<context>].yaml` (a coherent
@@ -294,9 +302,37 @@ validates is not re-run).
 **Stages** (`src/deeper/stages/`) are classes over a small protocol —
 `validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
 agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
-in `STAGES`. S0 (mock-only interview), S1 (fixed ensemble, no saturation rule yet),
-and S2 (real allocation math) are provisional; S3–S8 raise `NotImplementedYet`, which
-the engine reports cleanly, leaving state untouched and resumable.
+in `STAGES`. S3–S8 raise `NotImplementedYet`, which the engine reports cleanly,
+leaving state untouched and resumable. The built stages:
+
+- **S0 Intake** drives the interviewer through the dispatch layer's
+  `run_interview` loop — the system's only multi-turn dispatch. Each turn
+  re-invokes the agent with the transcript; a reply without artifact markers is a
+  question printed to the terminal (answer captured via the CLI's `ask_user`
+  channel), a reply with markers is the final emission, validated with the same
+  schema-retry discipline as any dispatch. The question budget
+  (`caps.max_interview_questions`, default 8) is enforced by code: an over-budget
+  question never reaches the user — it is fed back as a violation. The stage
+  prints a brief summary and requires explicit confirmation before writing
+  `brief.md` / `destination.md` / `preferences.yaml`; declining discards
+  everything and leaves the run resumable at S0. Non-interactive sessions (no
+  tty; every mock test walk) skip questions and confirmation — the interviewer
+  is told every turn is final. In live mode the interviewer may WebSearch to
+  verify destination-facts.
+- **S1 Cartography** dispatches the profile's initial ensemble in parallel
+  (one `asyncio.gather` through the dispatcher semaphore), then the merger, then
+  applies the **saturation rule** (design §5/S1; pure math in
+  `stages/saturation.py`): marginal novelty per cartographer = new distinct
+  merged angles / its total raw angles, computed from the merger's dedup map;
+  while the trailing-window mean (window 2) stays ≥ 0.2, it spawns up to 2 more
+  passes of the heuristics that produced the most novel angles (raw output at
+  `angles/raw/{heuristic}-{n}.yaml`, prompt lists the already-mapped angles),
+  re-merges, and re-measures — hard cap 8 invocations. All thresholds come from
+  `HardCaps`, never an LLM. `is_complete` replays the deterministic expansion
+  plan against the files on disk, so a crash mid-expansion resumes mid-plan.
+- **S2 Allocation** runs the budget formula over the post-Gate-A map and prints
+  the full table (angle, prior, units, share) at the gate exit — the user sees
+  where budget will go before S3 spends any of it.
 
 **Gates are file-edit pause states.** Entering a gate writes a commented template
 (`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
@@ -304,10 +340,20 @@ decision (`approved: false`), prints what to review and edit, and exits. The tem
 is never overwritten once it exists — a half-edited decision survives resume. On
 `deeper resume`, the file is validated: YAML/schema errors or a still-undecided body
 re-pause with the exact problem; `approved: true` advances (gate marked in
-`state.json`, one commit); Gate A's `rerun_hint` loops back through S1 via the same
-invalidation machinery as `rerun`. An agent that exhausts its schema retries
-(`AgentOutputInvalid`) pauses the run as `PAUSED_ATTENTION` with the validation
-errors; `deeper resume` re-enters the stage after you fix the cause.
+`state.json`, one commit). **Gate A's five actions are applied on resume**, before
+the state transition, so their writes ride the gate commit: removals drop the angle
+and its dedup entries (reason echoed to the terminal and preserved in the kept
+decision file + map diff — the S7 frame-checker re-examines them); additions enter
+the map as `human`-provenance angles with prior 0.5 (adjustable in the same
+decision via the name's kebab-case slug), which queues them for allocation and a
+scout; prior adjustments overwrite priors; referential mistakes (unknown angle id,
+colliding addition) re-pause the gate with every problem listed and nothing
+written. `rerun_hint` records the hint at `gates/gate-a-hint.txt` (where S1
+invalidation can't delete it), loops back through S1 via the same invalidation
+machinery as `rerun`, and the S1 pass injects it into every cartographer prompt
+then consumes the file — one pass, exactly. An agent that exhausts its schema
+retries (`AgentOutputInvalid`) pauses the run as `PAUSED_ATTENTION` with the
+validation errors; `deeper resume` re-enters the stage after you fix the cause.
 
 **Surgical rerun** (`deeper rerun <run> --stage S3 [--angle x]`) is git-tracked
 deletion: the target stage's output subtree (angle-scoped for S3) plus everything
@@ -329,25 +375,55 @@ pip install -e ".[dev]"
 ```
 
 Then drive a run through the CLI (mock mode is the default — the whole pipeline runs
-offline against fixtures):
+offline against fixtures). What a run looks like, from `deeper new` to the
+allocation table:
 
 ```bash
 deeper new "which vector database should we adopt" --profile quick
-#   creates runs/<date>-<goal-slug>, executes S0+S1, pauses at Gate A telling you
-#   exactly what to review and which file to edit
-#   (--live dispatches real agents; S0's interactive interview arrives in Prompt 7)
+#   1. creates runs/<date>-<goal-slug> (a git repo; every transition is a commit)
+#   2. S0 interviews you in the terminal — the agent's questions stream in, you
+#      answer inline, capped at 8 questions (--live lets it also web-verify
+#      destination-facts). It then prints a brief summary and asks you to CONFIRM
+#      before brief.md / destination.md / preferences.yaml are written. In a
+#      non-interactive session (pipe, mock test) it skips straight to artifacts.
+#   3. S1 dispatches the cartographer ensemble in parallel, merges, and prints
+#      the saturation math per cartographer:
+#        S1 saturation: first-principles novelty 1.00 (6/6 new)
+#        S1 saturation: contrarian novelty 0.33 (1/3 new)
+#        S1 saturation: saturated (trailing-2 mean novelty 0.17 < 0.2)
+#      (had novelty stayed >= 0.2 it would spawn up to 2 extra passes, cap 8)
+#   4. pauses at Gate A telling you exactly what to review and which file to edit
 
 deeper status <run>          # node, gate statuses, spend by stage, pending-gate hint
-# edit runs/<...>/gates/gate-a.yaml -> approved: true
-deeper resume <run>          # validates the gate file, runs S2, continues to S3
+
+# edit runs/<...>/gates/gate-a.yaml — approve, optionally with actions:
+#   approved: true
+#   added_angles:      [{name: "Graph-native retrieval", note: "scout graph hybrids"}]
+#   removed_angles:    [{angle_id: training-efficiency, reason: "crowded space"}]
+#   prior_adjustments: [{angle_id: evaluation-science, new_prior: 0.9}]
+
+deeper resume <run>
+#   applies your edits to angles/map.yaml (echoing each action), then S2 prints
+#   the allocation table before S3 would spend anything:
+#     gate-a: added angle 'graph-native-retrieval' (prior 0.5) — queued for scouting
+#     gate-a: prior of 'evaluation-science' 0.7 -> 0.9
+#     S2: allocation — 16 units over 9 angles (floor 1, gamma 1.0, cap 25%):
+#       angle                         prior  units  share
+#       evaluation-science             0.90      2  12.5%
+#       graph-native-retrieval         0.50      2  12.5%
+#       ...
+#   then reports that S3 is not built yet (arrives in Prompt 8) and exits cleanly
+
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
 deeper report <run>          # decision-report path (S8, not built yet)
 ```
 
-`<run>` is a path or a name under `runs/`. Every command is safe to repeat: pauses
-exit 0 with instructions, `status`/`report` are read-only, and re-entering a run never
-re-executes completed work.
+Setting `rerun_hint: "<hint>"` instead of approving loops cartography once with the
+hint injected into every cartographer prompt. `<run>` is a path or a name under
+`runs/`. Every command is safe to repeat: pauses exit 0 with instructions,
+`status`/`report` are read-only, and re-entering a run never re-executes completed
+work.
 
 ## How to test
 
@@ -408,11 +484,29 @@ canonical `Makefile` is used wherever GNU make is available.
   parses as a valid decision with `approved: false` and no actions; resume treats that
   as "no decision recorded" and re-pauses, so an accidental resume can never advance a
   gate. Gate templates are never overwritten once written.
-- **S0–S2 are provisional until Prompt 7.** So the state machine is walkable
-  end-to-end today (the build guide's Prompt 6 exit test), S0 dispatches the
-  interviewer non-interactively in mock mode only, S1 runs a fixed ensemble without
-  the saturation rule, and Gate A records but does not yet apply edit actions or
-  inject the rerun hint. S2's allocation is the real math.
+- **`Heuristic.HUMAN` marks Gate-A-added angles.** The design's "add an angle" action
+  needs the addition to live in the same map every downstream stage reads, but
+  `Angle.contributing_heuristics` requires provenance. A `human` member of the
+  heuristic enum records it honestly; a human-added angle also carries placeholder
+  example options ("(to be scouted…)") because existence proofs are exactly what the
+  assigned scout will establish. The saturation math never sees these (they have no
+  dedup entries).
+- **Interview cap and turn semantics are config, not prose.** Design §5/S0 says
+  "capped at ~8 questions"; `HardCaps.max_interview_questions` (default 8) makes the
+  cap enforceable code. "Streaming" is per-question: each question prints the moment
+  the agent's turn completes (token-level streaming inside a turn is not wired).
+  Declining the confirmation discards the interview entirely — a revision loop
+  (feed the objection back and re-emit) is deliberately out of scope for now.
+- **The Gate A rerun hint lives at `gates/gate-a-hint.txt`.** The design doesn't say
+  where the hint travels; S1 invalidation wipes `angles/` and the gate decision
+  file, so the hint is written beside the gate file (which invalidation preserves)
+  and deleted by the S1 pass that used it — "another pass with a hint" is exactly
+  one pass.
+- **Same-heuristic expansion passes get suffixed workspace names.** Design §7 lists
+  one raw file per cartographer; the saturation rule can re-run a heuristic, so
+  expansion output lands at `angles/raw/{heuristic}-{n}.yaml` and dedup entries are
+  attributed to a pass by (heuristic, raw angle name). "Novelty across the last two"
+  is read as the mean over the trailing window (`cartography_novelty_window`).
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -427,11 +521,13 @@ Following the phases in the build guide:
 - **Phase A — Foundation:** Prompt 1 (bootstrap) ✅ · Prompt 2 (schemas) ✅ · Prompt 3
   (agent prompts + prompt-lab) ✅.
 - **Phase B — Kernel happy path (M1):** Prompt 4 (workspace/config/allocation) ✅ →
-  Prompt 5 (dispatch layer) ✅ → Prompt 6 (orchestrator/CLI) ✅ → stages S0–S5.
+  Prompt 5 (dispatch layer) ✅ → Prompt 6 (orchestrator/CLI) ✅ → Prompt 7 (real
+  S0–S2: interactive intake, saturation-rule cartography, Gate A actions, allocation
+  at the gate exit) ✅ → stages S3–S5.
 - **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
   synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase B, Prompt 7 — real S0–S2: interactive intake, cartography ensemble with
-the saturation rule, Gate A action application, allocation at the gate exit.**
+**Next: Phase B, Prompt 8 — S3 scouts + critic + reflow, S4 rubric, Gate B, S5
+screening with the shortlist rule.**

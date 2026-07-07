@@ -117,14 +117,15 @@
       "type": "object"
     },
     "Heuristic": {
-      "description": "The cartographer framing personas \u2014 ensemble diversity is the breadth\nmechanism (design P3, \u00a75/S1).",
+      "description": "The cartographer framing personas \u2014 ensemble diversity is the breadth\nmechanism (design P3, \u00a75/S1). HUMAN is not a cartographer: it marks angles\nthe human added at Gate A, so provenance survives into the map.",
       "enum": [
         "first-principles",
         "analogist",
         "contrarian",
         "practitioner",
         "taxonomist",
-        "horizon-scanner"
+        "horizon-scanner",
+        "human"
       ],
       "title": "Heuristic",
       "type": "string"

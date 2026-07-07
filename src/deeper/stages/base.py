@@ -39,6 +39,12 @@ class StageInputsMissing(Exception):
     (P2: a stage cannot start until its inputs validate) was broken upstream."""
 
 
+class StageInterrupted(Exception):
+    """The stage stopped on a human decision it cannot make itself (declined
+    confirmation, interaction needed in a non-interactive session). The engine
+    reports it cleanly and leaves state untouched — `deeper resume` re-enters."""
+
+
 @dataclass
 class StageContext:
     """Everything a stage may touch. The dispatcher is the only path to an LLM."""
@@ -47,6 +53,9 @@ class StageContext:
     config: RunConfig
     dispatcher: Dispatcher
     emit: Callable[[str], None] = field(default=lambda _line: None)
+    # Terminal Q&A channel (S0 interview + confirmations). None when the session
+    # is non-interactive — stages must degrade gracefully, never block.
+    ask_user: Callable[[str], str] | None = None
 
 
 class StageBase:

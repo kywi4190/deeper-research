@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import NamedTuple, Protocol
 
@@ -65,6 +66,14 @@ class Dispatcher(Protocol):
     """The interface every stage codes against."""
 
     async def run_agent(self, contract: AgentContract) -> AgentResult: ...
+
+    async def run_interview(
+        self,
+        contract: AgentContract,
+        *,
+        ask_user: Callable[[str], str] | None,
+        max_questions: int,
+    ) -> AgentResult: ...
 
 
 class _BaseDispatcher:
@@ -132,8 +141,138 @@ class _BaseDispatcher:
             )
         raise AgentOutputInvalid(contract, errors=feedback, raw_output=raw)
 
+    async def run_interview(
+        self,
+        contract: AgentContract,
+        *,
+        ask_user: Callable[[str], str] | None,
+        max_questions: int,
+    ) -> AgentResult:
+        """The S0 conversational loop — the only multi-turn dispatch in the
+        system (design §5/S0: the interviewer is "the only conversational
+        agent"). Each turn re-invokes the agent with the transcript so far; a
+        reply without artifact markers is a question for the human (`ask_user`),
+        a reply with markers is the final artifact emission and flows through
+        the same parse/validate/retry discipline as `run_agent`. When
+        `ask_user` is None (non-interactive session) or the question budget is
+        spent, the turn is marked final and the agent must emit."""
+        prompt = assemble_prompt(contract)
+        retry_key = f"{contract.stage.value}:{contract.role}:{contract.context or '-'}"
+        transcript: list[tuple[str, str]] = []
+        retries = 0
+        raw, feedback = "", ""
+        while True:
+            final = ask_user is None or len(transcript) >= max_questions
+            full = _interview_prompt(
+                prompt,
+                transcript,
+                max_questions=max_questions,
+                final=final,
+                raw=raw,
+                feedback=feedback,
+            )
+            async with self._semaphore():
+                inv = await self._invoke(full, contract, retries)
+            self.ledger.record(
+                SpendEntry(
+                    stage=contract.stage,
+                    role=contract.role,
+                    context=contract.context,
+                    usd=inv.usd,
+                    input_tokens=inv.input_tokens,
+                    output_tokens=inv.output_tokens,
+                    at=datetime.now(UTC),
+                )
+            )
+            if "### artifact:" in inv.text:
+                try:
+                    artifacts = parse_artifacts(inv.text, contract.output_schemas)
+                except ArtifactParseError as err:
+                    retries += 1
+                    if retries > self.config.caps.max_schema_retries:
+                        raise AgentOutputInvalid(
+                            contract, errors=err.report, raw_output=inv.text
+                        ) from err
+                    self.ledger.bump_retry(retry_key)
+                    raw, feedback = inv.text, err.report
+                    continue
+                return AgentResult(
+                    role=contract.role,
+                    artifacts=artifacts,
+                    raw_text=inv.text,
+                    usd=inv.usd,
+                    input_tokens=inv.input_tokens,
+                    output_tokens=inv.output_tokens,
+                    num_turns=inv.num_turns,
+                    duration_ms=inv.duration_ms,
+                    session_id=inv.session_id,
+                    retries_used=retries,
+                )
+            question = inv.text.strip()
+            if final or not question:
+                # Asked past the budget (or replied with nothing): a contract
+                # violation, disciplined exactly like a schema failure.
+                problem = (
+                    "The question budget is spent — do not ask anything more; "
+                    "emit all three artifacts now."
+                    if final
+                    else "Your reply was empty. Ask one question as plain text, "
+                    "or emit all three artifacts."
+                )
+                retries += 1
+                if retries > self.config.caps.max_schema_retries:
+                    raise AgentOutputInvalid(contract, errors=problem, raw_output=inv.text)
+                self.ledger.bump_retry(retry_key)
+                raw, feedback = inv.text, problem
+                continue
+            raw, feedback = "", ""
+            assert ask_user is not None  # final would be True otherwise
+            answer = ask_user(question)
+            transcript.append((question, answer))
+
     async def _invoke(self, prompt: str, contract: AgentContract, attempt: int) -> _Invocation:
         raise NotImplementedError
+
+
+def _interview_prompt(
+    prompt: str,
+    transcript: list[tuple[str, str]],
+    *,
+    max_questions: int,
+    final: bool,
+    raw: str,
+    feedback: str,
+) -> str:
+    """One interview turn's full prompt: role prompt + transcript + turn directive."""
+    parts = [prompt.rstrip()]
+    if transcript:
+        lines = []
+        for i, (question, answer) in enumerate(transcript, start=1):
+            lines.append(f"Q{i} (you): {question}")
+            lines.append(f"A{i} (user): {answer}")
+        parts.append("# INTERVIEW SO FAR\n" + "\n".join(lines))
+    else:
+        parts.append("# INTERVIEW SO FAR\n(no questions asked yet)")
+    if final:
+        parts.append(
+            "# TURN\nThis is your FINAL TURN: the question budget is spent or the "
+            "session is non-interactive. Do not ask anything more — emit all three "
+            "artifacts now, resolving any ambiguity per your finalizing instructions."
+        )
+    else:
+        parts.append(
+            f"# TURN\nYou have used {len(transcript)} of {max_questions} questions. "
+            "Either ask exactly ONE next question as plain text (no artifact "
+            "markers), or — if all three artifacts are already complete and "
+            "unambiguous — emit them now."
+        )
+    if feedback:
+        parts.append(
+            "# PREVIOUS ATTEMPT (INVALID — shown so you can correct it)\n"
+            f"{raw}\n\n# VALIDATION ERRORS\n{feedback}\n\n"
+            "Resubmit ALL required artifacts, complete and corrected."
+        )
+    return "\n\n".join(parts) + "\n"
 
 
 class LiveDispatcher(_BaseDispatcher):

@@ -1,4 +1,5 @@
 # Mock S1 raw report — practitioner: what do current PhD students say worked?
+# One novel region (supervisor pipelines); the rest corroborates earlier heuristics.
 heuristic: practitioner
 angles:
   - name: Supervisor-pipeline projects
@@ -13,17 +14,6 @@ angles:
       collaboration outweigh solo novelty; publication odds are highest inside a
       working pipeline.
     notes: null
-  - name: Workshop-first incremental publishing
-    definition: Structure the two semesters as workshop paper → main-venue extension,
-      publishing intermediate results early.
-    distinctness_rationale: A project-shaping strategy about cadence and de-risking,
-      applicable across topics but constituting its own selection criterion set.
-    example_options:
-      - Interpretability workshop paper in semester one, extended for ICML
-      - Eval-methods workshop submission with a planned main-track follow-up
-    relevance_rationale: Application deadlines (December) precede thesis submission;
-      only early-publishing structures produce citable artifacts in time.
-    notes: null
   - name: Open-source research tooling
     definition: Build and maintain a research tool the community adopts, with a
       systems-track paper describing it.
@@ -35,12 +25,32 @@ angles:
     relevance_rationale: Visible artifacts with real users give recommenders concrete
       material; feasible on lab compute since users bring their own.
     notes: null
+  - name: Industry-partner applied projects
+    definition: Deliver an ML solution against a company's or external lab's concrete
+      data problem, co-supervised by the partner.
+    distinctness_rationale: The partner's operational judgment is a second judge, and
+      data access replaces compute as the scarce resource.
+    example_options:
+      - Clinical-notes information extraction with a med-school lab
+      - Demand-forecasting study with a local industry partner
+    relevance_rationale: Practitioners report applied co-supervised theses produce
+      strong letters and defensible papers, though partner timelines are risky
+      against the December application deadline.
+    notes: null
 strategic_notes:
-  - insight: Whatever project is chosen, submit something — anything peer-reviewed —
-      before the December application deadline.
+  - insight: Whatever project is chosen, structure the two semesters as workshop paper
+      first, then main-venue extension — and submit something peer-reviewed before the
+      December application deadline.
     kind: execution
     rationale: Practitioners report an under-review first-author paper changes how
       committees read the whole file; the thesis deadline (April 2027) is not the
-      binding deadline.
+      binding deadline, and workshop-first cadence de-risks it.
+    source_heuristics: []
+  - insight: Pick the project whose supervisor writes the strongest specific letters,
+      even over a marginally better topic.
+    kind: rubric-weight
+    rationale: Current students consistently attribute admits to close-collaboration
+      letters; letter strength varies more across supervisors than topic quality
+      varies across these angles.
     source_heuristics: []
 notes: null

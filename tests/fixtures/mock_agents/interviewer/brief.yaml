@@ -1,4 +1,7 @@
 # Mock S0 brief — the design doc's senior-project running example.
+# The interview's "it must be a machine learning project" statement was challenged
+# (program rules do not require ML) and classified as a STRONG PREFERENCE — it lives
+# in preferences.yaml, deliberately absent from these constraints.
 goal: Choose the senior research project that best positions me for admission to a
   top ML PhD program
 answer_type: decision

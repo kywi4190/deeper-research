@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import re
+import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -65,8 +67,26 @@ def _emit(line: str) -> None:
     console.print(line, markup=False)
 
 
+def _terminal_ask_user() -> Callable[[str], str] | None:
+    """The S0 interview/confirmation channel: prints the agent's question and
+    reads one line back. None when stdin is not a terminal — stages then run
+    non-interactively (the interviewer finalizes without questions)."""
+    if not sys.stdin.isatty():
+        return None
+
+    def ask(question: str) -> str:
+        console.print()
+        console.print(question, markup=False)
+        try:
+            return input("> ").strip()
+        except EOFError:  # stdin looked like a tty but closed: decline, don't crash
+            return ""
+
+    return ask
+
+
 def _run_engine(workspace: Workspace, *, resume: bool = False) -> Node:
-    engine = Engine(workspace, emit=_emit)
+    engine = Engine(workspace, emit=_emit, ask_user=_terminal_ask_user())
     return asyncio.run(engine.resume() if resume else engine.run())
 
 

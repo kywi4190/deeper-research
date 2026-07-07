@@ -1,4 +1,10 @@
-# Mock S1 merged angle map — dedup of the six-cartographer ensemble.
+# Mock S1 merged angle map. The dedup_map is COMPLETE over every raw angle the
+# six cartographer fixtures can emit — the saturation rule's novelty math runs
+# on it. Under any profile the trailing-window novelty lands below 0.2, so the
+# default mock walk saturates after the initial ensemble (expansion passes are
+# exercised by tests with contrived fixtures). Profiles with fewer cartographers
+# simply have dedup entries for reports that never ran; the orchestrator only
+# requires present reports to be covered.
 angles:
   - id: interpretability-research
     name: Mechanistic interpretability research
@@ -33,6 +39,24 @@ angles:
       benchmarks tracks give a credible first-author path before the December
       application deadline.
     contributing_heuristics: [first-principles, contrarian, taxonomist, horizon-scanner]
+    sub_angles:
+      - name: Agent-behavior evaluation
+        definition: Measurement of multi-step agentic behavior over long horizons.
+    notes: null
+  - id: training-efficiency
+    name: Training and systems efficiency
+    definition: Methods that make training or inference cheaper, faster, or more
+      memory-efficient at small scale.
+    distinctness_rationale: Optimizes an engineering objective with measurable speedups
+      rather than understanding, measurement, or external validity.
+    example_options:
+      - Low-rank adaptation variants under a fixed compute budget
+      - Quantization-aware training study on a 1B model
+    relevance_prior: 0.35
+    prior_justification: Demonstrable on the lab node and legible to committees, but the
+      small-scale efficiency space is crowded, which weakens the first-author top-venue
+      reward path the destination model names.
+    contributing_heuristics: [first-principles, taxonomist]
     sub_angles: []
     notes: null
   - id: small-model-science
@@ -48,7 +72,7 @@ angles:
     prior_justification: The lab's 4x A100 node permits complete sweeps that scaled
       labs skip; controlled-science papers fit top-venue tracks and reproduction norms
       de-risk the deadline.
-    contributing_heuristics: [contrarian, analogist, horizon-scanner]
+    contributing_heuristics: [first-principles, analogist, contrarian, horizon-scanner]
     sub_angles: []
     notes: null
   - id: applied-domain-collaboration
@@ -62,9 +86,41 @@ angles:
       - Materials-property prediction with a chemistry group
     relevance_prior: 0.45
     prior_justification: Real-data papers with domain co-authors are publishable and
-      evidence collaboration skill, but depend on partner-lab availability the brief
+      evidence collaboration skill, but depend on partner availability the brief
       cannot guarantee within two semesters.
-    contributing_heuristics: [analogist, taxonomist]
+    contributing_heuristics: [first-principles, analogist, practitioner, taxonomist]
+    sub_angles: []
+    notes: null
+  - id: research-tooling
+    name: Open research tooling
+    definition: Build and maintain a research instrument or library the community
+      adopts, with a systems-track paper describing it.
+    distinctness_rationale: The deliverable is adopted infrastructure judged by use
+      and citations-from-use, not a result judged by novelty.
+    example_options:
+      - An activation-caching library for interpretability workflows
+      - A reproducible-eval harness adopted by other labs
+    relevance_prior: 0.5
+    prior_justification: Visible artifacts with real users give the destination's
+      letter-writers concrete material, and adoption is demonstrable before the
+      December deadline; venue fit is narrower than for research results.
+    contributing_heuristics: [first-principles, practitioner]
+    sub_angles: []
+    notes: null
+  - id: negative-results-science
+    name: Negative-results and failure-mode science
+    definition: Projects whose contribution is demonstrating rigorously that a popular
+      method fails, and characterizing when and why.
+    distinctness_rationale: Inverts the field's positive-result bias; the artifact is a
+      well-evidenced boundary, not an improvement.
+    example_options:
+      - Stress-test a popular interpretability method until it breaks
+      - Characterize where chain-of-thought hurts small-model accuracy
+    relevance_prior: 0.3
+    prior_justification: Memorable to committees precisely because it is rare and
+      signals research taste, but main-venue acceptance risk sits badly against the
+      December deadline the brief fixes.
+    contributing_heuristics: [contrarian]
     sub_angles: []
     notes: null
   - id: supervisor-pipeline
@@ -84,42 +140,79 @@ angles:
     sub_angles: []
     notes: null
 dedup_map:
+  # first-principles (dispatched first — introduces six regions)
+  - heuristic: first-principles
+    raw_name: Mechanistic interpretability research
+    merged_into: interpretability-research
+  - heuristic: first-principles
+    raw_name: Empirical benchmarking and evaluation science
+    merged_into: evaluation-science
+  - heuristic: first-principles
+    raw_name: Training and systems efficiency
+    merged_into: training-efficiency
+  - heuristic: first-principles
+    raw_name: Small-model controlled science
+    merged_into: small-model-science
+  - heuristic: first-principles
+    raw_name: Applied domain collaboration
+    merged_into: applied-domain-collaboration
+  - heuristic: first-principles
+    raw_name: Open research tooling
+    merged_into: research-tooling
+  # analogist (all corroboration — zero novel)
   - heuristic: analogist
     raw_name: Interpretability as microscopy
     merged_into: interpretability-research
-  - heuristic: horizon-scanner
-    raw_name: Interpretability for safety auditing
-    merged_into: interpretability-research
-  - heuristic: taxonomist
-    raw_name: Understanding-type contributions
-    merged_into: interpretability-research
-  - heuristic: contrarian
-    raw_name: Data-centric contributions
-    merged_into: evaluation-science
-  - heuristic: horizon-scanner
-    raw_name: Agent-behavior evaluation
-    merged_into: evaluation-science
-  - heuristic: taxonomist
-    raw_name: Measurement-type contributions
-    merged_into: evaluation-science
-  - heuristic: contrarian
-    raw_name: Small-model science
-    merged_into: small-model-science
-  - heuristic: horizon-scanner
-    raw_name: Synthetic-data science
-    merged_into: small-model-science
-  - heuristic: analogist
-    raw_name: Reproduction-then-extension studies
-    merged_into: small-model-science
   - heuristic: analogist
     raw_name: Domain-collaboration applied ML
     merged_into: applied-domain-collaboration
-  - heuristic: taxonomist
-    raw_name: Application-type contributions
-    merged_into: applied-domain-collaboration
+  - heuristic: analogist
+    raw_name: Reproduction-then-extension studies
+    merged_into: small-model-science
+  # contrarian (one novel region)
+  - heuristic: contrarian
+    raw_name: Negative-results and failure-mode science
+    merged_into: negative-results-science
+  - heuristic: contrarian
+    raw_name: Small-model science
+    merged_into: small-model-science
+  - heuristic: contrarian
+    raw_name: Data-centric contributions
+    merged_into: evaluation-science
+  # practitioner (one novel region)
   - heuristic: practitioner
     raw_name: Supervisor-pipeline projects
     merged_into: supervisor-pipeline
-notes: Capability-type contributions and negative-results science were folded into
-  small-model-science where they survived the compute constraint; pure capability
-  work was dropped as infeasible on the lab node (see coverage report thin areas).
+  - heuristic: practitioner
+    raw_name: Open-source research tooling
+    merged_into: research-tooling
+  - heuristic: practitioner
+    raw_name: Industry-partner applied projects
+    merged_into: applied-domain-collaboration
+  # taxonomist (pure corroboration)
+  - heuristic: taxonomist
+    raw_name: Understanding-type contributions
+    merged_into: interpretability-research
+  - heuristic: taxonomist
+    raw_name: Measurement-type contributions
+    merged_into: evaluation-science
+  - heuristic: taxonomist
+    raw_name: Capability-type contributions
+    merged_into: training-efficiency
+  - heuristic: taxonomist
+    raw_name: Application-type contributions
+    merged_into: applied-domain-collaboration
+  # horizon-scanner (pure corroboration; folded as sub-angles where warranted)
+  - heuristic: horizon-scanner
+    raw_name: Agent-behavior evaluation
+    merged_into: evaluation-science
+  - heuristic: horizon-scanner
+    raw_name: Interpretability for safety auditing
+    merged_into: interpretability-research
+  - heuristic: horizon-scanner
+    raw_name: Synthetic-data science
+    merged_into: small-model-science
+notes: Reproduction-then-extension folded into small-model-science because its option
+  set (reproduce, then sweep or extend at small scale) substantially coincides;
+  workshop-first cadence arrived as a strategy, not a region, and travels as an
+  execution strategic note in the coverage report.

@@ -1,5 +1,9 @@
 # Mock S0 preferences — QUARANTINED: only screener/synthesist may read this.
 items:
+  - statement: Wants a machine learning project — stated in the interview as a hard
+      "must", but on challenge confirmed the program does not require it; it is what
+      excites them
+    strength: strong
   - statement: Finds interpretability and "understanding why models work" genuinely exciting
     strength: strong
   - statement: Prefers solo-authored or small-team work over large lab collaborations
@@ -9,4 +13,5 @@ items:
 risk_appetite: Moderate — willing to bet on a novel research direction if a publishable
   fallback result exists, but not on projects where the whole thesis hinges on one
   uncertain experiment.
-notes: null
+notes: The machine-learning "must" was reclassified from constraint to strong preference
+  after the splitting question; the program's rules impose no field requirement.

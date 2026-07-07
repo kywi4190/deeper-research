@@ -12,24 +12,41 @@ must survive any number of resume attempts.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
 from deeper.schemas import (
+    Angle,
+    AngleMap,
     ArtifactModel,
     GateADecision,
     GateBDecision,
     GateCDecision,
     GateName,
     GateStatus,
+    Heuristic,
     Stage,
     format_validation_error,
 )
 from deeper.workspace import Workspace
+
+# Where the Gate A "another pass" hint survives S1 invalidation (angles/ is
+# wiped; gates/ keeps everything but the decision file). S1 consumes it.
+GATE_A_HINT_PATH = "gates/gate-a-hint.txt"
+# A human-added angle enters the map with a neutral prior; the human can pin it
+# with a prior_adjustments entry targeting the angle's slug in the same decision.
+ADDED_ANGLE_PRIOR = 0.5
+
+# An apply step mutates the workspace once a decision advances the gate:
+# (messages to emit, problem). A problem keeps the gate pending — nothing else
+# has been committed yet.
+ApplyResult = tuple[list[str], str | None]
 
 
 @dataclass(frozen=True)
@@ -42,22 +59,124 @@ class GateOutcome:
     invalidate_to: Stage | None = None  # loop edges re-enter via rerun invalidation
     commit_label: str | None = None
     messages: tuple[str, ...] = ()
+    # Workspace mutation the decision requires (Gate A edit actions, hint
+    # recording); runs before the state transition so its writes land in the
+    # gate's commit, and its problems re-pause instead of advancing.
+    apply: Callable[[Workspace], ApplyResult] | None = None
+
+
+def _slugify(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def apply_gate_a_actions(workspace: Workspace, decision: GateADecision) -> ApplyResult:
+    """Apply an approved Gate A decision's edit actions to angles/map.yaml
+    (design §5 Gate A): removals drop the angle (reason logged to the audit
+    trail via the returned messages, the kept decision file, and the map diff
+    in the gate commit); additions enter the map as human-provenance angles —
+    which queues them for S2 allocation and an S3 scout — and prior adjustments
+    overwrite relevance priors. All referential problems are reported together
+    and nothing is written when any action cannot be applied."""
+    angle_map = workspace.read_artifact("angles/map.yaml", AngleMap)
+    ids = {a.id for a in angle_map.angles}
+    removed_ids = {r.angle_id for r in decision.removed_angles}
+    problems: list[str] = []
+    additions: list[tuple[str, Any]] = []
+    for removal in decision.removed_angles:
+        if removal.angle_id not in ids:
+            problems.append(f"removed_angles: no angle '{removal.angle_id}' in the map")
+    for added in decision.added_angles:
+        slug = _slugify(added.name)
+        if not slug:
+            problems.append(f"added_angles: name {added.name!r} yields an empty slug")
+        elif slug in ids or any(s == slug for s, _ in additions):
+            problems.append(
+                f"added_angles: '{added.name}' collides with existing angle id '{slug}'"
+            )
+        else:
+            additions.append((slug, added))
+    known_after = (ids - removed_ids) | {slug for slug, _ in additions}
+    for adjustment in decision.prior_adjustments:
+        if adjustment.angle_id not in known_after:
+            problems.append(
+                f"prior_adjustments: no angle '{adjustment.angle_id}' in the post-edit map"
+            )
+    if not known_after:
+        problems.append("the decision removes every angle — the map cannot be emptied")
+    if problems:
+        return [], (
+            "gate-a decision cannot be applied:\n- "
+            + "\n- ".join(problems)
+            + "\nFix gates/gate-a.yaml, then `deeper resume` again."
+        )
+
+    messages: list[str] = []
+    angles = [a for a in angle_map.angles if a.id not in removed_ids]
+    for removal in decision.removed_angles:
+        messages.append(f"gate-a: removed angle '{removal.angle_id}' — {removal.reason}")
+    dedup = [e for e in angle_map.dedup_map if e.merged_into not in removed_ids]
+    for slug, added in additions:
+        angles.append(
+            Angle(
+                id=slug,
+                name=added.name,
+                definition=added.note,
+                distinctness_rationale=(
+                    "Added by the human at Gate A; the assigned scout establishes "
+                    "the region's boundaries."
+                ),
+                example_options=["(to be scouted — human-added angle)"],
+                relevance_prior=ADDED_ANGLE_PRIOR,
+                prior_justification=(f"Human judgment at Gate A. Note for the scout: {added.note}"),
+                contributing_heuristics=[Heuristic.HUMAN],
+                notes=f"Scout guidance: {added.note}",
+            )
+        )
+        messages.append(
+            f"gate-a: added angle '{slug}' (prior {ADDED_ANGLE_PRIOR}) — queued for scouting"
+        )
+    by_id = {a.id: a for a in angles}
+    for adjustment in decision.prior_adjustments:
+        angle = by_id[adjustment.angle_id]
+        messages.append(
+            f"gate-a: prior of '{angle.id}' {angle.relevance_prior} -> {adjustment.new_prior}"
+        )
+        angle.relevance_prior = adjustment.new_prior
+    workspace.write_artifact(
+        "angles/map.yaml", AngleMap(angles=angles, dedup_map=dedup, notes=angle_map.notes)
+    )
+    return messages, None
+
+
+def record_rerun_hint(workspace: Workspace, hint: str) -> ApplyResult:
+    """Persist the Gate A rerun hint where S1 invalidation cannot delete it;
+    the S1 pass injects it into every cartographer contract, then consumes it."""
+    target = workspace.path(GATE_A_HINT_PATH)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(hint.strip() + "\n", encoding="utf-8", newline="\n")
+    return [
+        "gate-a: rerun hint recorded — cartography re-runs with it injected "
+        "into every cartographer prompt (this pass only)"
+    ], None
 
 
 def _interpret_a(decision: GateADecision) -> GateOutcome:
     if decision.approved:
-        messages: tuple[str, ...] = ()
-        if decision.added_angles or decision.removed_angles or decision.prior_adjustments:
-            messages = (
-                "note: Gate A edit actions (add/remove/adjust prior) are recorded in "
-                "gates/gate-a.yaml but not applied yet — application arrives in Prompt 7.",
+        n_added = len(decision.added_angles)
+        n_removed = len(decision.removed_angles)
+        n_adjusted = len(decision.prior_adjustments)
+        has_actions = bool(n_added or n_removed or n_adjusted)
+        label = "approved"
+        if has_actions:
+            label = (
+                f"approved ({n_added} added, {n_removed} removed, {n_adjusted} prior(s) adjusted)"
             )
         return GateOutcome(
             advanced=True,
             next_stage=Stage.S2,
             gate_status=GateStatus.APPROVED,
-            commit_label="approved",
-            messages=messages,
+            commit_label=label,
+            apply=partial(apply_gate_a_actions, decision=decision) if has_actions else None,
         )
     if decision.rerun_hint is not None:
         return GateOutcome(
@@ -66,10 +185,7 @@ def _interpret_a(decision: GateADecision) -> GateOutcome:
             gate_status=GateStatus.RERUN_REQUESTED,
             invalidate_to=Stage.S1,
             commit_label=f"rerun requested (hint: {decision.rerun_hint})",
-            messages=(
-                "note: the rerun hint is recorded; injecting it into cartographer "
-                "prompts arrives in Prompt 7 — this pass reruns cartography without it.",
-            ),
+            apply=partial(record_rerun_hint, hint=decision.rerun_hint),
         )
     return GateOutcome(
         advanced=False,
@@ -138,14 +254,18 @@ _TEMPLATE_A = """\
 # Review: angles/map.yaml and angles/map-report.md (read the strategic notes —
 # reframe-kind notes are exactly what to weigh before approving the frame).
 #
-# Record your decision below, then run `deeper resume <run>`.
+# Record your decision below, then run `deeper resume <run>`. Actions are
+# APPLIED on resume: edits land in angles/map.yaml before S2 allocates.
 #
 #   approved: true              accept the map and continue to S2 allocation
 #   rerun_hint: "<hint>"        request another cartography pass with this hint
+#                               injected into every cartographer prompt
 #                               (mutually exclusive with approved: true)
-#   added_angles:               angles the map missed; a scout will be assigned
-#     - name: "..."
-#       note: "guidance for the scout"
+#   added_angles:               angles the map missed; each enters the map with
+#     - name: "..."             #   prior 0.5 and is queued for scouting; its id
+#       note: "guidance for the scout"  # is the name as a kebab-case slug —
+#                               #   target that slug in prior_adjustments to
+#                               #   set a different prior in the same decision
 #   removed_angles:
 #     - angle_id: some-angle-id
 #       reason: "why — logged; the S7 frame-checker re-examines removals"

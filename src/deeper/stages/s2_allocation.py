@@ -1,9 +1,11 @@
 """S2 — Budget allocation (design §5/S2). Pure code, no agents.
 
-Reads the Gate-A-approved angle map's relevance priors and runs the P8
-allocation formula from `deeper.allocation`. Near-final already: Prompt 7 adds
-only the application of Gate A edits (added angles, prior adjustments) to the
-map *before* this stage runs — the allocation itself is complete.
+Runs the P8 allocation formula from `deeper.allocation` over the Gate-A-approved
+angle map (Gate A's edit actions — additions, removals, prior adjustments —
+have already been applied to angles/map.yaml by the gate machinery, so the map
+read here IS the approved map). Besides writing allocation.yaml, the stage
+prints the full table: S2 runs at the Gate A exit, so the user sees where the
+budget will go before S3 spends any of it.
 """
 
 from __future__ import annotations
@@ -12,6 +14,27 @@ from deeper.allocation import allocate
 from deeper.schemas import AllocationTable, AngleMap, Stage
 
 from .base import StageBase, StageContext
+
+
+def table_lines(table: AllocationTable) -> list[str]:
+    """The allocation table as printable lines (rows sorted by units, desc)."""
+    rows = sorted(table.rows, key=lambda r: (-r.units, r.angle_id))
+    width = max(len(r.angle_id) for r in rows)
+    lines = [
+        f"S2: allocation — {table.total_budget_units} units over {len(rows)} angles "
+        f"(floor {table.floor}, gamma {table.gamma}, cap {table.per_angle_cap_pct:g}%):",
+        f"  {'angle':<{width}}  prior  units  share",
+    ]
+    for r in rows:
+        share = r.units / table.total_budget_units
+        lines.append(
+            f"  {r.angle_id:<{width}}  {r.relevance_prior:>5.2f}  {r.units:>5}  {share:>5.1%}"
+        )
+    lines.append(
+        f"  {'total':<{width}}         {table.total_budget_units:>5}   100%   "
+        "-> allocation.yaml (this is what S3 will spend per angle)"
+    )
+    return lines
 
 
 class AllocationStage(StageBase):
@@ -32,7 +55,5 @@ class AllocationStage(StageBase):
             per_angle_cap_pct=ctx.config.per_angle_cap_pct,
         )
         ctx.workspace.write_artifact("allocation.yaml", table)
-        ctx.emit(
-            f"S2: allocated {table.total_budget_units} units across "
-            f"{len(table.rows)} angles -> allocation.yaml"
-        )
+        for line in table_lines(table):
+            ctx.emit(line)

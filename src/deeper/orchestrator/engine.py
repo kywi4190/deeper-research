@@ -31,7 +31,7 @@ from pydantic import ValidationError
 from deeper.agents_runtime import AgentOutputInvalid, create_dispatcher
 from deeper.config import RunConfig
 from deeper.schemas import GateName, GateStatus, RunState, RunStatus, Stage
-from deeper.stages import STAGES, NotImplementedYet, StageBase, StageContext
+from deeper.stages import STAGES, NotImplementedYet, StageBase, StageContext, StageInterrupted
 from deeper.workspace import Workspace, WorkspaceError
 
 from .gates import GATE_AFTER_STAGE, GATE_SPECS, GateSpec, read_decision, write_template_if_absent
@@ -97,12 +97,14 @@ class Engine:
         *,
         stages: dict[Stage, type[StageBase]] | None = None,
         emit: Callable[[str], None] = print,
+        ask_user: Callable[[str], str] | None = None,
         mock_kwargs: dict | None = None,
     ) -> None:
         self.workspace = workspace
         self.config: RunConfig = workspace.load_config()
         self.stages = stages if stages is not None else STAGES
         self.emit = emit
+        self.ask_user = ask_user
         self.dispatcher = create_dispatcher(workspace, self.config, **(mock_kwargs or {}))
 
     # -- public entry points -----------------------------------------------------
@@ -154,6 +156,7 @@ class Engine:
             config=self.config,
             dispatcher=self.dispatcher,
             emit=self.emit,
+            ask_user=self.ask_user,
         )
         if instance.is_complete(ctx):
             self.emit(f"{stage.value}: outputs already valid — skipping (idempotent re-entry)")
@@ -161,7 +164,7 @@ class Engine:
             instance.validate_inputs(ctx)
             try:
                 await instance.execute(ctx)
-            except NotImplementedYet as err:
+            except (NotImplementedYet, StageInterrupted) as err:
                 self.emit(str(err))
                 return False
             except AgentOutputInvalid as err:
@@ -246,6 +249,17 @@ class Engine:
         if not outcome.advanced:
             self._emit_gate_instructions(spec)
             return False
+        if outcome.apply is not None:
+            # Decision-mandated workspace edits (Gate A actions, hint recording)
+            # run before the transition: their writes ride the gate commit, and
+            # a problem (e.g. an unknown angle id) re-pauses the gate untouched.
+            messages, problem = outcome.apply(self.workspace)
+            if problem is not None:
+                self.emit(problem)
+                self._emit_gate_instructions(spec)
+                return False
+            for message in messages:
+                self.emit(message)
         state = self.workspace.load_state()
         assert outcome.gate_status is not None and outcome.next_stage is not None
         state.gates[spec.name] = outcome.gate_status

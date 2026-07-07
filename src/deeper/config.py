@@ -44,6 +44,9 @@ class HardCaps(ArtifactModel):
     """The §12 diminishing-returns table: every expansion loop's stop condition
     and hard cap, as numbers code can enforce."""
 
+    max_interview_questions: int = Field(
+        default=8, ge=1, description="S0 interview question budget (design §5/S0: '~8')."
+    )
     max_cartographers: int = Field(default=8, ge=1)
     cartography_novelty_threshold: float = Field(
         default=0.2,
