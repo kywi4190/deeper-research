@@ -18,6 +18,7 @@ from .contracts import (
 )
 from .dispatch import (
     AgentDispatchFailed,
+    BillingAuthError,
     Dispatcher,
     LiveDispatcher,
     SpendCapExceeded,
@@ -40,6 +41,7 @@ __all__ = [
     "AgentOutputInvalid",
     "AgentResult",
     "ArtifactParseError",
+    "BillingAuthError",
     "ContractError",
     "DEFAULT_FIXTURES_DIR",
     "Dispatcher",

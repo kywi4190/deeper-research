@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
+from deeper.agents_runtime import BillingAuthError
 from deeper.config import ConfigError, RunConfig, profile_config
 from deeper.schemas import GateName, Stage
 from deeper.workspace import Workspace, WorkspaceError
@@ -88,7 +89,10 @@ def _terminal_ask_user() -> Callable[[str], str] | None:
 
 
 def _run_engine(workspace: Workspace, *, resume: bool = False) -> Node:
-    engine = Engine(workspace, emit=_emit, ask_user=_terminal_ask_user())
+    try:
+        engine = Engine(workspace, emit=_emit, ask_user=_terminal_ask_user())
+    except BillingAuthError as err:  # billing: api without a key — before any work
+        raise _fail(str(err)) from err
     return asyncio.run(engine.resume() if resume else engine.run())
 
 
@@ -239,10 +243,10 @@ def rerun(
 
 @app.command()
 def doctor() -> None:
-    """Preflight checks for a live run: API key, SDK, config, prompts, schemas.
+    """Preflight checks for a live run: auth, SDK, config, prompts, schemas.
 
-    Exit 1 only on a genuine failure; warnings (e.g. no ANTHROPIC_API_KEY but
-    the Claude Code CLI may hold credentials) exit 0.
+    Exit 1 only on a genuine failure; auth findings are informational
+    (subscription auth cannot be fully verified without dispatching).
     """
     import os
 
@@ -253,16 +257,43 @@ def doctor() -> None:
 
     rows: list[tuple[str, str, str]] = []  # (check, status, detail)
 
+    # Live runs bill the Claude Code login by default (billing: subscription);
+    # a metered ANTHROPIC_API_KEY is used only when config.yaml opts into
+    # billing: api. The credentials file is the CLI's login marker on
+    # Windows/Linux (macOS may hold it in the Keychain instead — hence warn,
+    # never fail, when neither is visible).
     key = os.environ.get("ANTHROPIC_API_KEY", "")
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", "") or (Path.home() / ".claude"))
+    cli_login = (config_dir / ".credentials.json").is_file()
     if key:
-        rows.append(("API key", "ok", f"ANTHROPIC_API_KEY present ({len(key)} chars)"))
+        rows.append(
+            (
+                "Auth",
+                "ok",
+                f"ANTHROPIC_API_KEY present ({len(key)} chars) — note: under the "
+                "default billing: subscription live subagents ignore it (the "
+                "dispatcher blanks it and uses the Claude Code login); it is "
+                "billed only when config.yaml sets billing: api",
+            )
+        )
+    elif cli_login:
+        rows.append(
+            (
+                "Auth",
+                "ok",
+                "subscription auth (the default): Claude Code CLI login found at "
+                f"{config_dir / '.credentials.json'} — live runs meter your Claude "
+                "plan, not an API account",
+            )
+        )
     else:
         rows.append(
             (
-                "API key",
+                "Auth",
                 "warn",
-                "ANTHROPIC_API_KEY not set — live dispatch falls back to the "
-                "Claude Code CLI's own credentials (run `claude` once to log in)",
+                "no Claude Code CLI login found and ANTHROPIC_API_KEY not set — "
+                "run `claude` once to log in (subscription billing, the default), "
+                "or export ANTHROPIC_API_KEY and set billing: api in the run config",
             )
         )
 

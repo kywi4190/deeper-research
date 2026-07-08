@@ -1,9 +1,12 @@
 # Mock S5 screening — every card from the 8 per-angle scout fixtures (including
 # the two reflow top-up cards), scored against the rubric fixture with slot
-# weight 0.2. Scenario landmarks, all under threshold 3.5 (quick profile):
+# weight 0.2. Scenario landmarks, under the top-k + dark-horse-margin rule
+# (quick profile: k=3, margin 0.25, floor 3.5; cutoff = 3rd UCB 4.3 -> 4.05):
 #   - supervisor-submission-extension: highest scorer, CONFIRMED kill-risk -> cut
-#   - cot-hurts-small-models: DARK HORSE — point 3.1 < 3.5 <= ucb 4.2 (wide band)
-#   - interpretability has 4 options with ucb >= 3.5 -> the 4th trips the angle cap
+#   - cot-hurts-small-models: DARK HORSE — point 3.1 < 3.5, ucb 4.2 within margin
+#   - interpretability has 4 options with ucb >= 4.05 -> the 4th trips the angle cap
+#   - long-horizon-eval-harness: ucb 3.62 clears the floor but not the margin
+#     cutoff -> below-cutoff (the concentration cut the M1 live run lacked)
 #   - top-3 finalists span 2 angles -> breadth guardrail adds the best option from
 #     each unrepresented top-half angle (supervisor-pipeline, small-model-science)
 # Aggregates assume preference-slot weight 0.2; S5 recomputes them in code anyway.
@@ -128,35 +131,35 @@ options:
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.5
+      hi: 4.2
     evidence_pointer: 'Top-venue publication potential: card''s own novelty-bar uncertainty caps the central
       estimate; T2 evidence only.'
   - criterion_id: letter-strength
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.5
+      hi: 4.2
     evidence_pointer: 'Recommendation-letter strength: card''s own novelty-bar uncertainty caps the central
       estimate; T2 evidence only.'
   - criterion_id: feasibility
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.5
+      hi: 4.2
     evidence_pointer: 'Two-semester feasibility under compute constraints: card''s own novelty-bar uncertainty
       caps the central estimate; T2 evidence only.'
   - criterion_id: research-taste-signal
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.5
+      hi: 4.2
     evidence_pointer: 'Independent research-taste signal: card''s own novelty-bar uncertainty caps the
       central estimate; T2 evidence only.'
   - criterion_id: momentum-by-deadline
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.5
+      hi: 4.2
     evidence_pointer: 'Citable momentum by application time: card''s own novelty-bar uncertainty caps
       the central estimate; T2 evidence only.'
   preference_score:
@@ -168,7 +171,7 @@ options:
     evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
   kill_risk_checks: []
   weighted_point: 3.1
-  weighted_ucb: 3.6
+  weighted_ucb: 4.16
   notes: null
 - option_id: feature-steering-study
   angle_id: interpretability-research
@@ -177,35 +180,35 @@ options:
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 4.15
     evidence_pointer: 'Top-venue publication potential: T1 steering precedent but dependency on the atlas
       card''s SAE training succeeding.'
   - criterion_id: letter-strength
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 4.15
     evidence_pointer: 'Recommendation-letter strength: T1 steering precedent but dependency on the atlas
       card''s SAE training succeeding.'
   - criterion_id: feasibility
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 4.15
     evidence_pointer: 'Two-semester feasibility under compute constraints: T1 steering precedent but dependency
       on the atlas card''s SAE training succeeding.'
   - criterion_id: research-taste-signal
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 4.15
     evidence_pointer: 'Independent research-taste signal: T1 steering precedent but dependency on the
       atlas card''s SAE training succeeding.'
   - criterion_id: momentum-by-deadline
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 4.15
     evidence_pointer: 'Citable momentum by application time: T1 steering precedent but dependency on the
       atlas card''s SAE training succeeding.'
   preference_score:
@@ -217,7 +220,7 @@ options:
     evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
   kill_risk_checks: []
   weighted_point: 3.1
-  weighted_ucb: 3.56
+  weighted_ucb: 4.12
   notes: null
 - option_id: circuit-case-study
   angle_id: interpretability-research
@@ -380,35 +383,35 @@ options:
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 3.65
     evidence_pointer: 'Top-venue publication potential: T2 survey evidence names the gap; measurability
       at open-model capability untested.'
   - criterion_id: letter-strength
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 3.65
     evidence_pointer: 'Recommendation-letter strength: T2 survey evidence names the gap; measurability
       at open-model capability untested.'
   - criterion_id: feasibility
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 3.65
     evidence_pointer: 'Two-semester feasibility under compute constraints: T2 survey evidence names the
       gap; measurability at open-model capability untested.'
   - criterion_id: research-taste-signal
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 3.65
     evidence_pointer: 'Independent research-taste signal: T2 survey evidence names the gap; measurability
       at open-model capability untested.'
   - criterion_id: momentum-by-deadline
     score: 3.0
     band:
       lo: 2.5
-      hi: 3.45
+      hi: 3.65
     evidence_pointer: 'Citable momentum by application time: T2 survey evidence names the gap; measurability
       at open-model capability untested.'
   preference_score:
@@ -420,7 +423,7 @@ options:
     evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
   kill_risk_checks: []
   weighted_point: 3.0
-  weighted_ucb: 3.46
+  weighted_ucb: 3.62
   notes: null
 - option_id: supervisor-submission-extension
   angle_id: supervisor-pipeline

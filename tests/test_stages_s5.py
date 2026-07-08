@@ -1,7 +1,8 @@
 """S5 screening-stage tests over the canonical mock scenario, asserting the
 design's landmark behaviors end to end: the dark horse advancing on its band
-alone, the confirmed kill cutting the top scorer, the angle cap, and the
-breadth guardrail — plus the P9 quarantine at the contract-assembly level."""
+alone, the confirmed kill cutting the top scorer, the angle cap, the breadth
+guardrail, and the concentration cutoff (top-k + dark-horse margin) — plus the
+P9 quarantine at the contract-assembly level."""
 
 from __future__ import annotations
 
@@ -63,14 +64,29 @@ async def test_dark_horse_advances_on_upper_bound_alone(run):
     ws, _, _, _, _ = run
     scores = ws.read_artifact("screening/scores.yaml", ScreeningResult)
     dark = next(o for o in scores.options if o.option_id == "cot-hurts-small-models")
-    # The fixture is built so the point estimate fails the threshold and only
-    # the wide band's upper bound clears it — assert exactly that.
+    # The fixture is built so the point estimate fails the floor and only the
+    # wide band's upper bound carries it (within the dark-horse margin of the
+    # top-k cutoff) — assert exactly that.
     assert dark.weighted_point < THRESHOLD <= dark.weighted_ucb
     shortlist = ws.read_artifact("screening/shortlist.md", Shortlist)
     d = decision_of(shortlist, "cot-hurts-small-models")
     assert d.decision is ShortlistOutcome.ADVANCED
     assert d.cause is ShortlistCause.UCB_ABOVE_THRESHOLD
     assert "wide uncertainty band" in d.reason
+
+
+async def test_concentration_cutoff_bounds_the_shortlist(run):
+    ws, ctx, _, _, _ = run
+    shortlist = ws.read_artifact("screening/shortlist.md", Shortlist)
+    # The M1 live-run regression guard: the shortlist is bounded by the hard
+    # cap no matter how generously the screener banded.
+    assert len(shortlist.finalist_ids) <= ctx.config.caps.max_finalists
+    # Above the absolute floor but beyond the dark-horse margin of the top-k
+    # cutoff: cut for concentration, explicitly not on the merits.
+    d = decision_of(shortlist, "long-horizon-eval-harness")
+    assert d.decision is ShortlistOutcome.CUT
+    assert d.cause is ShortlistCause.BELOW_CUTOFF
+    assert "nothing here eliminates the option on the merits" in d.reason
 
 
 async def test_confirmed_kill_cuts_the_top_scorer(run):

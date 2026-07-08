@@ -6,6 +6,7 @@
         "diversity-guardrail-add",
         "kill-risk-confirmed",
         "below-threshold",
+        "below-cutoff",
         "angle-cap"
       ],
       "title": "ShortlistCause",

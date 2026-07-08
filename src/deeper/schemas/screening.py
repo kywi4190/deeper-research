@@ -109,6 +109,7 @@ class ShortlistCause(StrEnum):
     DIVERSITY_GUARDRAIL_ADD = "diversity-guardrail-add"
     KILL_RISK_CONFIRMED = "kill-risk-confirmed"
     BELOW_THRESHOLD = "below-threshold"
+    BELOW_CUTOFF = "below-cutoff"
     ANGLE_CAP = "angle-cap"
 
 
@@ -116,6 +117,7 @@ _ADVANCE_CAUSES = {ShortlistCause.UCB_ABOVE_THRESHOLD, ShortlistCause.DIVERSITY_
 _CUT_CAUSES = {
     ShortlistCause.KILL_RISK_CONFIRMED,
     ShortlistCause.BELOW_THRESHOLD,
+    ShortlistCause.BELOW_CUTOFF,
     ShortlistCause.ANGLE_CAP,
 }
 

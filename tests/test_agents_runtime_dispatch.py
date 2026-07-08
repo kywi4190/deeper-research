@@ -13,6 +13,7 @@ import pytest
 from deeper.agents_runtime import (
     AgentContract,
     AgentOutputInvalid,
+    BillingAuthError,
     ContractError,
     LiveDispatcher,
     MockDispatcher,
@@ -219,3 +220,53 @@ def test_live_options_enforce_size_class_budgets(ws: Workspace) -> None:
     assert options.permission_mode == "dontAsk"
     assert "Bash" in options.disallowed_tools
     assert options.cwd == str(ws.root)
+
+
+def test_subscription_billing_blanks_the_api_key(ws: Workspace, monkeypatch) -> None:
+    """billing: subscription (the default) must guarantee plan usage even when
+    a metered key sits in the environment: ClaudeAgentOptions.env merges OVER
+    the inherited process env, so the dispatcher hands the SDK an empty-string
+    override — the CLI treats that as unset and uses the stored login."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-metered-key-that-must-not-be-billed")
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    assert config.billing == "subscription"  # the default
+    options = LiveDispatcher(ws, config)._live_options(scout_contract())
+    assert options.env["ANTHROPIC_API_KEY"] == ""
+
+
+def test_api_billing_passes_the_key_through(ws: Workspace, monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-explicitly-metered")
+    config = ws.load_config().model_copy(update={"mode": "live", "billing": "api"})
+    options = LiveDispatcher(ws, config)._live_options(scout_contract())
+    assert options.env["ANTHROPIC_API_KEY"] == "sk-explicitly-metered"
+
+
+def test_api_billing_without_a_key_fails_fast(ws: Workspace, monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    config = ws.load_config().model_copy(update={"mode": "live", "billing": "api"})
+    with pytest.raises(BillingAuthError, match="billing: api"):
+        LiveDispatcher(ws, config)
+
+
+def test_subscription_billing_refuses_a_foreign_auth_source(ws: Workspace, monkeypatch) -> None:
+    """The runtime belt to the env-override suspenders: if the CLI's init
+    message reports it authenticated with anything but the stored login, the
+    dispatch fails immediately (no backoff retries — it is deterministic)."""
+
+    class SystemMessage:
+        subtype = "init"
+        data = {"apiKeySource": "ANTHROPIC_API_KEY"}
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-whatever")
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    with pytest.raises(BillingAuthError, match="apiKeySource"):
+        LiveDispatcher(ws, config)._check_auth_source(SystemMessage())
+
+    # A login-authenticated init passes, and billing: api accepts any source.
+    class LoginInit(SystemMessage):
+        data = {"apiKeySource": "none"}
+
+    LoginInit.__name__ = "SystemMessage"
+    LiveDispatcher(ws, config)._check_auth_source(LoginInit())  # no raise
+    api_config = ws.load_config().model_copy(update={"mode": "live", "billing": "api"})
+    LiveDispatcher(ws, api_config)._check_auth_source(SystemMessage())  # no raise

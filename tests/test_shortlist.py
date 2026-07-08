@@ -1,6 +1,7 @@
 """Unit tests for the S5 shortlist rule (design §5/S5) — every clause, on
-hand-built screening records: kill-first, UCB-vs-threshold, the per-angle cap,
-and both sides of the breadth guardrail."""
+hand-built screening records: kill-first, top-k-by-UCB with the dark-horse
+margin and the absolute floor, the per-angle cap, the hard finalist cap, and
+both sides of the breadth guardrail."""
 
 from __future__ import annotations
 
@@ -97,13 +98,17 @@ def screened(
     )
 
 
-def shortlist(options, priors, *, threshold=3.5, top_k=3, max_per_angle=3):
+def shortlist(
+    options, priors, *, threshold=3.5, top_k=3, max_per_angle=3, margin=0.25, max_finalists=7
+):
     return build_shortlist(
         ScreeningResult(options=options),
         priors,
         threshold=threshold,
         top_k=top_k,
         max_per_angle=max_per_angle,
+        margin=margin,
+        max_finalists=max_finalists,
     )
 
 
@@ -158,6 +163,54 @@ def test_advance_compares_ucb_not_point_estimate():
     cut = decision_of(sl, "dud")
     assert cut.decision is ShortlistOutcome.CUT
     assert cut.cause is ShortlistCause.BELOW_THRESHOLD
+
+
+def test_concentration_cuts_above_floor_but_beyond_margin():
+    # The M1 live-run failure shape: everything clears the absolute floor. The
+    # relative rule advances the top k plus within-margin dark horses only.
+    options = [
+        screened("first", "a", score=4.2, hi=4.8),  # ucb 4.54
+        screened("second", "b", score=4.0, hi=4.6),  # ucb 4.38
+        screened("third", "c", score=3.9, hi=4.5),  # ucb 4.30 -> cutoff
+        screened("margin-rider", "d", score=3.4, hi=4.3),  # ucb 4.14 >= 4.30 - 0.25
+        screened("laggard", "e", score=3.5, hi=4.0),  # ucb 3.90: floor yes, margin no
+    ]
+    priors = {"a": 0.9, "b": 0.8, "c": 0.7, "d": 0.6, "e": 0.5}
+    sl = shortlist(options, priors, top_k=3, margin=0.25)
+    assert set(sl.finalist_ids) == {"first", "second", "third", "margin-rider"}
+    rider = decision_of(sl, "margin-rider")
+    assert rider.decision is ShortlistOutcome.ADVANCED
+    assert rider.cause is ShortlistCause.UCB_ABOVE_THRESHOLD
+    assert "margin" in rider.reason  # advanced as a dark-horse contender
+    cut = decision_of(sl, "laggard")
+    assert cut.decision is ShortlistOutcome.CUT
+    assert cut.cause is ShortlistCause.BELOW_CUTOFF
+    assert "nothing here eliminates the option on the merits" in cut.reason
+
+
+def test_absolute_floor_holds_even_inside_the_top_k():
+    # Rank alone never advances an option the evidence cannot support.
+    options = [
+        screened("good", "a", score=4.0, hi=4.5),
+        screened("meh", "b", score=3.0, hi=3.4),  # rank #2 by UCB, ucb 3.42 < 3.5
+    ]
+    sl = shortlist(options, {"a": 0.9, "b": 0.8}, top_k=3)
+    d = decision_of(sl, "meh")
+    assert d.decision is ShortlistOutcome.CUT
+    assert d.cause is ShortlistCause.BELOW_THRESHOLD
+
+
+def test_hard_finalist_cap_bounds_the_margin():
+    # Nine near-tied options across nine angles: the margin alone would
+    # advance all of them; the §12 hard cap seats only max_finalists.
+    options = [screened(f"o-{i}", f"ang-{i}", score=4.0, hi=4.5 - i * 0.01) for i in range(9)]
+    priors = {f"ang-{i}": 0.9 - i * 0.05 for i in range(9)}
+    sl = shortlist(options, priors, top_k=3, max_finalists=7)
+    assert len(sl.finalist_ids) == 7
+    overflow = decision_of(sl, "o-7")
+    assert overflow.decision is ShortlistOutcome.CUT
+    assert overflow.cause is ShortlistCause.BELOW_CUTOFF
+    assert "hard finalist cap" in overflow.reason
 
 
 # -- clause (c1): max finalists per angle -----------------------------------------

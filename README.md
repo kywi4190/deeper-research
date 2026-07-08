@@ -44,10 +44,15 @@ selection question) exercised the whole kernel: three spend-cap pauses each
 resumed cleanly, real SDK failures paused-not-crashed, gates materially
 changed the outcome (a 41→12 angle prune at Gate A, a weight swap at Gate B),
 and the shortlist's kill list carried specific checkable receipts. Its triage
-findings — cartography over-decomposition, screener band inflation (26
-finalists), per-batch persistence — live in
-[`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md) and feed the Prompt
-13 hardening pass.
+findings live in [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md);
+the worst one — screener band inflation turning the "shortlist" into 26
+finalists — is fixed: the screener prompt is calibrated (anchored levels as
+written, bands as genuine uncertainty) and the shortlist rule is now
+relative (top-k by UCB + a dark-horse margin) so it concentrates regardless
+of band width. Live-run billing is also pinned: runs authorize via the
+Claude Code login by default (`billing: subscription`), never a stray
+ANTHROPIC_API_KEY. The remaining findings (cartography over-decomposition,
+per-batch persistence) feed the Prompt 13 hardening pass.
 
 ## Architecture map
 
@@ -67,7 +72,7 @@ state of a run.
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (753 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (763 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -213,6 +218,19 @@ untrusted-web rule. Live dispatch is additionally fenced by
 WebSearch/WebFetch/Read/Write; no research agent gets Bash or subagents) +
 `setting_sources=[]` + `cwd` pinned to the run workspace.
 
+**Billing enforcement** (`RunConfig.billing`, default `subscription`): the
+SDK builds each subagent's env as `{**os.environ, **options.env}` — an
+override can't *remove* a key — so under subscription billing `_live_options`
+sets `ANTHROPIC_API_KEY=""`, which the CLI treats as unset (verified against
+the bundled CLI: its init message reports `apiKeySource: "none"`) and falls
+back to the stored Claude Code login; a non-empty key would silently take
+precedence over that login and meter the API account. A runtime belt backs
+the env suspenders: if a subagent's init message ever reports a real
+`apiKeySource` under subscription billing, the dispatch raises
+`BillingAuthError` (never retried — it's deterministic) and the run pauses.
+Under `billing: api` the key passes through untouched and its absence fails
+fast at dispatcher construction.
+
 Besides one-shot `run_agent`, the dispatcher exposes `run_interview` — the S0
 conversational loop (the design's single conversational agent). It shares the same
 semaphore, ledger, and schema-retry discipline; only the turn protocol differs: a
@@ -232,7 +250,9 @@ sequences to exercise the retry loop.
 **Spend accounting**: every attempt lands a `SpendEntry` (stage, role, angle/option
 context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
 is what gates report and the orchestrator's cap checks read. Retry counts persist in
-`RunState.retry_counts` keyed `stage:role:context`.
+`RunState.retry_counts` keyed `stage:role:context`. The USD figures are the SDK's
+API-equivalent estimates: under the default subscription billing they meter plan
+usage (and still drive the spend guard), not dollars charged.
 
 **The spend guard and the no-crash rule**: every raw invocation passes through one
 guarded chokepoint. Before dispatch, the ledger total is checked against
@@ -399,12 +419,16 @@ leaving state untouched and resumable. The built stages:
   options dropped; incoherence pauses the run), code merges the batches (a
   cross-angle duplicate option id pauses with instructions), the weighted
   aggregates are recomputed in code from the rubric weights, and then pure code
-  (`stages/shortlist.py`) applies the §5/S5 shortlist rule exactly: a confirmed
-  kill-risk eliminates regardless of score; survivors advance when their
-  weighted **upper confidence bound** clears `shortlist_threshold` (dark horses
-  with wide bands advance by design); at most `caps.max_finalists_per_angle`
-  (3) finalists per angle; and if the top-k finalists span ≤ 2 angles, the
-  highest-UCB option from each unrepresented top-half angle (by prior) is
+  (`stages/shortlist.py`) applies the shortlist rule: a confirmed kill-risk
+  eliminates regardless of score; survivors are ranked by their weighted
+  **upper confidence bound** and the top `shortlist_size` advance, plus any
+  option whose UCB is within `shortlist_dark_horse_margin` (0.25) of the
+  k-th finalist's — dark horses with wide bands advance by design, but band
+  inflation can no longer advance the whole field. Two absolute rails bound
+  the relative rule (nothing advances below `shortlist_threshold`; nothing
+  past `caps.max_finalists`), at most `caps.max_finalists_per_angle` (3)
+  finalists come from one angle, and if the top-k finalists span ≤ 2 angles,
+  the highest-UCB option from each unrepresented top-half angle (by prior) is
   added. Every option gets a one-paragraph advanced/cut reason in
   `screening/shortlist.md` — cuts are auditable.
 
@@ -511,10 +535,11 @@ deeper resume <run>
 deeper resume <run>
 #   applies the rubric edits, then S5 screens every card and pure code applies
 #   the shortlist rule — every advance/cut gets a written reason:
-#     S5 shortlist (UCB threshold 3.5): 7 finalists, 15 cut
-#     S5:   finalist cot-hurts-small-models        <- dark horse: wide band, UCB-only
+#     S5 shortlist (top-3 by UCB + dark-horse margin 0.25, floor 3.5): 7 finalists, 15 cut
+#     S5:   finalist cot-hurts-small-models        <- dark horse: wide band, within margin
 #     S5:   finalist model-collapse-dynamics [breadth-guardrail add]
 #     S5:   cut (kill-risk-confirmed): 1           <- the top scorer, killed anyway
+#     S5:   cut (below-cutoff): 1                  <- above the floor, not near the top-k
 #   then reports that S6 is not built yet (arrives in Prompt 10) and exits cleanly
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
@@ -530,15 +555,29 @@ work.
 
 ## Running your first live run
 
-Mock mode is the default everywhere; live dispatch is opt-in per run. Before the
-first live run:
+Mock mode is the default everywhere; live dispatch is opt-in per run.
+
+**Billing: subscription by default.** Live runs authorize through the Claude
+Code CLI's stored login and meter your Claude plan — never a metered
+`ANTHROPIC_API_KEY`, even if one sits in your environment (the dispatcher
+overrides it to an empty string in every subagent's env, which the CLI treats
+as unset, and refuses to dispatch if a subagent reports it authenticated any
+other way). To bill an API account instead, set `billing: api` in the run's
+`config.yaml`; that mode requires `ANTHROPIC_API_KEY` and fails fast without
+it. One consequence to know: the spend ledger's USD figures are the SDK's
+**API-equivalent estimates** — under subscription billing they meter plan
+usage (and drive the spend guard), they are not dollars charged.
+
+Before the first live run:
 
 ```bash
 deeper doctor
 ```
 
-checks the five things a live run needs: an `ANTHROPIC_API_KEY` (warning only —
-the Claude Code CLI's own login also works), `claude-agent-sdk` importable (its
+checks the five things a live run needs: auth (a Claude Code CLI login for the
+default subscription billing — a present `ANTHROPIC_API_KEY` is noted as
+ignored unless the run sets `billing: api`; warning only, since a macOS
+Keychain login isn't visible as a file), `claude-agent-sdk` importable (its
 version is printed), the shipped config profiles validating, every `agents/*.md`
 prompt parsing (frontmatter, `{{schema}}` placeholder, declared schemas known and
 exported), and `schemas/` exports fresh. It exits 1 on genuine failures only.
@@ -680,12 +719,31 @@ canonical `Makefile` is used wherever GNU make is available.
   scores and the Gate-B-approved rubric weights before persisting (drift beyond
   0.05 is reported) — arithmetic is the orchestrator's job (P8), and the gate
   may have changed the weights after the fixture-or-agent computed its numbers.
-- **Shortlist-rule readings.** "Clears the threshold" is `ucb >= threshold`;
-  "top-half angle" means the top `ceil(n/2)` map angles by relevance prior;
-  the "top-k" the guardrail inspects is the profile's `shortlist_size` highest-UCB
-  finalists. Nothing truncates the finalist list to k — the cut causes the
-  design enumerates (kill, below-threshold, angle-cap) are exactly the causes
-  the schema admits, so the threshold + guardrails ARE the rule.
+- **The shortlist rule is relative (top-k + dark-horse margin), not the
+  design's bare absolute threshold.** §5/S5 reads as "advances if its upper
+  confidence bound clears the shortlist threshold", with nothing truncating
+  to k. The M1 live run showed that rule does not concentrate when the
+  screener's bands inflate: 52 options, average band half-width 0.816 on the
+  1–5 scale, 50 of 52 UCBs above the 3.5 bar — 26 "finalists", every one via
+  `ucb-above-threshold`, where S6 would have built 26 dossiers. The rule is
+  now: advance the top `shortlist_size` by UCB **plus** any option whose UCB
+  is within `shortlist_dark_horse_margin` (default 0.25) of the k-th
+  finalist's — which preserves the design's dark-horse property (a wide band
+  still lifts an under-researched option into the shortlist) while making
+  concentration independent of band calibration. The absolute threshold
+  survives as a floor, `caps.max_finalists` is a hard ceiling, and the
+  kill-first / angle-cap / breadth-guardrail clauses are unchanged ("top-half
+  angle" for the guardrail still means the top `ceil(n/2)` map angles by
+  relevance prior). Cuts by the new mechanism get their own cause
+  (`below-cutoff`, "nothing here eliminates the option on the merits")
+  distinct from `below-threshold`.
+- **Run-level `billing` mode.** The design doc never addresses *whose money*
+  a live run spends. The M1 run happened to authorize via the Claude Code
+  CLI's login; `RunConfig.billing` makes that guaranteed rather than
+  accidental: `subscription` (default) blanks `ANTHROPIC_API_KEY` in every
+  subagent env (the CLI treats empty as unset and uses the stored login) and
+  refuses dispatch if a subagent reports any other auth source; `api` passes
+  the key through and fails fast without one.
 - **`rubric-rationale.md` is a rendered view.** The rubric-builder emits only
   `rubric` (the design's rationale file has no schema of its own); S4 renders
   the rationale markdown from the validated rubric's definitions, measurement

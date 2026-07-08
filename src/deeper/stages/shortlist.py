@@ -1,14 +1,20 @@
 """The S5 shortlist rule — pure deterministic code (design §5/S5, P8).
 
-Implemented exactly as specified:
+The rule, in application order:
 
 (a) **Kill-risks first.** A confirmed kill-risk eliminates the option
     regardless of score.
-(b) **Optimism under uncertainty.** A surviving option advances when its
-    weighted UPPER confidence bound clears the shortlist threshold — never its
-    point estimate. Under-researched dark horses (wide bands) advance alongside
-    well-documented favorites: under-information triggers more research, not
-    elimination.
+(b) **Optimism under uncertainty, relative.** Survivors are ranked by their
+    weighted UPPER confidence bound — never the point estimate — and the top
+    `top_k` advance, plus any option whose UCB is within `margin` of the
+    `top_k`-th finalist's UCB (the dark-horse clause: under-researched options
+    with wide bands advance alongside well-documented favorites, because
+    under-information triggers more research, not elimination). Two absolute
+    rails bound the relative rule: nothing advances with a UCB below
+    `threshold`, and nothing advances past `max_finalists` (the §12 hard cap).
+    The M1 live run is why the rule is relative, not a bare threshold: a
+    generously-banded screener put 50 of 52 UCBs above 3.5 and the "shortlist"
+    was 26 options — a relative cutoff concentrates regardless of calibration.
 (c) **Diversity guardrails.** No more than `max_per_angle` finalists from a
     single angle; and if the top-k finalists all come from ≤2 angles, the
     highest-UCB option from each unrepresented top-half angle (by relevance
@@ -129,11 +135,28 @@ def verify_screening(
 # -- the shortlist rule -------------------------------------------------------------
 
 
-def _advance_reason(option: OptionScreening, threshold: float) -> str:
-    base = (
-        f"Advanced: weighted upper confidence bound {option.weighted_ucb:g} clears the "
-        f"shortlist threshold {threshold:g} (point estimate {option.weighted_point:g})."
-    )
+def _advance_reason(
+    option: OptionScreening,
+    threshold: float,
+    *,
+    rank: int,
+    top_k: int,
+    cutoff: float,
+    margin: float,
+) -> str:
+    if rank <= top_k:
+        base = (
+            f"Advanced: weighted upper confidence bound {option.weighted_ucb:g} ranks "
+            f"#{rank} of the top {top_k} by UCB, above the absolute floor {threshold:g} "
+            f"(point estimate {option.weighted_point:g})."
+        )
+    else:
+        base = (
+            f"Advanced as a dark-horse contender: weighted upper confidence bound "
+            f"{option.weighted_ucb:g} is outside the top {top_k} but within the margin "
+            f"{margin:g} of the #{top_k} finalist's UCB ({cutoff:g}), above the absolute "
+            f"floor {threshold:g} (point estimate {option.weighted_point:g})."
+        )
     if option.weighted_point < threshold:
         base += (
             " The point estimate alone would not have cleared the bar — this option "
@@ -155,6 +178,8 @@ def build_shortlist(
     threshold: float,
     top_k: int,
     max_per_angle: int,
+    margin: float,
+    max_finalists: int,
 ) -> Shortlist:
     """Apply the shortlist rule to a screening result.
 
@@ -184,51 +209,95 @@ def build_shortlist(
         else:
             alive.append(option)
 
-    # (b) Advance on the UPPER confidence bound, with (c1) the per-angle cap.
+    # (b) Rank by the UPPER confidence bound and advance the top `top_k` plus
+    # within-margin dark horses, bounded by the absolute floor and the §12 hard
+    # finalist cap, with (c1) the per-angle cap. `cutoff` is the top_k-th
+    # finalist's UCB once k finalists are seated; until then, every survivor
+    # above the floor is inside the top k by construction.
     alive.sort(key=lambda o: (-o.weighted_ucb, o.option_id))
     finalists: list[OptionScreening] = []
     per_angle: Counter[str] = Counter()
+    cutoff: float | None = None
     for option in alive:
-        if option.weighted_ucb >= threshold:
-            if per_angle[option.angle_id] >= max_per_angle:
-                holders = ", ".join(f.option_id for f in finalists if f.angle_id == option.angle_id)
-                decisions[option.option_id] = ShortlistDecision(
-                    option_id=option.option_id,
-                    decision=ShortlistOutcome.CUT,
-                    cause=ShortlistCause.ANGLE_CAP,
-                    reason=(
-                        f"Cut by the angle-diversity cap: its weighted UCB of "
-                        f"{option.weighted_ucb:g} clears the threshold {threshold:g}, but "
-                        f"angle '{option.angle_id}' already holds the maximum of "
-                        f"{max_per_angle} finalists ({holders}), each with a higher UCB. "
-                        "One angle may not crowd out the rest of the map."
-                    ),
-                )
-            else:
-                per_angle[option.angle_id] += 1
-                finalists.append(option)
-                decisions[option.option_id] = ShortlistDecision(
-                    option_id=option.option_id,
-                    decision=ShortlistOutcome.ADVANCED,
-                    cause=ShortlistCause.UCB_ABOVE_THRESHOLD,
-                    reason=_advance_reason(option, threshold),
-                )
-        else:
+        if option.weighted_ucb < threshold:
             decisions[option.option_id] = ShortlistDecision(
                 option_id=option.option_id,
                 decision=ShortlistOutcome.CUT,
                 cause=ShortlistCause.BELOW_THRESHOLD,
                 reason=(
                     f"Cut: even the optimistic upper bound of its band "
-                    f"({option.weighted_ucb:g}) does not reach the shortlist threshold "
-                    f"{threshold:g} (point estimate {option.weighted_point:g}). The band "
-                    "already prices in the evidence gaps, so more research is not what "
-                    "this option is missing."
+                    f"({option.weighted_ucb:g}) does not reach the absolute shortlist "
+                    f"floor {threshold:g} (point estimate {option.weighted_point:g}). "
+                    "The band already prices in the evidence gaps, so more research is "
+                    "not what this option is missing."
                 ),
             )
+            continue
+        if len(finalists) >= max_finalists:
+            decisions[option.option_id] = ShortlistDecision(
+                option_id=option.option_id,
+                decision=ShortlistOutcome.CUT,
+                cause=ShortlistCause.BELOW_CUTOFF,
+                reason=(
+                    f"Cut by the hard finalist cap: its weighted UCB of "
+                    f"{option.weighted_ucb:g} clears the floor {threshold:g}, but "
+                    f"{max_finalists} finalists (design §12) are already seated, each "
+                    "with a higher UCB. Deep-dive budget is finite; nothing here "
+                    "eliminates the option on the merits."
+                ),
+            )
+            continue
+        if cutoff is not None and option.weighted_ucb < cutoff - margin:
+            decisions[option.option_id] = ShortlistDecision(
+                option_id=option.option_id,
+                decision=ShortlistOutcome.CUT,
+                cause=ShortlistCause.BELOW_CUTOFF,
+                reason=(
+                    f"Cut by the concentration cutoff: its weighted UCB of "
+                    f"{option.weighted_ucb:g} clears the absolute floor {threshold:g} "
+                    f"but is outside the top {top_k} by UCB and more than the "
+                    f"dark-horse margin {margin:g} below the #{top_k} finalist's UCB "
+                    f"({cutoff:g}). The shortlist concentrates deep-dive budget on the "
+                    "leaders; nothing here eliminates the option on the merits."
+                ),
+            )
+            continue
+        if per_angle[option.angle_id] >= max_per_angle:
+            holders = ", ".join(f.option_id for f in finalists if f.angle_id == option.angle_id)
+            decisions[option.option_id] = ShortlistDecision(
+                option_id=option.option_id,
+                decision=ShortlistOutcome.CUT,
+                cause=ShortlistCause.ANGLE_CAP,
+                reason=(
+                    f"Cut by the angle-diversity cap: its weighted UCB of "
+                    f"{option.weighted_ucb:g} clears the shortlist cutoff, but angle "
+                    f"'{option.angle_id}' already holds the maximum of "
+                    f"{max_per_angle} finalists ({holders}), each with a higher UCB. "
+                    "One angle may not crowd out the rest of the map."
+                ),
+            )
+            continue
+        per_angle[option.angle_id] += 1
+        finalists.append(option)
+        decisions[option.option_id] = ShortlistDecision(
+            option_id=option.option_id,
+            decision=ShortlistOutcome.ADVANCED,
+            cause=ShortlistCause.UCB_ABOVE_THRESHOLD,
+            reason=_advance_reason(
+                option,
+                threshold,
+                rank=len(finalists),
+                top_k=top_k,
+                cutoff=cutoff if cutoff is not None else option.weighted_ucb,
+                margin=margin,
+            ),
+        )
+        if len(finalists) == top_k:
+            cutoff = option.weighted_ucb
 
     # (c2) Breadth insurance: top-k finalists spanning <= 2 angles adds the
-    # highest-UCB option from each unrepresented top-half angle.
+    # highest-UCB option from each unrepresented top-half angle. Guardrail
+    # adds respect the §12 hard finalist cap like everything else.
     top = finalists[: min(top_k, len(finalists))]
     top_angles = {o.angle_id for o in top}
     if len(top_angles) <= GUARDRAIL_MAX_ANGLES:
@@ -236,6 +305,8 @@ def build_shortlist(
         top_half = sorted(angle_priors, key=lambda a: (-angle_priors[a], a))[:half]
         represented = {o.angle_id for o in finalists}
         for angle_id in top_half:
+            if len(finalists) >= max_finalists:
+                break
             if angle_id in represented:
                 continue
             candidates = [o for o in alive if o.angle_id == angle_id]

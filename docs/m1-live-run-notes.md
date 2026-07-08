@@ -116,24 +116,39 @@ workspace itself is the full audit trail (gitignored, kept locally).
    (git-bash default). Cosmetic; consider ASCII-safe punctuation in emit
    strings or forcing UTF-8 output.
 
-10. **The shortlist rule does not concentrate: 26 "finalists" out of 52.**
-   Quick profile, shortlist_size 3 — and 26 options advanced, all via
-   `ucb-above-threshold`; only 2 options fell below the 3.5 bar. Two
+10. **ADDRESSED — The shortlist rule does not concentrate: 26 "finalists"
+   out of 52.** Quick profile, shortlist_size 3 — and 26 options advanced,
+   all via `ucb-above-threshold`; only 2 options fell below the 3.5 bar. Two
    compounding causes: (a) *screener optimism/band inflation* — average band
    half-width 0.816 on a 1–5 scale, so nearly every survivor's UCB clears the
    threshold (the dark-horse mechanism degenerates into "advance everyone"
    when every band is wide); (b) *by design nothing truncates to k*, and with
    12 angles × cap 3 the angle cap barely binds. S6 would build 26 dossiers.
-   Fixes for Prompt 13: calibrate the screener prompt (anchored levels used
-   honestly, bands = screening uncertainty, not politeness; push spread), and
-   revisit the §5/S5 rule — e.g. advance the top `shortlist_size` by UCB plus
-   any option whose UCB is within a margin of the k-th (keeps the dark-horse
-   property), or a percentile threshold instead of an absolute 3.5.
+   **Fixed on both sides:** the screener prompt now demands the anchored
+   levels as written (most options 2–3 on most criteria), bands as genuine
+   screening uncertainty (±0.25 when evidence is clear, wide only when truly
+   thin — uniformly wide bands defeat the dark-horse mechanism), and carries
+   an S6 calibration-accountability line; and `stages/shortlist.py` now
+   advances the top `shortlist_size` by UCB plus any option within
+   `shortlist_dark_horse_margin` (0.25) of the k-th finalist's UCB, floored
+   at the absolute threshold and hard-capped at `caps.max_finalists` (new cut
+   cause `below-cutoff`; recorded as a Design deviation in the README).
 
 Final cost: **$65.20** total — S0 $0.75, S1 $12.34 (41-angle bloat), S3
 $21.99, S4 $1.32, S5 $20.06 (~$12 of which was re-paid discarded batches),
 plus unledgered failed dispatches (finding 5b). A quick-profile run with the
 cartography fix and batch persistence should land nearer $20–25.
+
+**ADDRESSED — Billing.** This run authorized through the Claude Code CLI's
+stored login (no ANTHROPIC_API_KEY in the environment), so the dollar figures
+above are the SDK's API-equivalent estimates metering plan usage — but that
+was accidental: a key in the environment would silently have taken precedence
+and billed a metered API account. Now guaranteed: `RunConfig.billing`
+defaults to `subscription` — the dispatcher blanks ANTHROPIC_API_KEY in every
+subagent env (the CLI treats empty as unset and falls back to the login) and
+refuses dispatch if a subagent reports any other auth source; `billing: api`
+opts into metered billing and fails fast without a key. `deeper doctor`
+describes subscription auth as the default path.
 
 ## Shortlist judgment (M1 exit question)
 
@@ -159,4 +174,7 @@ products this run kill-listed, without the receipt.
 trail is decision-grade; the concentration step is not yet. Verdict: the
 kernel earns M1 (every mechanism worked live, failures paused instead of
 crashed, gates changed the outcome), with finding 10 as the first
-prompt-quality target before S6 exists to pay 26-dossier costs.
+prompt-quality target before S6 exists to pay 26-dossier costs — since
+addressed (see finding 10 above): the screener is calibrated and the
+shortlist rule concentrates to at most `caps.max_finalists` regardless of
+band width.

@@ -27,10 +27,15 @@ one `OptionScreening` record per card.
    cheaply from the card alone with wide bands, and say in `notes` that scoring
    was abbreviated due to a confirmed kill.
 2. **Criterion scores.** Score each criterion against its anchored levels using
-   the card's evidence. Cite where each score comes from in `evidence_pointer`
-   (which card field, which evidence item). You are not deep-diving: a handful
-   of confirming lookups across the whole set is fine; new research beyond that
-   is Stage 6's budget.
+   the card's evidence. The levels are anchors, not suggestions: a 4 means the
+   level-4 evidence is actually present in the card, not that the option "seems
+   strong" — when the evidence sits between two anchors, score the level whose
+   evidence you can point to. Screening a scouted set honestly produces spread:
+   expect most options to land at 2–3 on most criteria, with 4s earned by
+   specific evidence and 5s rare. Cite where each score comes from in
+   `evidence_pointer` (which card field, which evidence item). You are not
+   deep-diving: a handful of confirming lookups across the whole set is fine;
+   new research beyond that is Stage 6's budget.
 3. **Preference slot.** Score it ONLY from `preferences.yaml` — how well does
    this option fit the stated tastes, weighted by their declared strengths,
    with `risk_appetite` applied to the option's uncertainty profile? Point the
@@ -42,22 +47,35 @@ one `OptionScreening` record per card.
 
 Every score carries a band `[lo, hi]` containing it. The shortlist rule
 advances options on the **upper bound**, so the band width *is* your statement
-of evidence quality. Width discipline, anchored:
+of evidence quality — genuine screening uncertainty, never a politeness margin
+or a hedge against being wrong. If every band is wide, every upper bound
+inflates and the dark-horse mechanism the bands exist to serve degenerates
+into "advance everyone": uniformly wide bands defeat it. Width discipline,
+anchored:
 
-- **Thin evidence → wide band.** A card whose only support for "publication
-  potential" is its own self-description: score 3.5, band **[2.0, 5.0]**. You
-  genuinely cannot rule out excellence or failure — under-information must
-  trigger more research (a wide band advances the option into deep-dive), not
-  quiet elimination via a falsely confident middling score.
-- **Strong evidence → narrow band.** A card citing two T1 sources showing
-  comparable projects published at target venues within the deadline: score
-  4.0, band **[3.5, 4.5]**. The remaining width reflects execution variance,
-  not ignorance.
+- **Clear evidence either way → narrow band (about ±0.25).** A card citing two
+  T1 sources showing comparable projects published at target venues within the
+  deadline: score 4.0, band **[3.75, 4.25]**. Clear evidence of *weakness*
+  earns the same treatment — a confidently mediocre 2.5 with a narrow band is
+  a legitimate, useful verdict, not unkindness.
+- **Truly thin evidence → wide band.** A card whose only support for
+  "publication potential" is its own self-description: score 3.0, band
+  **[2.0, 4.5]**. You genuinely cannot rule out excellence or failure —
+  under-information must trigger more research (a wide band advances the
+  option into deep-dive), not quiet elimination via a falsely confident
+  middling score. Reserve this for evidence that is actually thin, not for
+  scores you'd rather not defend.
 
 Never emit a zero-width band unless the criterion is mechanically checkable
 (a deadline either fits or it does not). Never use a narrow band to bury an
 option you dislike — dark horses with wide bands advancing is the system
 working as designed.
+
+Calibration accountability: Stage 6 re-scores every finalist with real
+research, and screening bands that always contained the Stage-6 score only at
+their edge — never near their center — are the signature of miscalibration
+(generous points, defensive widths); score so the Stage-6 number lands near
+your band's middle.
 
 ## Aggregates
 
@@ -93,8 +111,8 @@ options:
     angle_id: interpretability-research
     criterion_scores:
       - criterion_id: publication-potential
-        score: 3.5
-        band: {lo: 2.0, hi: 5.0}
+        score: 3.0
+        band: {lo: 2.0, hi: 4.5}
         evidence_pointer: >-
           Card's preliminary_evidence item 1 only — no external confirmation of
           venue fit; band widened accordingly.

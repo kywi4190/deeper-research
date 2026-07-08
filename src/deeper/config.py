@@ -96,6 +96,13 @@ class RunConfig(ArtifactModel):
     mode: Literal["mock", "live"] = Field(
         default="mock", description="Agent dispatch mode; mock runs the pipeline offline."
     )
+    billing: Literal["subscription", "api"] = Field(
+        default="subscription",
+        description="How live runs are authorized: 'subscription' (default) forces "
+        "subagents onto the Claude Code CLI's stored login — plan usage, never the "
+        "metered ANTHROPIC_API_KEY, even if one is set in the environment; 'api' "
+        "requires ANTHROPIC_API_KEY and bills it directly.",
+    )
     total_budget_units: int = Field(ge=1, description="B: the S2 option-scouting budget.")
     floor: int = Field(ge=0, description="Minimum units per surviving angle.")
     gamma: float = Field(gt=0, description="Concentration exponent — the breadth dial.")
@@ -105,8 +112,17 @@ class RunConfig(ArtifactModel):
     shortlist_threshold: float = Field(
         ge=1,
         le=5,
-        description="An option advances when its upper confidence bound clears this "
-        "(1–5 rubric scale).",
+        description="Absolute UCB floor (1–5 rubric scale): no option advances with "
+        "an upper confidence bound below this, however high it ranks.",
+    )
+    shortlist_dark_horse_margin: float = Field(
+        default=0.25,
+        ge=0,
+        description="S5 concentration rule: beyond the top shortlist_size options by "
+        "UCB, an option still advances when its UCB is within this margin of the "
+        "shortlist_size-th finalist's UCB — the dark-horse property of the old "
+        "absolute-threshold rule, kept relative so screener band inflation cannot "
+        "advance the whole field (M1 live run: 26 'finalists' of 52).",
     )
     preference_slot_default_weight: float = Field(
         default=0.20,

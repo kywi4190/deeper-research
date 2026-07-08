@@ -8,7 +8,7 @@ from deeper.orchestrator.cli import app
 
 runner = CliRunner()
 
-CHECKS = ("API key", "Agent SDK", "Config profiles", "Agent prompts", "Schema exports")
+CHECKS = ("Auth", "Agent SDK", "Config profiles", "Agent prompts", "Schema exports")
 
 
 def test_doctor_runs_every_check_and_passes_on_this_repo(monkeypatch):
@@ -22,12 +22,35 @@ def test_doctor_runs_every_check_and_passes_on_this_repo(monkeypatch):
     assert "claude-agent-sdk" in result.output  # version printed
 
 
-def test_doctor_warns_without_api_key_but_still_passes(monkeypatch):
+def test_doctor_notes_a_present_key_is_ignored_under_subscription(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-key")
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    # The key is noted, not treated as the default path (rich folds the detail
+    # column at arbitrary widths, so assert single tokens).
+    assert "subscription" in result.output
+    assert "ignore" in result.output
+
+
+def test_doctor_reports_subscription_auth_when_cli_is_logged_in(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    config_dir = tmp_path / "claude-config"
+    config_dir.mkdir()
+    (config_dir / ".credentials.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config_dir))
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    assert "subscription" in result.output
+    assert "login" in result.output
+
+
+def test_doctor_warns_without_any_auth_but_still_passes(monkeypatch, tmp_path):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "empty"))  # no login here
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     assert "warn" in result.output
-    assert "ANTHROPIC_API_KEY not set" in result.output
+    assert "log in" in result.output
 
 
 def test_doctor_fails_on_stale_schema_exports(monkeypatch):

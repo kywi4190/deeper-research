@@ -11,6 +11,7 @@ real pipeline.
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import time
 from collections.abc import Callable
@@ -93,6 +94,14 @@ class AgentDispatchFailed(Exception):
         self.cause = cause
 
 
+class BillingAuthError(Exception):
+    """The run's `billing` setting and the actual auth path disagree — a
+    deterministic misconfiguration, never retried. Raised fast at dispatcher
+    construction (billing: api without ANTHROPIC_API_KEY) or when a live
+    subagent reports it authenticated with a source the billing mode forbids
+    (billing: subscription must never spend the metered API key)."""
+
+
 class Dispatcher(Protocol):
     """The interface every stage codes against."""
 
@@ -145,7 +154,9 @@ class _BaseDispatcher:
                 try:
                     return await self._invoke(prompt, contract, attempt)
                 except Exception as err:  # noqa: PERF203 — retry loop is the point
-                    if backoff is None:
+                    # A billing/auth mismatch is deterministic — retrying it
+                    # would just spend on the wrong meter again.
+                    if backoff is None or isinstance(err, BillingAuthError):
                         raise AgentDispatchFailed(contract, err) from err
                     await asyncio.sleep(backoff + random.random())
 
@@ -339,17 +350,41 @@ class LiveDispatcher(_BaseDispatcher):
     context; cwd pins relative tool paths inside the run workspace.
     """
 
+    def __init__(self, workspace: Workspace, config: RunConfig) -> None:
+        super().__init__(workspace, config)
+        if config.billing == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise BillingAuthError(
+                "config.yaml sets billing: api but ANTHROPIC_API_KEY is not in the "
+                "environment — set the key, or switch to billing: subscription "
+                "(the default) to use the Claude Code CLI's stored login"
+            )
+
     def _live_options(self, contract: AgentContract):
         """The full option set for one live subagent process. Size-class
         budgets are enforced here, not just stated in the prompt: the CLI's
         default 32k output ceiling kills long single-reply artifacts (observed
         live: a 52-option screening), so max_output_tokens is passed as
-        CLAUDE_CODE_MAX_OUTPUT_TOKENS into the subagent's environment."""
+        CLAUDE_CODE_MAX_OUTPUT_TOKENS into the subagent's environment.
+
+        Billing is enforced here too. The SDK builds the subagent env as
+        `{**os.environ, **options.env}` — options.env overrides but cannot
+        *remove* a key, so under billing: subscription ANTHROPIC_API_KEY is
+        overridden to the empty string, which the CLI treats as unset
+        (verified against the bundled CLI: init reports apiKeySource "none")
+        and falls back to the stored Claude Code login. A non-empty key would
+        take precedence over that login and silently meter the API account.
+        Under billing: api the key is passed through explicitly (its absence
+        already failed fast at construction)."""
         from claude_agent_sdk import ClaudeAgentOptions
 
         meta, _ = load_role(contract.role)
         research = bool(meta.get("research"))
         spec = self.config.size_classes[contract.size_class]
+        env = {"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(spec.max_output_tokens)}
+        if self.config.billing == "subscription":
+            env["ANTHROPIC_API_KEY"] = ""
+        else:
+            env["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY", "")
         return ClaudeAgentOptions(
             model=spec.model,
             allowed_tools=list(RESEARCH_TOOLS if research else NON_RESEARCH_TOOLS),
@@ -359,8 +394,25 @@ class LiveDispatcher(_BaseDispatcher):
             cwd=str(self.workspace.root),
             max_turns=2 * spec.max_searches + 6,
             hooks=build_hooks(contract, self.workspace),
-            env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(spec.max_output_tokens)},
+            env=env,
         )
+
+    def _check_auth_source(self, message: object) -> None:
+        """Belt to _live_options' suspenders: the CLI's init message reports
+        which auth source it actually chose. Under billing: subscription any
+        real key source (an apiKeyHelper, a future CLI behavior change) must
+        stop the run before it meters the wrong account."""
+        if self.config.billing != "subscription":
+            return
+        if type(message).__name__ != "SystemMessage" or getattr(message, "subtype", "") != "init":
+            return
+        source = (getattr(message, "data", None) or {}).get("apiKeySource")
+        if source and source != "none":
+            raise BillingAuthError(
+                f"billing: subscription, but the live subagent authenticated via "
+                f"apiKeySource '{source}' instead of the Claude Code login — refusing "
+                "to meter an API account; set billing: api if that is intended"
+            )
 
     async def _invoke(self, prompt: str, contract: AgentContract, attempt: int) -> _Invocation:
         from claude_agent_sdk import query
@@ -373,6 +425,7 @@ class LiveDispatcher(_BaseDispatcher):
         session_id: str | None = None
         started = time.monotonic()
         async for message in query(prompt=prompt, options=options):
+            self._check_auth_source(message)
             for block in getattr(message, "content", None) or []:
                 text = getattr(block, "text", None)
                 if text:

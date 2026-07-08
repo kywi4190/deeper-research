@@ -88,6 +88,8 @@ class ScreeningStage(StageBase):
             threshold=ctx.config.shortlist_threshold,
             top_k=ctx.config.shortlist_size,
             max_per_angle=ctx.config.caps.max_finalists_per_angle,
+            margin=ctx.config.shortlist_dark_horse_margin,
+            max_finalists=ctx.config.caps.max_finalists,
         )
         ctx.workspace.write_artifact(SHORTLIST_PATH, shortlist)
         self._report(ctx, shortlist)
@@ -217,7 +219,9 @@ class ScreeningStage(StageBase):
     def _report(self, ctx: StageContext, shortlist: Shortlist) -> None:
         by_id = {d.option_id: d for d in shortlist.decisions}
         ctx.emit(
-            f"S5 shortlist (UCB threshold {shortlist.threshold:g}): "
+            f"S5 shortlist (top-{ctx.config.shortlist_size} by UCB + dark-horse "
+            f"margin {ctx.config.shortlist_dark_horse_margin:g}, "
+            f"floor {shortlist.threshold:g}): "
             f"{len(shortlist.finalist_ids)} finalists, "
             f"{len(shortlist.decisions) - len(shortlist.finalist_ids)} cut "
             "(every cut has a written reason in screening/shortlist.md)"
