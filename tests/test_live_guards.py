@@ -114,9 +114,10 @@ def test_new_records_spend_cap_override(tmp_path):
     assert Workspace.open(run_dir).load_config().max_spend_usd == 2.5
 
 
-async def test_dispatch_failure_pauses_run_with_traceback_transcript(tmp_path):
+async def test_dispatch_failure_pauses_run_with_traceback_transcript(tmp_path, monkeypatch):
     """An infrastructure failure (here: a missing mock fixture, standing in for
     any SDK/network error) pauses the run with the traceback saved to logs/."""
+    monkeypatch.setattr(MockDispatcher, "DISPATCH_RETRY_BACKOFF_S", (0.0,))
     ws = make_workspace(tmp_path)
     emitted: list[str] = []
     engine = Engine(ws, emit=emitted.append, mock_kwargs={"fixtures_dir": tmp_path / "empty"})
@@ -155,7 +156,7 @@ async def test_schema_retry_exhaustion_saves_transcript(tmp_path):
     assert "not an artifact" in transcript  # the raw output is preserved
 
 
-async def test_dispatch_failed_wraps_sdk_errors(tmp_path):
+async def test_dispatch_failed_wraps_sdk_errors(tmp_path, monkeypatch):
     """LiveDispatcher failure shape without the network: any exception from
     _invoke becomes AgentDispatchFailed with the cause attached."""
     ws = make_workspace(tmp_path)
@@ -163,6 +164,8 @@ async def test_dispatch_failed_wraps_sdk_errors(tmp_path):
     class ExplodingDispatcher(MockDispatcher):
         async def _invoke(self, prompt, contract, attempt):
             raise ConnectionError("api unreachable")
+
+    monkeypatch.setattr(ExplodingDispatcher, "DISPATCH_RETRY_BACKOFF_S", (0.0,))
 
     dispatcher = ExplodingDispatcher(ws, ws.load_config())
     contract = AgentContract(
@@ -175,3 +178,38 @@ async def test_dispatch_failed_wraps_sdk_errors(tmp_path):
     with pytest.raises(AgentDispatchFailed) as excinfo:
         await dispatcher.run_agent(contract)
     assert isinstance(excinfo.value.cause, ConnectionError)
+
+
+async def test_transient_dispatch_failure_retries_with_backoff(tmp_path, monkeypatch):
+    """A one-off infrastructure failure is absorbed by the dispatch backoff
+    (observed live: SDK stream errors that succeed on plain re-dispatch);
+    only exhaustion of the backoff schedule wraps into AgentDispatchFailed."""
+    ws = make_workspace(tmp_path)
+
+    class FlakyDispatcher(MockDispatcher):
+        failures_left = 1
+        calls = 0
+
+        async def _invoke(self, prompt, contract, attempt):
+            type(self).calls += 1
+            if type(self).failures_left > 0:
+                type(self).failures_left -= 1
+                raise ConnectionError("transient stream error")
+            return await super()._invoke(prompt, contract, attempt)
+
+    monkeypatch.setattr(FlakyDispatcher, "DISPATCH_RETRY_BACKOFF_S", (0.0, 0.0))
+    dispatcher = FlakyDispatcher(ws, ws.load_config())
+    contract = AgentContract(
+        role="scout",
+        stage=Stage.S3,
+        output_schemas=("option-card-set",),
+        size_class=SizeClass.M,
+        budget_line="b",
+    )
+    result = await dispatcher.run_agent(contract)
+    assert result.artifacts["option-card-set"] is not None
+    assert FlakyDispatcher.calls == 2  # one failure, one clean retry
+
+    FlakyDispatcher.failures_left = 99  # never recovers: schedule exhausts
+    with pytest.raises(AgentDispatchFailed):
+        await dispatcher.run_agent(contract)

@@ -11,6 +11,7 @@ real pipeline.
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -124,19 +125,29 @@ class _BaseDispatcher:
             self._sem = asyncio.Semaphore(self.config.concurrency)
         return self._sem
 
+    # Transient-infrastructure backoff before a dispatch failure pauses the
+    # run: the M1 live run hit repeated one-off SDK stream errors ("Claude
+    # Code returned an error result") that succeeded on plain re-dispatch —
+    # each human resume re-paid every completed sibling batch.
+    DISPATCH_RETRY_BACKOFF_S: tuple[float, ...] = (2.0, 8.0)
+
     async def _guarded_invoke(self, prompt: str, contract: AgentContract, attempt: int):
         """Every raw invocation passes here: the spend guard runs first (an
         in-flight batch may have crossed the cap since the stage started), then
-        the semaphore, then _invoke with infrastructure failures wrapped so the
-        orchestrator can pause instead of crash."""
+        the semaphore, then _invoke — transient infrastructure failures are
+        retried with backoff, and only then wrapped so the orchestrator can
+        pause instead of crash."""
         total = self.ledger.total_usd()
         if total >= self.config.max_spend_usd:
             raise SpendCapExceeded(contract, total, self.config.max_spend_usd)
         async with self._semaphore():
-            try:
-                return await self._invoke(prompt, contract, attempt)
-            except Exception as err:
-                raise AgentDispatchFailed(contract, err) from err
+            for backoff in (*self.DISPATCH_RETRY_BACKOFF_S, None):
+                try:
+                    return await self._invoke(prompt, contract, attempt)
+                except Exception as err:  # noqa: PERF203 — retry loop is the point
+                    if backoff is None:
+                        raise AgentDispatchFailed(contract, err) from err
+                    await asyncio.sleep(backoff + random.random())
 
     async def run_agent(self, contract: AgentContract) -> AgentResult:
         prompt = assemble_prompt(contract)  # raises on drift before any spend
@@ -328,13 +339,18 @@ class LiveDispatcher(_BaseDispatcher):
     context; cwd pins relative tool paths inside the run workspace.
     """
 
-    async def _invoke(self, prompt: str, contract: AgentContract, attempt: int) -> _Invocation:
-        from claude_agent_sdk import ClaudeAgentOptions, query
+    def _live_options(self, contract: AgentContract):
+        """The full option set for one live subagent process. Size-class
+        budgets are enforced here, not just stated in the prompt: the CLI's
+        default 32k output ceiling kills long single-reply artifacts (observed
+        live: a 52-option screening), so max_output_tokens is passed as
+        CLAUDE_CODE_MAX_OUTPUT_TOKENS into the subagent's environment."""
+        from claude_agent_sdk import ClaudeAgentOptions
 
         meta, _ = load_role(contract.role)
         research = bool(meta.get("research"))
         spec = self.config.size_classes[contract.size_class]
-        options = ClaudeAgentOptions(
+        return ClaudeAgentOptions(
             model=spec.model,
             allowed_tools=list(RESEARCH_TOOLS if research else NON_RESEARCH_TOOLS),
             disallowed_tools=list(DISALLOWED_TOOLS),
@@ -343,7 +359,13 @@ class LiveDispatcher(_BaseDispatcher):
             cwd=str(self.workspace.root),
             max_turns=2 * spec.max_searches + 6,
             hooks=build_hooks(contract, self.workspace),
+            env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(spec.max_output_tokens)},
         )
+
+    async def _invoke(self, prompt: str, contract: AgentContract, attempt: int) -> _Invocation:
+        from claude_agent_sdk import query
+
+        options = self._live_options(contract)
         chunks: list[str] = []
         usd = 0.0
         input_tokens = output_tokens = num_turns = 0

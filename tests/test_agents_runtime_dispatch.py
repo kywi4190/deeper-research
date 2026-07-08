@@ -193,3 +193,29 @@ async def test_assembly_failure_spends_nothing(ws: Workspace) -> None:
         await dispatcher.run_agent(scout_contract(output_schemas=("rubric",)))
     assert dispatcher.prompts == []
     assert ws.load_state().spend == []
+
+
+def test_live_options_enforce_size_class_budgets(ws: Workspace) -> None:
+    """Size-class budgets are process-enforced, not prompt goodwill: the model,
+    the turn budget, and the output-token ceiling (as
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS in the subagent env — the CLI's default 32k
+    ceiling truncates long single-reply artifacts) all come from the config."""
+    from deeper.config import SizeClass
+
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    dispatcher = LiveDispatcher(ws, config)
+    contract = AgentContract(
+        role="scout",
+        stage=Stage.S3,
+        output_schemas=("option-card-set",),
+        size_class=SizeClass.M,
+        budget_line="b",
+    )
+    options = dispatcher._live_options(contract)
+    spec = config.size_classes[SizeClass.M]
+    assert options.model == spec.model
+    assert options.max_turns == 2 * spec.max_searches + 6
+    assert options.env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == str(spec.max_output_tokens)
+    assert options.permission_mode == "dontAsk"
+    assert "Bash" in options.disallowed_tools
+    assert options.cwd == str(ws.root)

@@ -124,28 +124,40 @@ async def test_breadth_guardrail_adds_unrepresented_top_half_angles(run):
 async def test_screener_contract_contains_preferences_scout_does_not(run):
     ws, _, _, dispatcher, _ = run
     prefs_marker = ws.path("preferences.yaml").read_text(encoding="utf-8").strip().splitlines()[0]
-    prompts = {role: prompt for role, _c, prompt in dispatcher.invocations}
-    # The task-level quarantine assertion, at the contract-assembly level (P9):
-    # the screener's assembled prompt carries preferences.yaml; no other role's does.
-    assert "### input: preferences" in prompts["screener"]
-    assert prefs_marker in prompts["screener"]
+    screener_batches = [
+        (context, prompt) for role, context, prompt in dispatcher.invocations if role == "screener"
+    ]
+    # One batch per allocated angle, each carrying preferences (P9), the rubric,
+    # and exactly its own angle's cards; no other role's contract has preferences.
+    assert {c for c, _p in screener_batches} == {
+        "interpretability-research",
+        "evaluation-science",
+        "training-efficiency",
+        "small-model-science",
+        "applied-domain-collaboration",
+        "research-tooling",
+        "negative-results-science",
+        "supervisor-pipeline",
+    }
+    for _context, prompt in screener_batches:
+        assert "### input: preferences" in prompt
+        assert prefs_marker in prompt
+        assert "### input: rubric" in prompt
+        assert "### input: cards" in prompt
     for role, _context, prompt in dispatcher.invocations:
         if role != "screener":
             assert prefs_marker not in prompt, f"{role} contract leaked preferences"
-    # And the screener received every angle's cards plus the rubric.
-    assert "### input: cards (negative-results-science)" in prompts["screener"]
-    assert "### input: rubric" in prompts["screener"]
 
 
 async def test_reexecution_reuses_scores_and_reapplies_pure_code(run):
     ws, ctx, stage, dispatcher, _ = run
     screener_calls = sum(1 for r, _c, _p in dispatcher.invocations if r == "screener")
-    assert screener_calls == 1
+    assert screener_calls == 8  # one batch per allocated angle
     ws.path("screening/shortlist.md").unlink()  # crash between the two writes
     assert not stage.is_complete(ctx)
     await stage.execute(ctx)
     assert stage.is_complete(ctx)
-    assert sum(1 for r, _c, _p in dispatcher.invocations if r == "screener") == 1
+    assert sum(1 for r, _c, _p in dispatcher.invocations if r == "screener") == 8
 
 
 async def test_incoherent_screening_pauses_instead_of_shortlisting(tmp_path):

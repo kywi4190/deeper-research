@@ -39,6 +39,16 @@ rule with a written reason per option. S6–S8 are registered stubs that report
 cleanly. A full mock run walks `deeper new` → Gate A → Gate B → the shortlist in
 seconds, offline.
 
+The **first supervised live run** (quick profile, a real vector-store
+selection question) exercised the whole kernel: three spend-cap pauses each
+resumed cleanly, real SDK failures paused-not-crashed, gates materially
+changed the outcome (a 41→12 angle prune at Gate A, a weight swap at Gate B),
+and the shortlist's kill list carried specific checkable receipts. Its triage
+findings — cartography over-decomposition, screener band inflation (26
+finalists), per-batch persistence — live in
+[`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md) and feed the Prompt
+13 hardening pass.
+
 ## Architecture map
 
 The system is three layers (design §2): a deterministic **kernel** (orchestrator),
@@ -57,7 +67,7 @@ state of a run.
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (751 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (753 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -229,10 +239,15 @@ guarded chokepoint. Before dispatch, the ledger total is checked against
 `config.max_spend_usd` (quick 5.0 / standard 25.0 / exhaustive 60.0 by default;
 `--max-spend-usd` overrides at `deeper new`, and `deeper resume --max-spend-usd`
 rewrites it, committed) — crossing it raises `SpendCapExceeded`. Inside dispatch,
-any infrastructure exception (SDK/network/CLI error, missing mock fixture) is
-wrapped as `AgentDispatchFailed` with the cause attached. Both, like
-`AgentOutputInvalid`, pause the run as `PAUSED_ATTENTION` with a transcript in
-`logs/` — a live run always ends in a resumable pause, never a crash or lost work.
+a transient infrastructure exception (SDK stream error, network hiccup) is
+retried on a short backoff schedule (`DISPATCH_RETRY_BACKOFF_S`, 2s/8s +
+jitter) before being wrapped as `AgentDispatchFailed` with the cause attached.
+Both, like `AgentOutputInvalid`, pause the run as `PAUSED_ATTENTION` with a
+transcript in `logs/` — a live run always ends in a resumable pause, never a
+crash or lost work. Live subagents also get their size-class output budget
+enforced, not just stated: `_live_options` passes `max_output_tokens` as
+`CLAUDE_CODE_MAX_OUTPUT_TOKENS` into the subagent's environment (the CLI's
+default 32k ceiling silently killed long artifact replies before this).
 
 ## The prompt-lab (`deeper-lab`)
 
@@ -375,10 +390,14 @@ leaving state untouched and resumable. The built stages:
   slot with `preference_slot_default_weight` (0.2) — the weight is a process
   knob, not agent content — and renders `rubric-rationale.md` from the
   validated rubric.
-- **S5 Screening** dispatches the screener once with the Gate-B-approved
-  rubric, all cards, and — uniquely in the pipeline — `preferences.yaml`. The
-  result is integrity-checked against the rubric and cards (every card scored
-  on every criterion, ids resolvable; incoherence pauses the run), its weighted
+- **S5 Screening** dispatches one screener batch per angle in parallel
+  (mirroring S3's fan-out — the M1 live run proved a full-map single call
+  exceeds even a 64k output-token ceiling), each with the Gate-B-approved
+  rubric, that angle's cards, and — uniquely in the pipeline —
+  `preferences.yaml`. Each batch is integrity-checked against its own angle's
+  cards (every card scored on every criterion, ids resolvable; over-scoped
+  options dropped; incoherence pauses the run), code merges the batches (a
+  cross-angle duplicate option id pauses with instructions), the weighted
   aggregates are recomputed in code from the rubric weights, and then pure code
   (`stages/shortlist.py`) applies the §5/S5 shortlist rule exactly: a confirmed
   kill-risk eliminates regardless of score; survivors advance when their
@@ -671,6 +690,17 @@ canonical `Makefile` is used wherever GNU make is available.
   `rubric` (the design's rationale file has no schema of its own); S4 renders
   the rationale markdown from the validated rubric's definitions, measurement
   methods, and weight justifications, so the two files cannot disagree.
+- **S5 screening is batched per angle.** Design §5/S5 reads as one screener
+  pass over all cards; the M1 live run (52 options × 7 criteria) needed a
+  reply beyond even a 64k output-token ceiling and hung the CLI. S5 now
+  dispatches one batch per angle and merges in code — like-for-like scoring
+  is preserved because every batch carries the same rubric and anchored
+  levels; the per-batch integrity checks union to the design's full-map
+  check.
+- **Dispatch retry-with-backoff arrived early.** The build guide schedules
+  exponential backoff for Prompt 13; the M1 live run hit repeated one-off SDK
+  stream errors, each costing a human resume, so the minimal schedule (2
+  retries, 2s/8s + jitter) landed with the M1-exit hardening.
 - **Run-level `max_spend_usd` guard.** Design §8 speaks of per-stage caps and
   spend visible at gates; the runaway-cost mitigation here is (additionally) one
   whole-run USD cap the dispatcher checks before every invocation, because a
