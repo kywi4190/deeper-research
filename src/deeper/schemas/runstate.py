@@ -79,6 +79,17 @@ class RunState(ArtifactModel):
         description="Schema-retry counts keyed by agent invocation (max 2 before "
         "PAUSED_ATTENTION).",
     )
+    gate_c_iterations: int = Field(
+        default=0,
+        ge=0,
+        description="Gate-C feedback loops consumed (§12: hard cap, then decide). "
+        "Never reset — the cap is per run, surviving rerun invalidation.",
+    )
+    redivergence_runs: int = Field(
+        default=0,
+        ge=0,
+        description="Re-divergence mini-loops executed (§12: 1 per run). Never reset.",
+    )
     updated_at: datetime
 
     @model_validator(mode="after")

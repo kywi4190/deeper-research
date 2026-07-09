@@ -1,0 +1,24 @@
+# Mini-loop verification: all three load-bearing claims re-fetched and
+# verified — no revision leg.
+option_id: clinical-imaging-collaboration
+results:
+  - claim_id: c-clin-access
+    verdict: verified
+    evidence_quote: >-
+      Agreement AR-2214 covers retrospective and secondary computational
+      analyses of the annotated scan corpus.
+    note: null
+  - claim_id: c-clin-precedent
+    verdict: verified
+    evidence_quote: >-
+      ...evaluation study conducted over eleven months with radiology
+      co-authors, published at both venues...
+    note: null
+  - claim_id: c-clin-review
+    verdict: verified
+    evidence_quote: >-
+      Expect six to eight weeks for annotation review during autumn term.
+    note: null
+sampled_load_bearing_count: 3
+sampled_other_count: 0
+notes: null

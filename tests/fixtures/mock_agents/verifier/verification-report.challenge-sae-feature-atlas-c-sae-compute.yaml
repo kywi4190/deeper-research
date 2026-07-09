@@ -1,0 +1,17 @@
+# Gate-C evidence challenge: the human doubted the compute-headroom claim and
+# the re-fetch sides with the human — CONTRADICTED, which lands the pair in
+# the contradiction ledger. Scores do not move here.
+option_id: sae-feature-atlas
+results:
+  - claim_id: c-sae-compute
+    verdict: contradicted
+    evidence_quote: >-
+      Sweeps at the atlas scale required roughly 1.5x the per-student
+      allocation once retries are counted; headroom claims assume zero failed
+      runs.
+    note: >-
+      The policy page's worked example contradicts the dossier's 2x-headroom
+      reading.
+sampled_load_bearing_count: 1
+sampled_other_count: 0
+notes: null

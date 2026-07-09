@@ -25,6 +25,7 @@ from deeper.schemas import (
     CartographerReport,
     ContradictionLedger,
     CoverageReport,
+    DecisionReport,
     DeepDiveRoundLog,
     DeepDiveStatus,
     DestinationModel,
@@ -68,6 +69,17 @@ approved: true
 preference_slot_weight: 0.25
 weight_overrides:
   letter-strength: 0.35
+"""
+
+GATE_C_FEEDBACK = """\
+approved: false
+preference_feedback:
+  - option_id: sae-feature-atlas
+    reaction: "the ops burden of the atlas bothers me more than I expected"
+    direction: negative
+  - option_id: backdoor-probe-study
+    reaction: "the probe study's scoped ambition is actually fine"
+    direction: positive
 """
 
 
@@ -285,16 +297,53 @@ async def test_full_mock_run_end_to_end(tmp_path):
     ws.read_artifact("dossiers/scores.yaml", ScreeningResult)  # S6 rewalked too
     ws.read_artifact("tournament/scores.yaml", ScreeningResult)  # and S7
 
-    # ---- Gate C: approval walks into the S8 stub, which parks cleanly ----------
+    # ---- Gate C loop 1: preference feedback moves ONLY the adjusted board ------
+    rubric = ws.read_artifact("rubric.yaml", Rubric)
+    dest_before, adj_before = dual_scoreboards(
+        ws.read_artifact("tournament/scores.yaml", ScreeningResult), rubric
+    )
+    ws.path("gates/gate-c.yaml").write_text(GATE_C_FEEDBACK, encoding="utf-8")
+    assert await engine.run() is Node.GATE_C  # the free re-score reopens the gate
+    state = ws.load_state()
+    assert state.gate_c_iterations == 1
+    assert state.gates[GateName.C] is GateStatus.PENDING
+    dest_after, adj_after = dual_scoreboards(
+        ws.read_artifact("tournament/scores.yaml", ScreeningResult), rubric
+    )
+    assert dest_after == dest_before  # tastes cannot move the destination board
+    assert adj_after != adj_before  # ...and the boards visibly moved
+    assert adj_after[0].option_id == "sae-feature-atlas"  # tempered, not flipped
+    assert ws.path("gates/gate-c.1.yaml").is_file()  # the loop is audited
+    assert any(s.startswith("gate-c loop 1:") for s in ws.history())
+
+    # ---- approve → S8 synthesis → DONE ------------------------------------------
     ws.path("gates/gate-c.yaml").write_text("approved: true\n", encoding="utf-8")
-    assert await engine.run() is Node.S8
+    assert await engine.run() is Node.DONE
     state = ws.load_state()
     assert state.gates[GateName.C] is GateStatus.APPROVED
-    assert state.status is RunStatus.RUNNING  # parked, resumable when S8 lands
-    assert any("not implemented yet" in m for m in emitted)
+    assert state.status is RunStatus.DONE
+    assert "synthesist" in {e.role for e in state.spend}
+    assert "run complete" in ws.history()
+
+    # The deliverable: all seven design components, claims linked, tables embedded.
+    report = ws.read_artifact("report/decision-report.yaml", DecisionReport)
+    assert report.winner_option_id == adj_after[0].option_id
+    text = ws.path("report/decision-report.md").read_text(encoding="utf-8")
+    for heading in (
+        "## 1. Recommendation",
+        "## 2. Decision matrix",
+        "## 3. Sensitivity analysis",
+        "## 4. Dissent",
+        "## 5. Residual uncertainty",
+        "## 6. Next actions",
+        "## 7. Appendix",
+    ):
+        assert heading in text
+    assert "[c-sae-precedent](#claim-sae-feature-atlas--c-sae-precedent)" in text
+    assert "### Claims index" in text
 
     # ---- terminal idempotency: re-running changes nothing ----------------------
     history_before = ws.history()
-    assert await engine.run() is Node.S8
+    assert await engine.run() is Node.DONE
     assert ws.history() == history_before
     assert Workspace.open(ws.root).load_state().stage is Stage.S8

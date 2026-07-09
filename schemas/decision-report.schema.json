@@ -1,0 +1,101 @@
+{
+  "additionalProperties": false,
+  "description": "report/decision-report.yaml \u2014 the seven design components (\u00a75/S8).\n\nComponents 2, 3, and 7 pair an agent narration field with code-rendered\ntables: the matrix, both scoreboards, the sensitivity tables, and the\nappendix tables are computed and embedded by code at render time.",
+  "properties": {
+    "winner_option_id": {
+      "description": "Must be rank 1 on the preference-adjusted scoreboard \u2014 code cross-checks it.",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Winner Option Id",
+      "type": "string"
+    },
+    "recommendation": {
+      "description": "\u00a75/S8-1: the recommendation with its decisive reasons, every factual sentence annotated [[claim-id]] (or [[option-id:claim-id]] when the bare id is ambiguous across dossiers).",
+      "minLength": 1,
+      "title": "Recommendation",
+      "type": "string"
+    },
+    "decision_matrix_narration": {
+      "description": "\u00a75/S8-2: what the finalists x criteria matrix (code-rendered beside this narration) says \u2014 where the winner is strong, weak, uncertain.",
+      "minLength": 1,
+      "title": "Decision Matrix Narration",
+      "type": "string"
+    },
+    "sensitivity_narration": {
+      "description": "\u00a75/S8-3: narrates the CODE-computed flip deltas and the preference-slot sweep. If the winner is fragile to plausible weight changes, this must say so prominently.",
+      "minLength": 1,
+      "title": "Sensitivity Narration",
+      "type": "string"
+    },
+    "dissent": {
+      "description": "\u00a75/S8-4: the prosecution's best surviving argument against the winner, stated at full strength.",
+      "minLength": 1,
+      "title": "Dissent",
+      "type": "string"
+    },
+    "dissent_unrebutted": {
+      "description": "True when nothing in the tournament rebutted the dissent \u2014 the report must then say so explicitly.",
+      "title": "Dissent Unrebutted",
+      "type": "boolean"
+    },
+    "dissent_source": {
+      "description": "Workspace-relative path of the prosecution the dissent survives from.",
+      "minLength": 1,
+      "title": "Dissent Source",
+      "type": "string"
+    },
+    "residual_uncertainty": {
+      "description": "\u00a75/S8-5: open questions, BUDGET-CAPPED areas, and what new information should trigger revisiting the decision.",
+      "minLength": 1,
+      "title": "Residual Uncertainty",
+      "type": "string"
+    },
+    "next_actions": {
+      "description": "\u00a75/S8-6: concrete next steps, folding in any execution-kind strategic notes that apply to the winner.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Next Actions",
+      "type": "array"
+    },
+    "appendix_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\u00a75/S8-7 commentary; the appendix tables themselves (angle map, allocation, cut audit, pass rates, spend) are code-rendered.",
+      "title": "Appendix Notes"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "winner_option_id",
+    "recommendation",
+    "decision_matrix_narration",
+    "sensitivity_narration",
+    "dissent",
+    "dissent_unrebutted",
+    "dissent_source",
+    "residual_uncertainty",
+    "next_actions"
+  ],
+  "title": "DecisionReport",
+  "type": "object"
+}

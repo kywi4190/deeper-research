@@ -10,9 +10,6 @@ from .base import (
     StageInputsMissing,
     StageInterrupted,
 )
-from .not_yet import (
-    SynthesisStage,
-)
 from .s0_intake import IntakeStage
 from .s1_cartography import CartographyStage
 from .s2_allocation import AllocationStage
@@ -21,6 +18,7 @@ from .s4_rubric import RubricStage
 from .s5_screening import ScreeningStage
 from .s6_deepdive import DeepDiveStage
 from .s7_tournament import TournamentStage
+from .s8_synthesis import SynthesisStage
 
 STAGES: dict[Stage, type[StageBase]] = {
     Stage.S0: IntakeStage,

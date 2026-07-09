@@ -1,0 +1,33 @@
+# Gate-C re-divergence scout: the frame-checker's approved proposal names the
+# clinical-imaging collaboration the applied-domain critique flagged and no
+# reflow top-up ever scouted. One card, targeted at exactly the proposed miss.
+angle_id: applied-domain-collaboration
+cards:
+  - id: clinical-imaging-collaboration
+    name: Clinical-imaging collaboration with the university hospital
+    angle_id: applied-domain-collaboration
+    description: Segmentation-model evaluation against the university hospital's
+      radiology dataset, with the radiology group as co-author and second judge.
+      The data-access agreement already exists, removing the partner-commitment
+      risk the angle's other cards carry.
+    mechanism: Fine-tuned segmentation models are evaluated against the hospital's
+      annotated scans; radiologist review supplies the external validity a
+      benchmark cannot.
+    preliminary_evidence:
+      - text: Radiology-ML collaborations with existing data access publish at both
+          ML and clinical venues on one-year timelines.
+        source:
+          url: "https://www.nature.com/articles/s41591-018-0316-z"
+          tier: T1
+          title: Clinical deep-learning evaluation precedent
+          content_hash: null
+    uncertainties:
+      - Whether the radiology group's annotation backlog leaves reviewer time this year
+      - Ethics-approval scope for a secondary analysis
+    kill_risks:
+      - fact: The existing data-sharing agreement excludes secondary ML analyses
+        check_hint: One email to the hospital's research office confirms the
+          agreement's scope.
+    misplaced_flag: null
+    notes: null
+notes: Scoped to the approved proposal only; the angle's other cards stand.

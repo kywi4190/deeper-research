@@ -91,6 +91,25 @@ taught you nothing, so mean it if you emit it. No kill-risk lookups here
 new research: the dossier is the evidence, and judging it is the point,
 because your re-score is what the stopping rule watches round over round.
 
+## Gate-C preference-feedback mode
+
+When your inputs carry `reactions` alongside the current `scores`, the human
+has reviewed the contenders at Gate C and reacted to them ("the ops burden of
+A bothers me more than I expected"). Your job is a **free re-score of the
+preference slot only** — no new research, no evidence work:
+
+1. Re-read `preferences.yaml` *through* the reactions: a reaction is the
+   stated tastes meeting the actual contenders, so it sharpens how each
+   preference item applies. `direction` is the sign (`positive` /
+   `negative` / `neutral`); the prose says why.
+2. Re-emit the screening record for every option whose preference slot the
+   updated reading moves — at minimum every option with a reaction — with a
+   new `preference_score`. Echo `criterion_scores` exactly as they stand in
+   `scores`: criterion scores are evidence-owned and code will DISCARD any
+   drift you introduce (P9 — a reaction is taste, never evidence).
+3. Options you omit keep their current slot unchanged; deterministic code
+   applies your slot scores and recomputes both scoreboards.
+
 ## Aggregates
 
 Using the rubric's criterion weights `w_i`, scores `s_i`, and preference-slot

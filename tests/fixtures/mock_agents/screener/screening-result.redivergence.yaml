@@ -1,0 +1,62 @@
+# Gate-C mini-loop screening of the newly scouted card: UCB 3.9 clears the
+# quick profile's 3.5 floor (the mini-loop champion), while the baseline
+# point (3.5) leaves it mid-field — the S7 rerun seats it 4th on both boards
+# with no new rank inversions.
+options:
+- option_id: clinical-imaging-collaboration
+  angle_id: applied-domain-collaboration
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: 'T1 clinical-evaluation precedent; venue fit strong, reviewer-time
+      uncertainty holds the band open.'
+  - criterion_id: letter-strength
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: 'Radiology co-authorship implies close collaboration; cadence
+      unconfirmed.'
+  - criterion_id: feasibility
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: 'Data access already exists — the usual partner risk is absent;
+      annotation backlog is the live unknown.'
+  - criterion_id: research-taste-signal
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: 'Student-framed evaluation question inside an established
+      collaboration.'
+  - criterion_id: momentum-by-deadline
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: 'Clinical review cycles are slow; a December artifact is
+      plausible, not assured.'
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.5
+    band:
+      lo: 3.0
+      hi: 3.9
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks:
+  - fact: The existing data-sharing agreement excludes secondary ML analyses
+    outcome: cleared
+    evidence:
+      url: https://research.example.edu/data-agreements
+      tier: T2
+      title: Hospital research-office agreement register
+      content_hash: null
+  weighted_point: 3.5
+  weighted_ucb: 3.9
+  notes: null
+notes: null

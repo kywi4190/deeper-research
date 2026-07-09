@@ -1,0 +1,94 @@
+# Mini-loop deep dive, round 1 (the whole scoped budget: dive cap 1 when the
+# proposal estimates 2 units). Every claim is load-bearing and high/med
+# confidence, so the verifier sample is exactly the claim list (3 + 0).
+option_id: clinical-imaging-collaboration
+criterion_sections:
+  publication-potential:
+    content: 'Clinical-imaging collaboration — evidence bearing on publication-potential:
+      the precedent claim [c-clin-precedent] anchors venue fit at both ML and clinical
+      venues.'
+    claim_ids:
+    - c-clin-precedent
+  letter-strength:
+    content: 'Clinical-imaging collaboration — evidence bearing on letter-strength:
+      co-authorship with the radiology group implies close, specific collaboration
+      [c-clin-precedent].'
+    claim_ids:
+    - c-clin-precedent
+  feasibility:
+    content: 'Clinical-imaging collaboration — evidence bearing on feasibility: the
+      data-sharing agreement covers secondary ML analyses [c-clin-access], removing
+      the angle''s usual partner risk.'
+    claim_ids:
+    - c-clin-access
+  research-taste-signal:
+    content: 'Clinical-imaging collaboration — evidence bearing on research-taste-signal:
+      the evaluation framing is the student''s own within an established collaboration
+      [c-clin-precedent].'
+    claim_ids:
+    - c-clin-precedent
+  momentum-by-deadline:
+    content: 'Clinical-imaging collaboration — evidence bearing on momentum-by-deadline:
+      radiologist review cycles put a December artifact at risk [c-clin-review].'
+    claim_ids:
+    - c-clin-review
+failure_modes:
+  content: 'Clinical-imaging collaboration: the dominant failure mode is reviewer-time
+    starvation in the radiology group [c-clin-review].'
+  claim_ids:
+  - c-clin-review
+cost_of_adoption:
+  content: 'Clinical-imaging collaboration: ethics-approval paperwork and clinical
+    data handling training front-load the first month [c-clin-access].'
+  claim_ids:
+  - c-clin-access
+second_order_effects:
+  content: 'Clinical-imaging collaboration: an evaluated pipeline opens a standing
+    partnership for later lab projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'Clinical-imaging collaboration: clinical-ML evaluation studies are
+    criticized as methodologically thin at ML venues when the clinical partner
+    drives the question [c-clin-precedent].'
+  claim_ids:
+  - c-clin-precedent
+comparable_cases:
+  content: 'Clinical-imaging collaboration: comparable one-year radiology-ML
+    evaluations published with domain co-authors [c-clin-precedent].'
+  claim_ids:
+  - c-clin-precedent
+claims:
+- id: c-clin-precedent
+  text: Radiology-ML evaluation collaborations with existing data access have published
+    at both ML and clinical venues on one-year timelines.
+  confidence: high
+  source:
+    url: https://www.nature.com/articles/s41591-018-0316-z
+    tier: T1
+    title: Clinical deep-learning evaluation precedent
+    content_hash: null
+  load_bearing: true
+- id: c-clin-access
+  text: The hospital's existing data-sharing agreement covers secondary ML analyses,
+    per the research office's agreement register.
+  confidence: high
+  source:
+    url: https://research.example.edu/data-agreements
+    tier: T2
+    title: Hospital research-office agreement register
+    content_hash: null
+  load_bearing: true
+- id: c-clin-review
+  text: The radiology group's annotation and review backlog runs 6-8 weeks in
+    application season, pushing a December artifact to the edge of feasible.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-clin-review
+    content_hash: null
+  load_bearing: true
+rounds_completed: 1
+budget_capped: false
+open_questions: []
+notes: null

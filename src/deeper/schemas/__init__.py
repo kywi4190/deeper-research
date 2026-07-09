@@ -78,6 +78,7 @@ from .options import (
     OptionCard,
     OptionCardSet,
 )
+from .report import DecisionReport
 from .rubric import Criterion, PreferenceSlot, Rubric
 from .runstate import GateName, GateStatus, RunState, RunStatus, SpendEntry, Stage
 from .screening import (
@@ -180,6 +181,8 @@ __all__ = [
     "DossierSection",
     "VerificationReport",
     "VerificationResult",
+    # S8 report
+    "DecisionReport",
     # S7 tournament
     "CheckFinding",
     "FrameCheck",

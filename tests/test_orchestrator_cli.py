@@ -57,7 +57,7 @@ def test_new_unknown_profile_fails_cleanly(tmp_path):
     assert "unknown profile" in result.output
 
 
-def test_resume_past_gate_a_walks_s2_to_gate_c_then_s8_stub(tmp_path):
+def test_resume_past_gate_a_walks_s2_to_gate_c_then_s8_report(tmp_path):
     _, run_dir = new_run(tmp_path)
     approve_gate_a(run_dir)
     result = runner.invoke(app, ["resume", str(run_dir)])
@@ -84,11 +84,25 @@ def test_resume_past_gate_a_walks_s2_to_gate_c_then_s8_stub(tmp_path):
     (run_dir / "gates" / "gate-c.yaml").write_text("approved: true\n", encoding="utf-8")
     result = runner.invoke(app, ["resume", str(run_dir)])
     assert result.exit_code == 0, result.output
-    assert "not implemented yet" in result.output  # S8 stub reports cleanly
-    # Resuming again is safe and repeats the same clean report.
+    assert "decision report written" in result.output  # S8 synthesized
+    assert "is complete" in result.output  # ...and the run reached DONE
+    ws = Workspace.open(run_dir)
+    assert ws.load_state().status is RunStatus.DONE
+    # Resuming again is safe and repeats the same terminal report.
     again = runner.invoke(app, ["resume", str(run_dir)])
     assert again.exit_code == 0
-    assert "not implemented yet" in again.output
+    assert "is complete" in again.output
+
+    # `deeper report`: path + winner + both boards + flag + pass rates + spend.
+    result = runner.invoke(app, ["report", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "decision-report.md" in result.output
+    assert "winner:" in result.output and "sae-feature-atlas" in result.output
+    assert "DISSENT UNREBUTTED" in result.output
+    assert "destination-only" in result.output and "preference-adjusted" in result.output
+    assert "sensitivity:" in result.output
+    assert "pass rate" in result.output
+    assert "agent spend: $" in result.output
 
 
 def test_resume_with_undecided_gate_repauses(tmp_path):
@@ -153,14 +167,15 @@ def test_rerun_unknown_stage_fails_cleanly(tmp_path):
     assert "unknown stage" in result.output
 
 
-def test_report_stub(tmp_path):
+def test_report_before_s8_says_no_report_yet(tmp_path):
     _, run_dir = new_run(tmp_path)
     result = runner.invoke(app, ["report", str(run_dir)])
     assert result.exit_code == 0
     assert "no report yet" in result.output
+    # A stray markdown alone is not a report — the validated artifact is.
     (run_dir / "report" / "decision-report.md").write_text("# report\n", encoding="utf-8")
     result = runner.invoke(app, ["report", str(run_dir)])
-    assert "decision-report.md" in result.output
+    assert "no report yet" in result.output
 
 
 async def test_schema_retry_exhaustion_pauses_run_for_attention(tmp_path):

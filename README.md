@@ -13,16 +13,19 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**M1 complete; Phase C underway — kernel S0–S7 runs end-to-end (mock + live-smoke
-through S5).** The design-doc §9 M1 exit is proven by `tests/test_e2e_mock.py`: one
-test drives a full mock run S0 → Gate A (approved with a prior adjustment) → S2 →
-S3 → S4 → Gate B (weight override) → S5 → S6 deep dives → S7 tournament → Gate C,
-asserting every artifact validates, the git log carries one commit per stage and
-gate, the spend ledger is populated and under the cap, and `rerun --stage S3
+**The full pipeline is built — S0–S8 runs end-to-end in mock (live-smoke through
+S5), from `deeper new` to a citation-linked decision report.** The extended M1/M2
+walk is proven by `tests/test_e2e_mock.py`: one test drives a full mock run S0 →
+Gate A (approved with a prior adjustment) → S2 → S3 → S4 → Gate B (weight
+override) → S5 → S6 deep dives → S7 tournament → Gate C (a preference-feedback
+loop that moves the preference-adjusted board and provably not the
+destination-only one, then approval) → S8 synthesis → DONE, asserting every
+artifact validates, the git log carries one commit per stage, gate, and Gate-C
+loop, the spend ledger is populated and under the cap, and `rerun --stage S3
 --angle X` invalidates exactly that subtree before reconverging.
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip,
 an LLM-facing validation-error formatter, and a generated JSON Schema in
-`schemas/`; the versioned agent prompts for stages 0–7 live in `agents/`. The
+`schemas/`; the versioned agent prompts for stages 0–8 live in `agents/`. The
 kernel is live-run hardened: `deeper doctor` preflights the environment, every
 run carries a `max_spend_usd` guard the dispatcher enforces before each
 invocation, and every agent failure path (schema-retry exhaustion, SDK/network
@@ -47,9 +50,24 @@ preference-adjusted) and their rank inversions in code, runs prosecutors
 parallel with the code-computed rubric-sensitivity tables as evidence, then a
 judge whose every score change lands in a cause-logged ledger and is applied
 by code — any re-divergence proposal is surfaced at Gate C, never
-auto-executed. S8 is a registered stub that reports cleanly. A full mock run
-walks `deeper new` → Gate A → Gate B → the shortlist → seven settled dossiers
-→ the tournament → Gate C in seconds, offline.
+auto-executed. Gate C's four typed actions are live: preference feedback (one
+screener dispatch converts reactions to preference-slot adjustments; code
+re-scores both scoreboards — free, no new research), evidence challenges (one
+scoped verifier task per challenged claim; contradicted claims enter the §6
+ledger, scores never move), accept-re-divergence (a mini-loop S1→S6 scoped to
+the proposed region on its OWN budget, then S7 reruns over the merged
+finalists — 1 per run, §12), and approve — with iterations capped at 3, after
+which the gate template only offers approve. S8's synthesist (the only agent
+besides the screener permitted preferences) narrates the code-computed
+boards, matrix, and sensitivity tables into the seven-component decision
+report; a mechanical citation pass then resolves every inline `[[claim-id]]`
+annotation against the dossiers (one retry on failure) before code renders
+`report/decision-report.md` with claims linked into an appendix index.
+`deeper report <run>` prints the path plus a terminal summary: winner, both
+scoreboards, the top sensitivity flag, verification pass rates, spend. A full
+mock run walks `deeper new` → Gate A → Gate B → the shortlist → seven settled
+dossiers → the tournament → Gate C feedback → the decision report in seconds,
+offline.
 
 The **first supervised live run** (quick profile, a real vector-store
 selection question) exercised the whole kernel: three spend-cap pauses each
@@ -81,12 +99,13 @@ state of a run.
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/contradictions.py` | The §6 contradiction ledger's shared append helper (idempotent by entry id) | **built** |
 | `src/deeper/sensitivity.py` | S7/S8 scoreboard + rubric-sensitivity math: dual boards, rank inversions, steelman docket, criterion weight-flip deltas, preference-slot sweep — pure deterministic code | **built** |
+| `src/deeper/report.py` | S8 report machinery: the mechanical citation pass over `[[claim-id]]` annotations, decision-matrix/appendix table rendering, the top-sensitivity-flag line, markdown assembly — pure deterministic code | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S7 built**, S8 stub (Prompt 12) |
-| `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
-| `agents/` | Versioned agent prompt files (one per role), stages 0–7 | **built** |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S8 built** |
+| `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), Gate-C loop actions (`gate_c_loops.py`), the re-divergence mini-loop (`redivergence.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
+| `agents/` | Versioned agent prompt files (one per role), stages 0–8 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7, saturation, shortlist, depth, contradiction ledger, Gates A/B), end-to-end mock run, live guards, doctor suites (890 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor suites (930 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -141,6 +160,10 @@ each model validates a single file.
 | `tournament/score-updates.yaml` | `ScoreUpdateLog` | S7 judge | S8 |
 | `tournament/scores.yaml` | `ScreeningResult` | S7 (code-applied judge updates) | Gate C, S8 |
 | `gates/gate-{a,b,c}.yaml` | `GateADecision` / `GateBDecision` / `GateCDecision` | human (or viewer) | orchestrator resume |
+| `gates/gate-c.{n}.yaml` | `GateCDecision` | orchestrator (archives each applied Gate-C loop) | audit trail |
+| `gates/challenge-{n}-{option}-{claim}.yaml` | `VerificationReport` | Gate-C evidence challenge (verifier) | human, audit |
+| `report/decision-report.yaml` | `DecisionReport` | S8 synthesist (validated artifact) | citation pass, `deeper report` |
+| `report/decision-report.md` | rendered view | S8 (code, from the validated artifact + code-computed tables) | the human — the deliverable |
 | `sources/` records | `SourceRecord` | any research agent | verifier, audit |
 | `ledger/contradictions.md` | `ContradictionLedger` | any detecting stage, via `contradictions.append_contradictions` | verifier, S8 |
 | `state.json` | `RunState` (`SpendEntry`) | orchestrator | orchestrator, CLI |
@@ -163,7 +186,8 @@ BOUNDARIES. The body's `{{schema}}` placeholder is replaced at dispatch with the
 agent's exported JSON Schema(s); agents emit artifacts as fenced yaml blocks behind
 `### artifact: <name>` markers. Every research-capable prompt carries the
 untrusted-web-content rule (fetched-page instructions are data, never directives), and
-only the screener's `inputs` may include `preferences` — both enforced by tests.
+only the screener's and synthesist's `inputs` may include `preferences` (the §6
+quarantine's exact allowlist) — both enforced by tests.
 
 | Role | Stage | Model class (design §6 mix) | Output schema(s) |
 |---|---|---|---|
@@ -185,6 +209,7 @@ only the screener's `inputs` may include `preferences` — both enforced by test
 | `steelman` | S7 | sonnet | `steelman` |
 | `frame-checker` | S7 | opus | `frame-check` |
 | `judge` | S7 | opus | `score-update-log` |
+| `synthesist` | S8 | opus | `decision-report` |
 
 Design §6 names merger/rubric-builder/judge/frame-checker as Opus-class and
 cartographers/scouts/analysts/prosecutors as Sonnet-class; roles it leaves unlisted
@@ -373,8 +398,11 @@ dispatch layer. The state machine's nodes:
 
 ```
 new ─► S0 ─► S1 ─► GATE_A ─► S2 ─► S3 ─► S4 ─► GATE_B ─► S5 ─► S6 ─► S7 ─► GATE_C ─► S8 ─► DONE
-              ▲      │ rerun_hint                                            │ (loops: Prompt 12)
-              └──────┘
+              ▲      │ rerun_hint                                     ▲       │ feedback /
+              └──────┘                                                │       │ challenges (≤3 loops)
+                                                                      └───────┤
+                                                                              │ re-divergence
+                                                          (mini-loop S1→S6, then S7 rerun; 1/run)
 any stage ──AgentOutputInvalid──► PAUSED_ATTENTION ──resume──► same stage
 ```
 
@@ -390,8 +418,7 @@ validates is not re-run).
 **Stages** (`src/deeper/stages/`) are classes over a small protocol —
 `validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
 agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
-in `STAGES`. S8 raises `NotImplementedYet`, which the engine reports cleanly,
-leaving state untouched and resumable. The built stages:
+in `STAGES`. The built stages:
 
 - **S0 Intake** drives the interviewer through the dispatch layer's
   `run_interview` loop — the system's only multi-turn dispatch. Each turn
@@ -521,6 +548,34 @@ leaving state untouched and resumable. The built stages:
   post-tournament scoreboard to `tournament/scores.yaml` (written last — it
   marks the stage settled). Each adversarial artifact is written the moment
   its dispatch completes, so a resume re-dispatches only what is missing.
+- **S8 Synthesis** starts with pure code over `tournament/scores.yaml`: both
+  scoreboards, the criterion flip deltas, the 0→40% preference sweep, the
+  finalists×criteria decision matrix with confidence bands, per-finalist
+  verifier pass rates, and spend by stage. The **synthesist** (Opus-class, the
+  only agent besides the screener the quarantine hook allowlists for
+  preferences) narrates all of it — plus the dossiers, prosecutions, steelmen,
+  frame-check, shortlist, contradiction ledger, and the coverage report's
+  execution-kind strategic notes — into the validated `decision-report`
+  artifact carrying the design's seven components: recommendation with
+  decisive reasons, matrix narration, sensitivity narration (its prompt says
+  verbatim: if the winner is fragile to plausible weight changes, say so
+  prominently), the dissent (the best surviving prosecution argument, marked
+  explicitly when unrebutted; code checks it comes from the winner's
+  prosecution), the residual-uncertainty register (open questions,
+  BUDGET-CAPPED areas, revisit triggers), next actions (execution strategic
+  notes folded in), and appendix commentary. Code cross-checks the winner
+  against the adjusted board's rank 1, then runs the **mechanical citation
+  pass** (`src/deeper/report.py`, code not LLM): every inline `[[claim-id]]`
+  (or `[[option-id:claim-id]]` where a bare id is ambiguous across dossiers)
+  must resolve to a dossier claim, and the recommendation must carry at least
+  one; unresolvable annotations fail the stage with the exact list and buy
+  ONE synthesist retry — a second failure pauses the run. On success code
+  renders `report/decision-report.md`: seven numbered sections, the
+  code-computed tables embedded verbatim, every annotation linked to an
+  appendix claims index carrying each claim's text, source, and tier, plus
+  the angle map, allocation table, cut-option audit trail (screening
+  decisions + Gate-A removals), verification pass rates, and spend by stage.
+  `report/decision-report.yaml` is written last — the settled marker.
 
 **Gates are file-edit pause states.** Entering a gate writes a commented template
 (`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
@@ -546,7 +601,34 @@ still sum to 1.0; referential problems re-pause with nothing written.
 `rerun_hint` records the hint at `gates/gate-a-hint.txt` (where S1
 invalidation can't delete it), loops back through S1 via the same invalidation
 machinery as `rerun`, and the S1 pass injects it into every cartographer prompt
-then consumes the file — one pass, exactly. **Every agent failure is a pause, not a crash**: schema-retry
+then consumes the file — one pass, exactly. **Gate C is the loop gate** (design
+§5): `approved: true` proceeds to S8, and its three loop actions are bounded,
+typed loops rather than open-ended chat — each submission is one Gate-C
+iteration (counted in `state.json`, capped at `caps.max_gate_c_loops` = 3 per
+§12, after which the engine writes an approve-only template with a note
+explaining why). A loop decision is validated whole and up-front (Gate A
+style): an unknown option/claim id, a second re-divergence, or acceptance with
+no proposal on file refuses the entire decision, consumes no iteration, and
+dispatches nothing. Applied loops archive the decision to `gates/gate-c.N.yaml`
+and commit as `gate-c loop N`. *Preference feedback* dispatches the screener
+in its Gate-C mode; code copies ONLY the returned preference slots (criterion
+drift is discarded — P9 by construction) into both `tournament/scores.yaml`
+and `dossiers/scores.yaml`, recomputes the aggregates, and prints both
+scoreboards — the destination-only board cannot move. *Evidence challenges*
+each fire one scoped verifier contract carrying the human's challenge
+verbatim; the verdict lands at `gates/challenge-N-{option}-{claim}.yaml`, a
+contradicted claim enters the contradiction ledger, and scores never move — a
+re-score is the human's next loop, taken deliberately. *Accept re-divergence*
+runs the mini-loop (`orchestrator/redivergence.py`) on the proposal's own
+`estimated_cost_units` — 1 unit buys one targeted scout pass over the proposed
+region (a `new-angle` proposal first enters the map with human provenance),
+the remainder caps the deep dive via a scoped config copy of
+`deep_dive_unit_cap` — then one screener batch scores the new cards and the
+threshold rule seats at most one new finalist (the §12 `max_finalists` cap
+still binds; every new option's advance/cut reason is appended to
+`shortlist.md`), the real S6 machinery dives the champion, its final re-score
+merges into `dossiers/scores.yaml`, and S7 is invalidated so the tournament
+reruns over the merged finalists before Gate C reopens. **Every agent failure is a pause, not a crash**: schema-retry
 exhaustion (`AgentOutputInvalid`), a dispatch/SDK failure
 (`AgentDispatchFailed`), or the spend guard (`SpendCapExceeded`) all land the
 run in `PAUSED_ATTENTION` — the failure transcript (validation errors + raw
@@ -653,13 +735,39 @@ deeper resume <run>
 #     S7: judge — sae-feature-atlas 'momentum-by-deadline' 4.5 -> 4.25 (cause: ...)
 #   and pauses at Gate C (the contender review)
 
+# edit runs/<...>/gates/gate-c.yaml — approve, or submit a typed loop first:
+#   preference_feedback:
+#     - option_id: sae-feature-atlas
+#       reaction: "the ops burden bothers me more than I expected"
+#       direction: negative
+deeper resume <run>
+#   the screener converts the reactions to preference-slot adjustments and CODE
+#   re-scores both scoreboards (free — no new research), then the gate reopens:
+#     gate-c: preference slot of 'sae-feature-atlas' 4.5 -> 4.4
+#     gate-c: code re-scored both scoreboards (the destination-only board cannot
+#             move — the slot weighs 0 there): ...
+#     gate-c: loop 1 of 3 applied (1 preference reaction(s); decision archived to
+#             gates/gate-c.1.yaml) — review the updated artifacts, then decide again
+#   (evidence_challenges fire scoped verifier tasks; accept_redivergence: true
+#    runs the mini-loop on the proposal's own budget, then S7 reruns)
+
 # edit runs/<...>/gates/gate-c.yaml — approved: true proceeds to S8
 deeper resume <run>
-#   reports that S8 is not built yet (arrives in Prompt 12), exiting cleanly
+#   S8 synthesizes the report and the run completes:
+#     S8: synthesist drafting the decision report — adjusted-board winner '...'
+#     S8: decision report written — report/decision-report.md (winner
+#         'sae-feature-atlas', dissent UNREBUTTED; citation pass clean over 28
+#         indexed claim ids)
+#     run <id> is complete — see report/decision-report.md
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
-deeper report <run>          # decision-report path (S8, not built yet)
+deeper report <run>
+#   the report's path + a terminal summary: winner (first decisive sentence,
+#   with a red DISSENT UNREBUTTED marker when it stands), both scoreboards
+#   with ranks, the top sensitivity flag (e.g. "FRAGILE: the winner depends on
+#   the preference-slot weight — ... between slot weights 0.1 and 0.15"),
+#   per-finalist verification pass rates, and total agent spend
 ```
 
 Setting `rerun_hint: "<hint>"` instead of approving loops cartography once with the
@@ -961,6 +1069,51 @@ canonical `Makefile` is used wherever GNU make is available.
   "required-section checks for markdown" become field requirements — e.g. the five
   standing dossier sections are required fields). Stages may render markdown views of
   these artifacts later; the validated file is the structured one.
+- **`decision-report.md` is a code-rendered view of a validated artifact.** The
+  design names one report file; here the synthesist emits the structured
+  `report/decision-report.yaml` (`DecisionReport` — seven component fields, so
+  the "all seven sections" contract is schema-checkable) and code renders the
+  human deliverable `report/decision-report.md` around it, embedding the
+  code-computed scoreboards, sensitivity tables, matrix, and appendix tables
+  verbatim (P8: the agent narrates arithmetic, never produces it) and turning
+  every `[[claim-id]]` annotation into a link to the appendix claims index.
+  The yaml is written last and is the stage's declared output.
+- **The citation pass validates inline annotations, not raw sentences.** "Every
+  factual claim in the report body links back to a dossier claim" is made
+  mechanical by having the synthesist annotate each factual sentence with
+  `[[claim-id]]` (qualified `[[option-id:claim-id]]` when the bare id exists in
+  more than one dossier — claim ids are unique only per dossier); code verifies
+  every annotation resolves and that the recommendation carries at least one.
+  Sentence-level coverage is the prompt's contract; resolution is code's.
+- **Gate-C preference feedback amends `dossiers/scores.yaml` too.** The re-score
+  naturally lands in `tournament/scores.yaml` (S8's input), but a later
+  re-divergence mini-loop invalidates the tournament and reranks from
+  `dossiers/scores.yaml` — so the human's slot adjustments are applied to both
+  files (same rubric, aggregates recomputed in code); the gate-loop commit is
+  the audit trail for the S6-owned file changing at a gate.
+- **The mini-loop compresses S1→S6.** "A mini-loop of Stages 1–6 scoped to the
+  new region" runs, on the proposal's own `estimated_cost_units`: a map edit
+  (new-angle proposals only; human provenance like Gate-A additions) → ONE
+  targeted scout pass with no critic round (a critique would double a
+  1–6-unit budget) → one screener batch + the threshold seat rule (at most one
+  new finalist, `max_finalists` still binding, all decisions appended to
+  `shortlist.md`) → the real `DeepDiveStage` round/verification machinery under
+  a scoped `deep_dive_unit_cap`. S4 is deliberately not re-run — the
+  Gate-B-approved rubric is fixed for the run.
+- **Evidence challenges dispatch the verifier only, and never move scores.**
+  The design says "targeted verifier/analyst task"; adjudicating "I don't
+  believe claim X" against its source is exactly the verifier's existing skill
+  and schema, so no analyst rewrite is spawned. The verdict is surfaced
+  (gates/challenge artifact, ledger entry when contradicted, terminal message);
+  any score consequence is the human's next deliberate loop (preference
+  feedback, or approving informed) — a challenge is a question, not an edit.
+- **Gate-loop bookkeeping lives in `RunState`, spend under stage S7.**
+  `gate_c_iterations` and `redivergence_runs` are new run-state counters
+  (defaults 0, so old state.json still validates); they are never reset by
+  rerun invalidation — the §12 caps are per *run*. Gate-loop agent dispatches
+  ledger their spend under S7 (the gate's preceding stage; `SpendEntry` has no
+  gate stages) with `gate-c-feedback` / `challenge-*` / `redivergence*`
+  contexts, so the audit trail still separates them.
 
 ## Roadmap position
 
@@ -977,9 +1130,12 @@ Following the phases in the build guide:
   rounds under the stability stopping rule, verifier pass, contradiction
   ledger) ✅ → Prompt 11 (S7 tournament: prosecutor, steelman, frame-checker,
   judge + the code-computed rubric sensitivity in `sensitivity.py`) ✅ →
-  Gate C loops, synthesis.
+  Prompt 12 (Gate C loops: preference feedback, evidence challenges, the
+  re-divergence mini-loop; S8 synthesis with the mechanical citation pass;
+  `deeper report`) ✅. **The full pipeline S0→S8 is built.**
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase C, Prompt 12 — Gate C loops (preference feedback, evidence
-challenges, re-divergence mini-loop) + S8 synthesis with the citation pass.**
+**Next: Phase D, Prompt 13 — the hardening pass (the triage list includes the
+cp1252 console crash on S6's 'Δ' emit, cartography over-decomposition, and
+per-batch persistence), then the benchmark evals.**

@@ -20,6 +20,7 @@ from .dossier import DeepDiveRoundLog, Dossier, VerificationReport
 from .gates import GateADecision, GateBDecision, GateCDecision
 from .intake import Brief, DestinationModel, Preferences
 from .options import CardCritique, OptionCardSet
+from .report import DecisionReport
 from .rubric import Rubric
 from .runstate import RunState
 from .screening import ScreeningResult, Shortlist
@@ -46,6 +47,7 @@ ARTIFACT_REGISTRY: dict[str, type[ArtifactModel]] = {
     "steelman": Steelman,
     "frame-check": FrameCheck,
     "score-update-log": ScoreUpdateLog,
+    "decision-report": DecisionReport,
     "gate-a-decision": GateADecision,
     "gate-b-decision": GateBDecision,
     "gate-c-decision": GateCDecision,

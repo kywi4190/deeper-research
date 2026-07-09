@@ -65,6 +65,9 @@ class GateOutcome:
     # recording); runs before the state transition so its writes land in the
     # gate's commit, and its problems re-pause instead of advancing.
     apply: Callable[[Workspace], ApplyResult] | None = None
+    # Gate C loop actions (§5): interpretation stays pure — the ENGINE executes
+    # the loop (it owns the dispatcher, the caps, and the iteration counter).
+    loop_decision: GateCDecision | None = None
 
 
 def _slugify(name: str) -> str:
@@ -324,19 +327,13 @@ def _interpret_c(decision: GateCDecision) -> GateOutcome:
             commit_label="approved",
         )
     if decision.preference_feedback or decision.evidence_challenges or decision.accept_redivergence:
-        return GateOutcome(
-            advanced=False,
-            messages=(
-                "Gate C loop actions (preference feedback, evidence challenges, "
-                "re-divergence) are not implemented yet — they arrive in Prompt 12. "
-                "For now the only actionable decision is `approved: true`.",
-            ),
-        )
+        return GateOutcome(advanced=False, loop_decision=decision)
     return GateOutcome(
         advanced=False,
         messages=(
             "gates/gate-c.yaml holds no decision yet: review the contender pack, then "
-            "set `approved: true` (loop actions arrive in Prompt 12).",
+            "set `approved: true` — or submit loop actions (preference feedback, "
+            "evidence challenges, accept_redivergence) in their own iteration.",
         ),
     )
 
@@ -406,20 +403,40 @@ _TEMPLATE_C = """\
 #
 #   approved: true                   proceed to S8 synthesis
 #
-# If tournament/frame-check.md carries a re-divergence proposal, it executes
-# ONLY if you accept it here — the pipeline never re-diverges on its own.
-#
-# Loop actions (arrive in Prompt 12; mutually exclusive with approval):
-#   preference_feedback:
-#     - option_id: some-option-id
+# Loop actions (mutually exclusive with approval; each submission is one
+# Gate-C iteration, capped at `caps.max_gate_c_loops` per run — design §12):
+#   preference_feedback:             the screener converts reactions into
+#     - option_id: some-option-id    #   preference-slot adjustments and code
 #       reaction: "the ops burden bothers me more than I expected"
 #       direction: negative          # positive | negative | neutral
-#   evidence_challenges:
-#     - option_id: some-option-id
-#       claim_id: some-claim-id
+#                                    #   re-scores both scoreboards — a free
+#                                    #   re-score, no new research
+#   evidence_challenges:             each fires one scoped verifier task; a
+#     - option_id: some-option-id    #   contradicted claim lands in the
+#       claim_id: some-claim-id      #   contradiction ledger
 #       challenge: "I don't believe this"
-#   accept_redivergence: true        accept the frame-checker's proposal
+#   accept_redivergence: true        accept the frame-checker's proposal (only
+#                                    #   if tournament/frame-check.md carries
+#                                    #   one — the pipeline never re-diverges
+#                                    #   on its own): a mini-loop S1->S6 scoped
+#                                    #   to the proposed region, on its own
+#                                    #   budget, then S7 reruns over the merged
+#                                    #   finalists. Max 1 per run (design §12).
 #   notes: "anything else"
+
+approved: false
+"""
+
+_TEMPLATE_C_CAPPED = """\
+# Gate C — contender review (design §5).
+#
+# ALL GATE-C FEEDBACK LOOPS ARE USED for this run: the §12 diminishing-returns
+# policy caps Gate-C iterations (`caps.max_gate_c_loops`), and every further
+# loop was judged not worth its cost when the cap was set. The remaining
+# action is to approve — the loops already taken are in gates/gate-c.N.yaml
+# and the run's commit history.
+#
+#   approved: true                   proceed to S8 synthesis
 
 approved: false
 """
@@ -474,14 +491,20 @@ GATE_AFTER_STAGE: dict[Stage, GateName] = {
 }
 
 
-def write_template_if_absent(workspace: Workspace, spec: GateSpec) -> bool:
+def write_template_if_absent(
+    workspace: Workspace, spec: GateSpec, template: str | None = None
+) -> bool:
     """Write the gate template; returns True when a fresh template was written.
-    Never overwrites — a half-edited decision must survive resume."""
+    Never overwrites — a half-edited decision must survive resume. `template`
+    overrides the spec's default (the engine selects the capped Gate-C variant
+    once the §12 iteration cap is spent)."""
     target = workspace.path(spec.relpath)
     if target.exists():
         return False
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(spec.template, encoding="utf-8", newline="\n")
+    target.write_text(
+        template if template is not None else spec.template, encoding="utf-8", newline="\n"
+    )
     return True
 
 

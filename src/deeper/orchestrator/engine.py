@@ -36,11 +36,33 @@ from deeper.agents_runtime import (
     create_dispatcher,
 )
 from deeper.config import RunConfig
-from deeper.schemas import GateName, GateStatus, RunState, RunStatus, Stage
+from deeper.schemas import (
+    FrameCheck,
+    GateCDecision,
+    GateName,
+    GateStatus,
+    RunState,
+    RunStatus,
+    Stage,
+)
 from deeper.stages import STAGES, NotImplementedYet, StageBase, StageContext, StageInterrupted
+from deeper.stages.s7_tournament import FRAME_CHECK_PATH
 from deeper.workspace import Workspace, WorkspaceError
 
-from .gates import GATE_AFTER_STAGE, GATE_SPECS, GateSpec, read_decision, write_template_if_absent
+from .gate_c_loops import (
+    apply_preference_feedback,
+    run_evidence_challenges,
+    validate_gate_c_decision,
+)
+from .gates import (
+    _TEMPLATE_C_CAPPED,
+    GATE_AFTER_STAGE,
+    GATE_SPECS,
+    GateSpec,
+    read_decision,
+    write_template_if_absent,
+)
+from .redivergence import run_mini_loop
 from .rerun import invalidate
 
 
@@ -132,8 +154,8 @@ class Engine:
                 )
                 return node
             if node in GATE_NODES:
-                if not self._process_gate(GATE_SPECS[GateName(node.value)]):
-                    return node
+                if not await self._process_gate(GATE_SPECS[GateName(node.value)]):
+                    return node_of(self.workspace.load_state())
                 continue
             if not await self._process_stage(Stage(node.value)):
                 return node_of(self.workspace.load_state())
@@ -173,61 +195,8 @@ class Engine:
             except (NotImplementedYet, StageInterrupted) as err:
                 self.emit(str(err))
                 return False
-            except AgentOutputInvalid as err:
-                self._pause_attention(
-                    stage,
-                    role=err.contract.role,
-                    reason=f"agent '{err.contract.role}' output invalid after retries",
-                    detail=(
-                        f"agent '{err.contract.role}' failed schema validation "
-                        f"{self.config.caps.max_schema_retries + 1} times.\n"
-                        f"Last validation errors:\n{err.errors}\n"
-                        "Fix the cause (prompt, fixture, or schema), then resume."
-                    ),
-                    transcript=(
-                        f"# {stage.value} '{err.contract.role}' — schema retries exhausted\n\n"
-                        f"## Validation errors\n\n{err.errors}\n\n"
-                        f"## Last raw output\n\n{err.raw_output}\n"
-                    ),
-                )
-                return False
-            except AgentDispatchFailed as err:
-                tb = "".join(
-                    traceback.format_exception(type(err.cause), err.cause, err.cause.__traceback__)
-                )
-                self._pause_attention(
-                    stage,
-                    role=err.contract.role,
-                    reason=f"agent '{err.contract.role}' dispatch failed",
-                    detail=f"{err}\nInspect the saved transcript, fix the cause, then resume.",
-                    transcript=(
-                        f"# {stage.value} '{err.contract.role}' — dispatch failed\n\n"
-                        f"{err}\n\n## Traceback\n\n```\n{tb}```\n"
-                    ),
-                )
-                return False
-            except SpendCapExceeded as err:
-                self._pause_attention(
-                    stage,
-                    role=err.contract.role,
-                    reason=f"spend cap ${err.cap_usd:.2f} crossed",
-                    detail=(
-                        f"{err}\nCompleted work is saved. To continue, raise the cap "
-                        f"(`deeper resume {self.workspace.root} --max-spend-usd <usd>`, "
-                        "or edit max_spend_usd in config.yaml) — or accept the partial run."
-                    ),
-                    transcript=(
-                        f"# {stage.value} — spend cap crossed\n\n{err}\n\n"
-                        f"Spend by stage:\n"
-                        + "\n".join(
-                            f"- {s}: ${usd:.4f}"
-                            for s, usd in sorted(
-                                self.workspace.load_state().spend_by_stage().items()
-                            )
-                        )
-                        + "\n"
-                    ),
-                )
+            except (AgentOutputInvalid, AgentDispatchFailed, SpendCapExceeded) as err:
+                self._pause_on_agent_error(stage, err)
                 return False
             instance.evaluate_stop_rules(ctx)
             self._check_outputs(stage, instance, ctx)
@@ -245,6 +214,63 @@ class Engine:
             raise EngineError(
                 f"stage {stage.value} finished but its declared outputs are missing "
                 "or invalid — this is a stage bug:\n" + "\n".join(problems)
+            )
+
+    def _pause_on_agent_error(
+        self, stage: Stage, err: AgentOutputInvalid | AgentDispatchFailed | SpendCapExceeded
+    ) -> None:
+        """Route any agent failure — from a stage or a Gate-C loop — into the
+        one resumable pause path."""
+        if isinstance(err, AgentOutputInvalid):
+            self._pause_attention(
+                stage,
+                role=err.contract.role,
+                reason=f"agent '{err.contract.role}' output invalid after retries",
+                detail=(
+                    f"agent '{err.contract.role}' failed schema validation "
+                    f"{self.config.caps.max_schema_retries + 1} times.\n"
+                    f"Last validation errors:\n{err.errors}\n"
+                    "Fix the cause (prompt, fixture, or schema), then resume."
+                ),
+                transcript=(
+                    f"# {stage.value} '{err.contract.role}' — schema retries exhausted\n\n"
+                    f"## Validation errors\n\n{err.errors}\n\n"
+                    f"## Last raw output\n\n{err.raw_output}\n"
+                ),
+            )
+        elif isinstance(err, AgentDispatchFailed):
+            tb = "".join(
+                traceback.format_exception(type(err.cause), err.cause, err.cause.__traceback__)
+            )
+            self._pause_attention(
+                stage,
+                role=err.contract.role,
+                reason=f"agent '{err.contract.role}' dispatch failed",
+                detail=f"{err}\nInspect the saved transcript, fix the cause, then resume.",
+                transcript=(
+                    f"# {stage.value} '{err.contract.role}' — dispatch failed\n\n"
+                    f"{err}\n\n## Traceback\n\n```\n{tb}```\n"
+                ),
+            )
+        else:
+            self._pause_attention(
+                stage,
+                role=err.contract.role,
+                reason=f"spend cap ${err.cap_usd:.2f} crossed",
+                detail=(
+                    f"{err}\nCompleted work is saved. To continue, raise the cap "
+                    f"(`deeper resume {self.workspace.root} --max-spend-usd <usd>`, "
+                    "or edit max_spend_usd in config.yaml) — or accept the partial run."
+                ),
+                transcript=(
+                    f"# {stage.value} — spend cap crossed\n\n{err}\n\n"
+                    f"Spend by stage:\n"
+                    + "\n".join(
+                        f"- {s}: ${usd:.4f}"
+                        for s, usd in sorted(self.workspace.load_state().spend_by_stage().items())
+                    )
+                    + "\n"
+                ),
             )
 
     def _pause_attention(
@@ -284,7 +310,7 @@ class Engine:
         gate = GATE_AFTER_STAGE.get(completed)
         if gate is not None:
             spec = GATE_SPECS[gate]
-            write_template_if_absent(self.workspace, spec)
+            write_template_if_absent(self.workspace, spec, self._gate_template_override(spec))
             state.status = RunStatus.GATE_PENDING
             state.pending_gate = gate
             state.gates[gate] = GateStatus.PENDING
@@ -304,9 +330,19 @@ class Engine:
 
     # -- gate nodes ------------------------------------------------------------------
 
-    def _process_gate(self, spec: GateSpec) -> bool:
+    def _gate_template_override(self, spec: GateSpec) -> str | None:
+        """The capped Gate-C template once the §12 iteration cap is spent —
+        the gate then only offers approve, with a note explaining why."""
+        if spec.name is not GateName.C:
+            return None
+        state = self.workspace.load_state()
+        if state.gate_c_iterations >= self.config.caps.max_gate_c_loops:
+            return _TEMPLATE_C_CAPPED
+        return None
+
+    async def _process_gate(self, spec: GateSpec) -> bool:
         """Validate + interpret the gate file; True when the machine advanced."""
-        if write_template_if_absent(self.workspace, spec):
+        if write_template_if_absent(self.workspace, spec, self._gate_template_override(spec)):
             # Entry normally writes it; this covers a hand-deleted file.
             self.workspace.commit(f"{spec.name.value} template rewritten")
         decision, problem = read_decision(self.workspace, spec)
@@ -317,6 +353,8 @@ class Engine:
         outcome = spec.interpret(decision)
         for message in outcome.messages:
             self.emit(message)
+        if outcome.loop_decision is not None:
+            return await self._process_gate_c_loop(spec, outcome.loop_decision)
         if not outcome.advanced:
             self._emit_gate_instructions(spec)
             return False
@@ -345,6 +383,94 @@ class Engine:
             # invalidation `deeper rerun` uses, so stale outputs never look complete.
             invalidate(self.workspace, outcome.invalidate_to)
         return True
+
+    async def _process_gate_c_loop(self, spec: GateSpec, decision: GateCDecision) -> bool:
+        """Execute one Gate-C loop iteration (design §5 Gate C, §12 caps).
+
+        Cap and referential checks first — a refused decision consumes no
+        iteration and dispatches nothing. Applied loops archive the decision
+        to gates/gate-c.N.yaml, bump the per-run counters, and either re-open
+        the gate with a fresh template (feedback/challenges) or invalidate S7
+        so the tournament reruns over the merged finalists (re-divergence).
+        Returns True only on the S7-rerun path — `run()` then continues.
+        """
+        state = self.workspace.load_state()
+        caps = self.config.caps
+        if state.gate_c_iterations >= caps.max_gate_c_loops:
+            self.emit(
+                f"gate-c: the {caps.max_gate_c_loops} feedback loop(s) this run "
+                "allows are used (design §12: hard cap, then decide) — the "
+                "remaining action is `approved: true`."
+            )
+            self._emit_gate_instructions(spec)
+            return False
+        problems = validate_gate_c_decision(self.workspace, decision, state, self.config)
+        if problems:
+            self.emit(
+                "gate-c decision cannot be applied:\n- "
+                + "\n- ".join(problems)
+                + f"\nFix {spec.relpath}, then `deeper resume` again."
+            )
+            self._emit_gate_instructions(spec)
+            return False
+
+        n = state.gate_c_iterations + 1
+        ctx = StageContext(
+            workspace=self.workspace,
+            config=self.config,
+            dispatcher=self.dispatcher,
+            emit=self.emit,
+            ask_user=self.ask_user,
+        )
+        rerun_s7 = False
+        try:
+            if decision.evidence_challenges:
+                await run_evidence_challenges(ctx, list(decision.evidence_challenges), iteration=n)
+            if decision.preference_feedback:
+                await apply_preference_feedback(ctx, list(decision.preference_feedback))
+            if decision.accept_redivergence:
+                frame_check = self.workspace.read_artifact(FRAME_CHECK_PATH, FrameCheck)
+                assert frame_check.proposal is not None  # validated above
+                rerun_s7 = await run_mini_loop(ctx, frame_check.proposal)
+        except (AgentOutputInvalid, AgentDispatchFailed, SpendCapExceeded) as err:
+            self._pause_on_agent_error(self.workspace.load_state().stage, err)
+            return False
+
+        parts = []
+        if decision.evidence_challenges:
+            parts.append(f"{len(decision.evidence_challenges)} evidence challenge(s)")
+        if decision.preference_feedback:
+            parts.append(f"{len(decision.preference_feedback)} preference reaction(s)")
+        if decision.accept_redivergence:
+            parts.append("re-divergence accepted")
+        label = ", ".join(parts)
+        archive = f"gates/gate-c.{n}.yaml"
+        self.workspace.path(spec.relpath).replace(self.workspace.path(archive))
+        # Reload: the loop's dispatches appended spend entries to state.json.
+        state = self.workspace.load_state()
+        state.gate_c_iterations = n
+        if decision.accept_redivergence:
+            state.redivergence_runs += 1
+        state.updated_at = datetime.now(UTC)
+        self.workspace.save_state(state)
+        if rerun_s7:
+            self.workspace.commit(f"gate-c loop {n}: {label}")
+            # The same git-tracked invalidation `deeper rerun` uses: S7's stale
+            # outputs must not look complete over the merged scoreboard.
+            invalidate(self.workspace, Stage.S7)
+            self.emit(
+                f"gate-c: loop {n} of {caps.max_gate_c_loops} applied ({label}; "
+                f"decision archived to {archive}) — S7 reruns, then Gate C reopens"
+            )
+            return True
+        write_template_if_absent(self.workspace, spec, self._gate_template_override(spec))
+        self.workspace.commit(f"gate-c loop {n}: {label}")
+        self.emit(
+            f"gate-c: loop {n} of {caps.max_gate_c_loops} applied ({label}; decision "
+            f"archived to {archive}) — review the updated artifacts, then decide again"
+        )
+        self._emit_gate_instructions(spec)
+        return False
 
     def _emit_gate_instructions(self, spec: GateSpec) -> None:
         total = self.workspace.load_state().total_usd()

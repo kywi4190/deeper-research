@@ -158,6 +158,20 @@
       "title": "Retry Counts",
       "type": "object"
     },
+    "gate_c_iterations": {
+      "default": 0,
+      "description": "Gate-C feedback loops consumed (\u00a712: hard cap, then decide). Never reset \u2014 the cap is per run, surviving rerun invalidation.",
+      "minimum": 0,
+      "title": "Gate C Iterations",
+      "type": "integer"
+    },
+    "redivergence_runs": {
+      "default": 0,
+      "description": "Re-divergence mini-loops executed (\u00a712: 1 per run). Never reset.",
+      "minimum": 0,
+      "title": "Redivergence Runs",
+      "type": "integer"
+    },
     "updated_at": {
       "format": "date-time",
       "title": "Updated At",

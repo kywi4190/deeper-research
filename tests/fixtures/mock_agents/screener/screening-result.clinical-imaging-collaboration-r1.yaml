@@ -1,0 +1,55 @@
+# Mini-loop round-1 re-score: the dive tempers the screening estimate (3.5 ->
+# 3.0 destination, delta 0.45 > the 0.15 stability stop), so with the scoped
+# cap of 1 round the dossier lands BUDGET-CAPPED — the mini-loop's own budget
+# binding, visibly. Destination point 3.0 ties the mid-field on the S7 rerun:
+# no new rank inversions.
+options:
+- option_id: clinical-imaging-collaboration
+  angle_id: applied-domain-collaboration
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Dossier criterion section 'publication-potential' — the
+      methodological-thinness criticism caps the estimate.
+  - criterion_id: letter-strength
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Dossier criterion section 'letter-strength' — collaboration
+      cadence still unconfirmed.
+  - criterion_id: feasibility
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Dossier criterion section 'feasibility' — access is settled
+      but reviewer time is not.
+  - criterion_id: research-taste-signal
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Dossier criterion section 'research-taste-signal'.
+  - criterion_id: momentum-by-deadline
+    score: 3.0
+    band:
+      lo: 2.75
+      hi: 3.4
+    evidence_pointer: Dossier criterion section 'momentum-by-deadline' — the 6-8
+      week review backlog claim.
+  preference_score:
+    criterion_id: preference-slot
+    score: 3.25
+    band:
+      lo: 2.75
+      hi: 3.6
+    evidence_pointer: Scored from preferences.yaml items only, weighted by their declared strengths.
+  kill_risk_checks: []
+  weighted_point: 3.05
+  weighted_ucb: 3.44
+  notes: null
+notes: null

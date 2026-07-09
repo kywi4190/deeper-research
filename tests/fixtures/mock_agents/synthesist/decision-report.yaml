@@ -1,0 +1,53 @@
+# Mock S8 decision report. Coherence contract: winner_option_id is the
+# preference-adjusted board's rank 1 (sae-feature-atlas in the canned
+# scenario) and dissent_source is the winner's prosecution. Every annotation
+# resolves against the finalist dossiers' claim ids (the mechanical citation
+# pass checks exactly that). The sensitivity narration states the engineered
+# fragility prominently, per the synthesist prompt's verbatim instruction.
+winner_option_id: sae-feature-atlas
+recommendation: >-
+  Choose the SAE feature atlas. Comparable atlas projects have been published
+  at the target venues within a single semester [[c-sae-precedent]], the
+  training sweeps fit the lab's per-student compute cap with roughly 2x
+  headroom [[c-sae-compute]], and the annotated atlas becomes reusable lab
+  infrastructure cited by follow-on projects [[c-sae-reuse]]. The
+  destination-only leader, the contamination-robust benchmark, still carries
+  an open precision question at its budget cap [[c-cont-rate]].
+decision_matrix_narration: >-
+  The winner leads or ties on every criterion except momentum-by-deadline,
+  where the judge docked it for cluster contention; its bands are the
+  narrowest on the board after two converged deep-dive rounds
+  [[c-sae-precedent]]. The benchmark's feasibility band stayed wide — its
+  validation-cost comparable ran 2-3x plan [[c-cont-maintenance]].
+sensitivity_narration: >-
+  The winner is FRAGILE to plausible weight changes: the preference-slot
+  sweep flips the winner to the contamination-robust benchmark at low slot
+  weights — the atlas leads only where the stated preferences carry their
+  configured weight. No in-range criterion reweighting flips ranks 1-2. Read
+  the recommendation with that dependence in view: on the destination model
+  alone, the benchmark wins [[c-cont-venues]].
+dissent: >-
+  The shared 4x A100 node runs above 80% allocation through teaching
+  semesters, exactly the window the December citable artifact depends on —
+  the sweeps the atlas needs [[c-sae-compute]] queue behind lab jobs, the
+  preprint slips past the application deadline, and the momentum criterion
+  pays out at its floor while the benchmark, which needed no contended
+  compute, would have had its artifact up in November. Nothing in the
+  tournament rebutted this argument; it stands.
+dissent_unrebutted: true
+dissent_source: tournament/sae-feature-atlas-prosecution.md
+residual_uncertainty: >-
+  The benchmark dossier is BUDGET-CAPPED with its contamination-rate
+  precision question open [[c-cont-rate]]; the atlas's annotation-quality
+  claim rests on a single-rater workflow [[c-sae-annotation]]. Revisit this
+  decision if the cluster queue for multi-day jobs lengthens past two weeks
+  before October, or if a comparable atlas is published first.
+next_actions:
+  - Confirm the sweep window's cluster headroom with the lab manager in
+    writing before committing [[c-sae-compute]].
+  - Structure the year workshop-paper-first so a citable artifact exists by
+    the December application deadline, per the run's execution note.
+  - Book the verifier's contradicted-claims list for a re-check at the
+    semester boundary.
+appendix_notes: null
+notes: null

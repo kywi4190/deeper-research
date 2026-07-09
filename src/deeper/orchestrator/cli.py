@@ -369,13 +369,62 @@ def doctor() -> None:
 
 @app.command()
 def report(run: RunArg) -> None:
-    """Print the decision report's path once S8 has produced it."""
+    """The decision report's path plus a terminal summary: winner, both
+    scoreboards, the top sensitivity flag, verification pass rates, spend."""
+    from deeper.report import strip_annotations, top_sensitivity_flag
+    from deeper.schemas import DecisionReport, Rubric, ScreeningResult, VerificationReport
+    from deeper.sensitivity import dual_scoreboards, preference_sweep, weight_sensitivity
+    from deeper.stages.s6_deepdive import verification_path
+    from deeper.stages.s7_tournament import UPDATED_SCORES_PATH
+    from deeper.stages.s8_synthesis import REPORT_MD_PATH, REPORT_YAML_PATH
+
     workspace = _open_run(run)
-    target = workspace.path("report/decision-report.md")
-    if target.is_file():
-        console.print(str(target))
-    else:
-        console.print("no report yet — the run has not completed S8 synthesis (Prompt 12)")
+    md_target = workspace.path(REPORT_MD_PATH)
+    if not md_target.is_file() or not workspace.path(REPORT_YAML_PATH).is_file():
+        console.print("no report yet — the run has not completed S8 synthesis")
+        return
+    decision = workspace.read_artifact(REPORT_YAML_PATH, DecisionReport)
+    rubric = workspace.read_artifact("rubric.yaml", Rubric)
+    scores = workspace.read_artifact(UPDATED_SCORES_PATH, ScreeningResult)
+    weights = {c.id: c.weight for c in rubric.criteria}
+    slot_weight = rubric.preference_slot.weight
+    dest, adjusted = dual_scoreboards(scores, rubric)
+    flag = top_sensitivity_flag(
+        weight_sensitivity(scores.options, weights, slot_weight),
+        preference_sweep(scores.options, weights),
+        slot_weight,
+    )
+
+    console.print(str(md_target), markup=False, soft_wrap=True)
+    first_sentence = strip_annotations(decision.recommendation).split(". ")[0].rstrip(".")
+    winner_line = f"winner: [bold]{decision.winner_option_id}[/bold] — {first_sentence}."
+    if decision.dissent_unrebutted:
+        winner_line += " [red]DISSENT UNREBUTTED[/red]"
+    console.print(winner_line, soft_wrap=True)
+
+    boards = Table(title="the two scoreboards")
+    boards.add_column("option")
+    boards.add_column("destination-only", justify="right")
+    boards.add_column("preference-adjusted", justify="right")
+    dest_by_id = {row.option_id: row for row in dest}
+    for row in adjusted:
+        d = dest_by_id[row.option_id]
+        boards.add_row(row.option_id, f"{d.score:g} (#{d.rank})", f"{row.score:g} (#{row.rank})")
+    console.print(boards)
+    console.print(f"sensitivity: {flag}", markup=False, soft_wrap=True)
+
+    checks = Table(title="verification pass rates")
+    checks.add_column("option")
+    checks.add_column("pass rate", justify="right")
+    for row in adjusted:
+        target = workspace.path(verification_path(row.option_id))
+        if target.is_file():
+            vr = workspace.read_artifact(verification_path(row.option_id), VerificationReport)
+            checks.add_row(row.option_id, f"{vr.pass_rate:.0%}")
+        else:
+            checks.add_row(row.option_id, "-")
+    console.print(checks)
+    console.print(f"agent spend: ${workspace.load_state().total_usd():.4f}")
 
 
 if __name__ == "__main__":

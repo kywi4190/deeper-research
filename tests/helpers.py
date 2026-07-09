@@ -97,6 +97,30 @@ def make_ctx(
     )
 
 
+async def walk_engine_to_gate_c(
+    tmp_path,
+    caps: dict | None = None,
+    emitted: list[str] | None = None,
+    **mock_kwargs,
+):
+    """Drive the real engine over the canned scenario to the Gate C pause:
+    S0 -> Gate A (plain approval) -> S4 -> Gate B (slot 0.2) -> S7 -> Gate C.
+    Returns (workspace, engine, emitted)."""
+    from deeper.orchestrator import Engine, Node
+
+    ws = make_workspace(tmp_path, caps=caps)
+    emitted = emitted if emitted is not None else []
+    engine = Engine(ws, emit=emitted.append, mock_kwargs=mock_kwargs or None)
+    assert await engine.run() is Node.GATE_A
+    ws.path("gates/gate-a.yaml").write_text("approved: true\n", encoding="utf-8")
+    assert await engine.run() is Node.GATE_B
+    ws.path("gates/gate-b.yaml").write_text(
+        "approved: true\npreference_slot_weight: 0.2\n", encoding="utf-8"
+    )
+    assert await engine.run() is Node.GATE_C
+    return ws, engine, emitted
+
+
 class RecordingMockDispatcher(MockDispatcher):
     """Mock dispatcher that records every (role, context, prompt) it sends."""
 

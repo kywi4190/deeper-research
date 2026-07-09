@@ -45,6 +45,7 @@ EXPECTED_ROLES = {
     "steelman",
     "frame-checker",
     "judge",
+    "synthesist",
 }
 REQUIRED_META_KEYS = {"role", "stage", "model_class", "output_schemas", "inputs", "research"}
 CONTRACT_SECTIONS = ["# OBJECTIVE", "# OUTPUT FORMAT", "# TOOL & SOURCE GUIDANCE", "# BOUNDARIES"]
@@ -130,8 +131,10 @@ def test_research_agents_carry_untrusted_content_rule(path: Path) -> None:
 def test_preference_quarantine_in_declared_inputs(path: Path) -> None:
     meta, _ = parse_agent(path)
     reads_preferences = "preferences" in meta["inputs"]
-    if path.stem == "screener":
-        assert reads_preferences, "the screener scores the preference slot from preferences"
+    if path.stem in {"screener", "synthesist"}:
+        # The only two roles the quarantine hook allowlists (design §6): the
+        # screener scores the slot; the synthesist frames the report.
+        assert reads_preferences, f"{path.name} is a permitted preferences reader"
     else:
         # The interviewer *produces* preferences; nobody else may read them (design P1).
         assert not reads_preferences, f"{path.name} must not read preferences"
