@@ -41,6 +41,10 @@ EXPECTED_ROLES = {
     "screener",
     "analyst",
     "verifier",
+    "prosecutor",
+    "steelman",
+    "frame-checker",
+    "judge",
 }
 REQUIRED_META_KEYS = {"role", "stage", "model_class", "output_schemas", "inputs", "research"}
 CONTRACT_SECTIONS = ["# OBJECTIVE", "# OUTPUT FORMAT", "# TOOL & SOURCE GUIDANCE", "# BOUNDARIES"]

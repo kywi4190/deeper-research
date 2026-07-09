@@ -1,0 +1,26 @@
+# Mock S7 steelman keyed to the engineered rank inversion:
+# contamination-robust-benchmark wins the destination-only board (4.6 vs 4.5)
+# but loses preference-adjusted to sae-feature-atlas — exactly where
+# preference-overfitting would hide.
+option_id: contamination-robust-benchmark
+trigger: rank-inversion
+case: >-
+  Strip the preference slot and this option wins: the destination-only board
+  ranks it first at 4.6 against the atlas's 4.5. That margin is built on
+  verified claims — c-cont-venues shows the exact venue precedent the
+  destination model's committees reward, and c-cont-baseline puts a citable
+  artifact up a month before the atlas's earliest realistic preprint. The
+  atlas's lead exists only after the preference slot is mixed in, and the
+  winner's own dossier (c-sae-compute) concedes its December milestone depends
+  on contended shared compute this option does not need. If the admissions
+  committee is the judge that matters — and the brief says it is — the
+  preference-adjusted ranking is trading the stronger committee signal for
+  taste. That trade may still be right, but it should be made knowingly at the
+  gate, not silently by a 0.25 slot weight.
+supporting_claim_ids:
+  - c-cont-venues
+  - c-cont-baseline
+notes: >-
+  The BUDGET-CAPPED open questions cut both ways: the difficulty ceiling could
+  erode the 4.6, but the same unfinished depth means the destination-only lead
+  survived the pipeline's hardest scrutiny so far.

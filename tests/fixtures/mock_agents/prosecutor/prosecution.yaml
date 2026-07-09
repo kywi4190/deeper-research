@@ -1,0 +1,35 @@
+# Mock S7 prosecution of the preference-adjusted winner (default fixture:
+# sae-feature-atlas). Its new-evidence item is what the judge fixture cites as
+# decisive for the momentum-by-deadline update.
+option_id: sae-feature-atlas
+case: >-
+  The dossier's momentum story leans on c-sae-compute — training sweeps fitting
+  the shared node's headroom — which is tagged medium confidence and was never
+  load-bearing enough to draw a verifier re-fetch. A targeted search of the
+  cluster's public usage dashboard shows the shared node runs above 80%
+  allocation through teaching semesters, exactly the window the December
+  citable-artifact milestone depends on. The atlas itself can still finish by
+  April, but the committee-visible artifact the destination model rewards
+  (c-sae-precedent's venue path) slips a quarter the moment sweeps queue behind
+  lab jobs.
+regret_path: >-
+  You choose the atlas; by October the sweep queue on the shared node has
+  slipped the first full training run three weeks; the December application
+  deadline arrives with a partial atlas and no preprint, so the momentum
+  criterion the rubric weights toward the committee's reading window pays out
+  at its floor — and the runner-up's benchmark, which needed no contended
+  compute, would have had its artifact up in November.
+supporting_claim_ids:
+  - c-sae-compute
+  - c-sae-precedent
+new_evidence:
+  - text: >-
+      The cluster's public usage dashboard shows the shared 4x A100 node at
+      sustained >80% allocation during teaching semesters, with batch queues
+      of 2-3 weeks for multi-day jobs.
+    source:
+      url: https://cluster.example.edu/usage
+      tier: T2
+      title: Shared-cluster usage dashboard
+      content_hash: null
+notes: null

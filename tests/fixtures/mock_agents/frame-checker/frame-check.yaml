@@ -1,0 +1,41 @@
+# Mock S7 frame-check: the engineered gap — the applied-domain critique named
+# a clinical-imaging collaboration as a missed option and no reflow top-up
+# ever scouted it (the reflow pool went to interpretability-research and
+# evaluation-science). Verdict gap-found, so the schema requires the proposal;
+# the orchestrator surfaces it at Gate C and never auto-executes it.
+verdict: gap-found
+removals_check:
+  finding: >-
+    No angles were removed at Gate A in this run; the one gate action was a
+    prior adjustment, which widened rather than narrowed the map. Nothing to
+    re-examine.
+  consequential: false
+missed_options_check:
+  finding: >-
+    The applied-domain-collaboration critique named a clinical-imaging
+    collaboration with the university hospital's radiology dataset — a
+    different partner domain and judge — and it was never scouted: the reflow
+    top-ups went to interpretability-research and evaluation-science. The
+    angle's scouted options scored mid-field on partner-commitment risk the
+    hospital dataset does not share (the data access already exists), so a
+    defensible winner could plausibly live in the unscouted region.
+  consequential: true
+rubric_fragility_check:
+  finding: >-
+    No in-range criterion reweighting flips ranks 1-2 — the top two move
+    together on every criterion. But the preference-slot sweep flips the
+    winner below roughly 0.17: the atlas leads only where the slot weight is;
+    the destination-only winner is the benchmark. That is a real fragility
+    for the human to weigh at Gate C, though it argues for scrutiny of the
+    preference weight, not for a new map region.
+  consequential: false
+proposal:
+  kind: scout-task
+  description: >-
+    Scout the clinical-imaging collaboration the applied-domain critique
+    named: confirm the radiology dataset's access terms (one check), then
+    produce standard option cards for a partnership study — the one
+    critiqued-and-known miss a defensible winner could hide in.
+  target_angle_id: applied-domain-collaboration
+  estimated_cost_units: 2
+notes: null

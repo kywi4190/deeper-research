@@ -328,7 +328,7 @@ def _interpret_c(decision: GateCDecision) -> GateOutcome:
             advanced=False,
             messages=(
                 "Gate C loop actions (preference feedback, evidence challenges, "
-                "re-divergence) are not implemented yet — they arrive in Prompts 11/12. "
+                "re-divergence) are not implemented yet — they arrive in Prompt 12. "
                 "For now the only actionable decision is `approved: true`.",
             ),
         )
@@ -336,7 +336,7 @@ def _interpret_c(decision: GateCDecision) -> GateOutcome:
         advanced=False,
         messages=(
             "gates/gate-c.yaml holds no decision yet: review the contender pack, then "
-            "set `approved: true` (loop actions arrive in Prompts 11/12).",
+            "set `approved: true` (loop actions arrive in Prompt 12).",
         ),
     )
 
@@ -406,7 +406,10 @@ _TEMPLATE_C = """\
 #
 #   approved: true                   proceed to S8 synthesis
 #
-# Loop actions (arrive in Prompts 11/12; mutually exclusive with approval):
+# If tournament/frame-check.md carries a re-divergence proposal, it executes
+# ONLY if you accept it here — the pipeline never re-diverges on its own.
+#
+# Loop actions (arrive in Prompt 12; mutually exclusive with approval):
 #   preference_feedback:
 #     - option_id: some-option-id
 #       reaction: "the ops burden bothers me more than I expected"

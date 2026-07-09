@@ -1,7 +1,7 @@
-"""Registered-but-unbuilt stages S7–S8: the machine has full shape today; these
-raise NotImplementedYet with a pointer to the build-guide prompt that fills
-them in. The engine reports the message and leaves state untouched, so the run
-resumes exactly here once the stage lands."""
+"""Registered-but-unbuilt stages (now only S8): the machine has full shape
+today; these raise NotImplementedYet with a pointer to the build-guide prompt
+that fills them in. The engine reports the message and leaves state untouched,
+so the run resumes exactly here once the stage lands."""
 
 from __future__ import annotations
 
@@ -25,5 +25,4 @@ def _not_yet_stage(stage: Stage, description: str, prompt_no: int) -> type[Stage
     return NotYetStage
 
 
-TournamentStage = _not_yet_stage(Stage.S7, "adversarial tournament", 11)
 SynthesisStage = _not_yet_stage(Stage.S8, "synthesis", 12)

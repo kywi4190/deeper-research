@@ -1,0 +1,32 @@
+# Mock S7 prosecution of the destination-only winner (the inversion's other
+# half). Its annotation-workload evidence is what the judge fixture cites as
+# decisive for the feasibility update.
+option_id: contamination-robust-benchmark
+case: >-
+  The BUDGET-CAPPED stamp is the case: the deep dive ran out of rounds with the
+  difficulty-ceiling question still open (c-cont-rate), and the feasibility
+  score of 4.6 assumes item-generation templates amortize the way c-cont-baseline
+  hopes. A targeted search of comparable functional-benchmark postmortems finds
+  the annotation and validation pass — not generation — dominating effort at
+  2-3x the planned budget, on a project whose scope this option mirrors.
+regret_path: >-
+  You choose the benchmark; item generation goes fast through November, then
+  the human-validation pass balloons exactly as the comparable postmortem
+  describes; by February you are still validating instead of running baselines,
+  the thesis pivots to a smaller item set, and the headline
+  contamination-robustness claim (c-cont-rate) lands too weakly measured to
+  clear the top-venue bar the destination model rewards.
+supporting_claim_ids:
+  - c-cont-rate
+  - c-cont-baseline
+new_evidence:
+  - text: >-
+      A postmortem of a comparable functional-reasoning benchmark reports the
+      validation pass consumed 2-3x its planned annotation budget and delayed
+      baseline experiments by a quarter.
+    source:
+      url: https://blog.example.org/benchmark-postmortem
+      tier: T2
+      title: Functional benchmark postmortem
+      content_hash: null
+notes: null

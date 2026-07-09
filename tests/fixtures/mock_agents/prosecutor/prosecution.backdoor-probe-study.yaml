@@ -1,0 +1,25 @@
+# Mock S7 prosecution of the #3 finalist — the revision already priced in the
+# contradicted transfer claim, so the honest case is thin and says so.
+option_id: backdoor-probe-study
+case: >-
+  The strongest case is already in the record: the verifier contradicted the
+  original transfer claim and the revision (c-back-transfer) now concedes probe
+  transfer is unsettled, which is why every criterion sits at 3.0. What remains
+  is a scope risk the dossier lists but does not weight: c-back-datasets ties
+  the study to public poisoned checkpoints, and if the available checkpoint
+  families stay as narrow as the revised claim describes, the thesis's
+  generalization section rests on two model families — reviewable as a
+  workshop paper, not the main-venue path the destination model rewards.
+regret_path: >-
+  You choose the probe study; the transfer result stays negative-to-mixed
+  across the two available checkpoint families; by application time the honest
+  writeup is a solid negative result at a workshop, the letter describes
+  careful execution rather than taste, and the stronger publication signal the
+  committee wanted sits in the option you passed over.
+supporting_claim_ids:
+  - c-back-transfer
+  - c-back-datasets
+new_evidence: []
+notes: >-
+  A weak prosecution, honestly: the deep-dive revision already moved this
+  option's scores to where this case would have pushed them.

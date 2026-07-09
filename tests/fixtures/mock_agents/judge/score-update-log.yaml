@@ -1,0 +1,31 @@
+# Mock S7 judge verdict: two prosecution findings were decisive (each carried
+# new checkable evidence); the steelman and the frame-check moved no scores —
+# the steelman's force comes from arithmetic already on the boards, and the
+# frame-check routes to Gate C, not to the ledger. old_score values match the
+# post-deep-dive scoreboard exactly (the orchestrator verifies this in code).
+updates:
+  - option_id: sae-feature-atlas
+    criterion_id: momentum-by-deadline
+    old_score: 4.5
+    new_score: 4.25
+    cause: >-
+      The prosecution's cluster-usage dashboard evidence (T2, new targeted
+      search) shows the shared node contended through the exact window the
+      December citable artifact depends on; the anchored level 4-5 boundary
+      requires an artifact date that evidence no longer supports at 4.5.
+    source_artifact: tournament/sae-feature-atlas-prosecution.md
+  - option_id: contamination-robust-benchmark
+    criterion_id: feasibility
+    old_score: 4.6
+    new_score: 4.2
+    cause: >-
+      The prosecution surfaced a comparable benchmark's postmortem (T2, new
+      targeted search) in which the validation pass ran 2-3x its planned
+      budget — the dossier's feasibility level assumed template amortization
+      with no comparable-case check; the anchored levels put a
+      validation-dominated schedule below 4.5.
+    source_artifact: tournament/contamination-robust-benchmark-prosecution.md
+notes: >-
+  The backdoor-probe prosecution was honest that its case was already priced
+  into the revised scores; no change. The steelman's destination-only case is
+  fully expressed by the dual scoreboards; nothing to re-score.

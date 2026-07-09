@@ -57,7 +57,7 @@ def test_new_unknown_profile_fails_cleanly(tmp_path):
     assert "unknown profile" in result.output
 
 
-def test_resume_past_gate_a_walks_s2_to_gate_b_then_s6_to_s7_stub(tmp_path):
+def test_resume_past_gate_a_walks_s2_to_gate_c_then_s8_stub(tmp_path):
     _, run_dir = new_run(tmp_path)
     approve_gate_a(run_dir)
     result = runner.invoke(app, ["resume", str(run_dir)])
@@ -77,7 +77,14 @@ def test_resume_past_gate_a_walks_s2_to_gate_b_then_s6_to_s7_stub(tmp_path):
     assert "preference-slot weight set to 0.25" in result.output
     assert "finalists" in result.output  # S5 shortlist reported
     assert "deep-diving" in result.output  # S6 ran its round loops
-    assert "not implemented yet" in result.output  # S7 stub reports cleanly
+    assert "rank inversion" in result.output  # S7's docket over the dual boards
+    assert "NOT auto-executed" in result.output  # the re-divergence proposal
+    assert "gate-c" in result.output  # paused at the contender review
+
+    (run_dir / "gates" / "gate-c.yaml").write_text("approved: true\n", encoding="utf-8")
+    result = runner.invoke(app, ["resume", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "not implemented yet" in result.output  # S8 stub reports cleanly
     # Resuming again is safe and repeats the same clean report.
     again = runner.invoke(app, ["resume", str(run_dir)])
     assert again.exit_code == 0

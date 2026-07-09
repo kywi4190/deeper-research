@@ -13,16 +13,16 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**M1 complete; Phase C underway — kernel S0–S6 runs end-to-end (mock + live-smoke
+**M1 complete; Phase C underway — kernel S0–S7 runs end-to-end (mock + live-smoke
 through S5).** The design-doc §9 M1 exit is proven by `tests/test_e2e_mock.py`: one
 test drives a full mock run S0 → Gate A (approved with a prior adjustment) → S2 →
-S3 → S4 → Gate B (weight override) → S5 → S6 deep dives, asserting every artifact
-validates, the git log carries one commit per stage and gate, the spend ledger is
-populated and under the cap, and `rerun --stage S3 --angle X` invalidates exactly
-that subtree before reconverging.
+S3 → S4 → Gate B (weight override) → S5 → S6 deep dives → S7 tournament → Gate C,
+asserting every artifact validates, the git log carries one commit per stage and
+gate, the spend ledger is populated and under the cap, and `rerun --stage S3
+--angle X` invalidates exactly that subtree before reconverging.
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip,
 an LLM-facing validation-error formatter, and a generated JSON Schema in
-`schemas/`; the versioned agent prompts for stages 0–6 live in `agents/`. The
+`schemas/`; the versioned agent prompts for stages 0–7 live in `agents/`. The
 kernel is live-run hardened: `deeper doctor` preflights the environment, every
 run carries a `max_spend_usd` guard the dispatcher enforces before each
 invocation, and every agent failure path (schema-retry exhaustion, SDK/network
@@ -41,9 +41,15 @@ rounds under the design's three-clause stability stopping rule, re-scoring each
 round with the S5 screening machinery pointed at the dossier, then an
 independent verifier adjudicates every load-bearing claim (plus a seeded 20% of
 the rest) — contradictions land in the §6 ledger and trigger exactly one
-targeted revision. S7–S8 are registered stubs that report cleanly. A full mock
-run walks `deeper new` → Gate A → Gate B → the shortlist → seven settled
-dossiers in seconds, offline.
+targeted revision; S7 computes the two scoreboards (destination-only vs
+preference-adjusted) and their rank inversions in code, runs prosecutors
+(top 3), steelmen (runner-up + every inversion), and the frame-checker in
+parallel with the code-computed rubric-sensitivity tables as evidence, then a
+judge whose every score change lands in a cause-logged ledger and is applied
+by code — any re-divergence proposal is surfaced at Gate C, never
+auto-executed. S8 is a registered stub that reports cleanly. A full mock run
+walks `deeper new` → Gate A → Gate B → the shortlist → seven settled dossiers
+→ the tournament → Gate C in seconds, offline.
 
 The **first supervised live run** (quick profile, a real vector-store
 selection question) exercised the whole kernel: three spend-cap pauses each
@@ -74,12 +80,13 @@ state of a run.
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
 | `src/deeper/contradictions.py` | The §6 contradiction ledger's shared append helper (idempotent by entry id) | **built** |
+| `src/deeper/sensitivity.py` | S7/S8 scoreboard + rubric-sensitivity math: dual boards, rank inversions, steelman docket, criterion weight-flip deltas, preference-slot sweep — pure deterministic code | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S6 built**, S7–S8 stubs (Prompts 11–12) |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S7 built**, S8 stub (Prompt 12) |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
-| `agents/` | Versioned agent prompt files (one per role), stages 0–6 | **built** |
+| `agents/` | Versioned agent prompt files (one per role), stages 0–7 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6, saturation, shortlist, depth, contradiction ledger, Gates A/B), end-to-end mock run, live guards, doctor suites (809 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7, saturation, shortlist, depth, contradiction ledger, Gates A/B), end-to-end mock run, live guards, doctor suites (890 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -128,10 +135,11 @@ each model validates a single file.
 | `dossiers/{option}-verification.md` | `VerificationReport` | S6 verifier | S8 report |
 | `dossiers/{option}-rounds.yaml` | `DeepDiveRoundLog` (`DeepDiveRound`) | S6 (pure code) | S6 resume, S8 metrics |
 | `dossiers/scores.yaml` | `ScreeningResult` | S6 (code-merged re-scores) | S7 scoreboards, S8 |
-| `tournament/{option}-prosecution.md` | `Prosecution` | S7 prosecutor | Gate C, S8 |
-| `tournament/steelman.md` | `Steelman` | S7 steelman | Gate C, S8 |
-| `tournament/frame-check.md` | `FrameCheck` (`RedivergenceProposal`) | S7 frame-checker | Gate C |
+| `tournament/{option}-prosecution.md` | `Prosecution` | S7 prosecutor | judge, Gate C, S8 |
+| `tournament/{option}-steelman.md` | `Steelman` | S7 steelman | judge, Gate C, S8 |
+| `tournament/frame-check.md` | `FrameCheck` (`RedivergenceProposal`) | S7 frame-checker | judge, Gate C |
 | `tournament/score-updates.yaml` | `ScoreUpdateLog` | S7 judge | S8 |
+| `tournament/scores.yaml` | `ScreeningResult` | S7 (code-applied judge updates) | Gate C, S8 |
 | `gates/gate-{a,b,c}.yaml` | `GateADecision` / `GateBDecision` / `GateCDecision` | human (or viewer) | orchestrator resume |
 | `sources/` records | `SourceRecord` | any research agent | verifier, audit |
 | `ledger/contradictions.md` | `ContradictionLedger` | any detecting stage, via `contradictions.append_contradictions` | verifier, S8 |
@@ -173,10 +181,15 @@ only the screener's `inputs` may include `preferences` — both enforced by test
 | `screener` | S5 (+ S6 re-scores) | sonnet | `screening-result` |
 | `analyst` | S6 | sonnet | `dossier` |
 | `verifier` | S6 | sonnet | `verification-report` |
+| `prosecutor` | S7 | sonnet | `prosecution` |
+| `steelman` | S7 | sonnet | `steelman` |
+| `frame-checker` | S7 | opus | `frame-check` |
+| `judge` | S7 | opus | `score-update-log` |
 
-Design §6 names merger/rubric-builder as Opus-class and cartographers/scouts/analysts
-as Sonnet-class; roles it leaves unlisted are assigned by analogy (interviewer → opus
-because the destination model anchors the whole run; card-critic/screener → sonnet;
+Design §6 names merger/rubric-builder/judge/frame-checker as Opus-class and
+cartographers/scouts/analysts/prosecutors as Sonnet-class; roles it leaves unlisted
+are assigned by analogy (interviewer → opus because the destination model anchors the
+whole run; card-critic/screener → sonnet; steelman → sonnet, the prosecutor's mirror;
 verifier → sonnet, because adjudication is more than §6's Haiku-class citation
 checking and the S size class's search budget could not re-fetch a full sample).
 The six cartographers share a skeleton but carry genuinely distinct framing-heuristic
@@ -256,9 +269,10 @@ violation, like a schema failure).
 **Mock mode** (`config.yaml mode: mock`, the default) substitutes only the network
 call: `MockDispatcher` renders canned fixtures from
 `tests/fixtures/mock_agents/<role>/<schema>[.<context>].yaml` (a coherent
-senior-project scenario covering all 14 roles, including per-round analyst
-dossiers, deep-dive re-scores, and verifier reports that exercise all three S6
-termination paths) into the same marker+fenced-yaml
+senior-project scenario covering all 18 roles, including per-round analyst
+dossiers, deep-dive re-scores, verifier reports that exercise all three S6
+termination paths, and a tournament with an engineered rank inversion and
+frame-check gap) into the same marker+fenced-yaml
 text a live agent emits, then flows through the identical parse/validate/retry/ledger
 path — the whole pipeline runs offline with zero SDK imports (asserted by a
 fresh-interpreter test). `scripted_responses` lets tests inject invalid-then-valid
@@ -359,7 +373,7 @@ dispatch layer. The state machine's nodes:
 
 ```
 new ─► S0 ─► S1 ─► GATE_A ─► S2 ─► S3 ─► S4 ─► GATE_B ─► S5 ─► S6 ─► S7 ─► GATE_C ─► S8 ─► DONE
-              ▲      │ rerun_hint                                            │ (loops: Prompts 11/12)
+              ▲      │ rerun_hint                                            │ (loops: Prompt 12)
               └──────┘
 any stage ──AgentOutputInvalid──► PAUSED_ATTENTION ──resume──► same stage
 ```
@@ -376,7 +390,7 @@ validates is not re-run).
 **Stages** (`src/deeper/stages/`) are classes over a small protocol —
 `validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
 agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
-in `STAGES`. S7–S8 raise `NotImplementedYet`, which the engine reports cleanly,
+in `STAGES`. S8 raises `NotImplementedYet`, which the engine reports cleanly,
 leaving state untouched and resumable. The built stages:
 
 - **S0 Intake** drives the interviewer through the dispatch layer's
@@ -477,6 +491,36 @@ leaving state untouched and resumable. The built stages:
   them, and the count of capped dossiers is one of the design-§10 depth metrics.
   A capped option is not penalized on the merits; its score simply carries wider
   honest uncertainty into the tournament.
+- **S7 Tournament** starts with pure code (`sensitivity.py`) over the
+  post-deep-dive scores: the **destination-only** scoreboard (preference-slot
+  weight forced to 0) and the **preference-adjusted** one (slot weight as set
+  at Gate B), their **rank inversions** (a pair whose strict order flips
+  between the boards — a tie refined by the other board is not an inversion),
+  and the rubric-sensitivity tables (per-criterion weight delta that ties
+  ranks 1–2 under Gate B's own pin-and-rescale semantics, plus the
+  preference-slot sweep 0→40%). Inversions are the priority docket — exactly
+  where preference-overfitting would hide. Then three adversarial roles run in
+  parallel: a **prosecutor** per top-3 finalist (strongest good-faith case
+  against, from dossier evidence + at most `caps.tournament_new_searches`
+  targeted searches, with the mandatory most-likely-regret path), a
+  **steelman** per docket entry (the runner-up plus every inversion-demoted
+  option — never the current winner), and the **frame-checker** (Opus-class),
+  which sees the original brief, the map with Gate A's removals log, every
+  critique's missed options against an index of what was actually scouted,
+  the reframe strategic notes, the final ranking, and the code-computed
+  sensitivity tables, and answers one question: is there a plausible answer
+  to the brief this map could not have produced? Its three checks are
+  consequential Gate-A removals, critiqued-but-never-scouted missed options,
+  and rubric fragility; a credible gap yields a **re-divergence proposal**
+  that is persisted and surfaced at Gate C — never auto-executed. Finally the
+  **judge** (Opus-class) updates criterion scores only where tournament
+  material is decisive; code verifies every update (real option, rubric
+  criterion — never the preference slot — and an `old_score` matching the
+  ledger), applies it (widening a band the new score falls outside), logs it
+  with its cause in `tournament/score-updates.yaml`, and writes the
+  post-tournament scoreboard to `tournament/scores.yaml` (written last — it
+  marks the stage settled). Each adversarial artifact is written the moment
+  its dispatch completes, so a resume re-dispatches only what is missing.
 
 **Gates are file-edit pause states.** Entering a gate writes a commented template
 (`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
@@ -596,7 +640,22 @@ deeper resume <run>
 #     S6: backdoor-probe-study contradicted claim(s) ['c-back-transfer'] — one
 #         targeted analyst revision
 #     S6: backdoor-probe-study final re-score after revision: 3.2 (was 3.6)
-#   and reports that S7 is not built yet (arrives in Prompt 11), exiting cleanly
+#   then S7 computes both scoreboards in code and runs the tournament:
+#     S7: rank inversion — destination-only ranks 'contamination-robust-benchmark'
+#         above 'sae-feature-atlas'; the preference-adjusted board reverses them
+#     S7: tournament — 3 prosecution(s) (top-3 by preference-adjusted rank: ...),
+#         1 steelman(s) (docket: contamination-robust-benchmark [rank-inversion]),
+#         frame-check
+#     S7: frame-check found a credible gap — re-divergence proposal [scout-task]
+#         (target angle: applied-domain-collaboration), estimated cost 2 unit(s): ...
+#     S7: the proposal is NOT auto-executed — review tournament/frame-check.md and
+#         approve or decline it at Gate C
+#     S7: judge — sae-feature-atlas 'momentum-by-deadline' 4.5 -> 4.25 (cause: ...)
+#   and pauses at Gate C (the contender review)
+
+# edit runs/<...>/gates/gate-c.yaml — approved: true proceeds to S8
+deeper resume <run>
+#   reports that S8 is not built yet (arrives in Prompt 12), exiting cleanly
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
@@ -870,6 +929,32 @@ canonical `Makefile` is used wherever GNU make is available.
   demands honest `open_questions`; if the analyst still left none, code derives
   them from the remaining low-confidence load-bearing claims — the schema
   requires a capped dossier to list them.
+- **Steelmen are per-option files (`tournament/{option}-steelman.md`).** Design
+  §7 lists a single `tournament/steelman.md`, but the docket it defines — the
+  runner-up *plus every rank inversion* — can hold several options, each owed
+  its own steelman (schema `Steelman` models exactly one case). One file per
+  docket entry keeps the naming parallel with prosecutions.
+- **A rank inversion is a strict pairwise flip, and the docket excludes the
+  winner.** "Any option whose destination-only rank differs from its
+  preference-adjusted rank" is read as: a pair the destination-only board
+  strictly orders one way and the preference-adjusted board strictly reverses
+  (a tie refined by the other board contradicts nothing, and dense ranks mean
+  tie-break jitter never manufactures an inversion). Steelmen go to the
+  *demoted* option of each inverted pair — the destination model's preference
+  that tastes overrode is exactly where overfitting hides — plus the adjusted
+  runner-up; the adjusted winner is never steelmanned (the case for it is the
+  status quo the prosecutors attack), and an option that is both runner-up
+  and inverted carries the sharper `rank-inversion` trigger.
+- **The judge emits the ledger; code applies it (`tournament/scores.yaml`).**
+  Design §5/S7 has the judge "update scores"; here (P8) the judge's artifact
+  is only the cause-logged `ScoreUpdateLog` — code verifies every entry (real
+  option, rubric criterion, never the preference slot, `old_score` matching
+  the scoreboard as it stands), applies the changes (widening an uncertainty
+  band the new score falls outside), recomputes the weighted aggregates, and
+  persists the post-tournament scoreboard to `tournament/scores.yaml` (a
+  fifth tournament artifact the design doesn't name — S8 needs the updated
+  scores without replaying the ledger; written last, it marks the stage
+  settled).
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -890,9 +975,11 @@ Following the phases in the build guide:
   integration test, `deeper doctor`, spend guard, live hardening) ✅. **M1 done.**
 - **Phase C — Depth & adversarial (M2):** Prompt 10 (S6 deep dives: analyst
   rounds under the stability stopping rule, verifier pass, contradiction
-  ledger) ✅ → tournament, Gate C, synthesis.
+  ledger) ✅ → Prompt 11 (S7 tournament: prosecutor, steelman, frame-checker,
+  judge + the code-computed rubric sensitivity in `sensitivity.py`) ✅ →
+  Gate C loops, synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase C, Prompt 11 — S7 tournament (prosecutor, steelman, frame-checker,
-judge) + the code-computed rubric sensitivity.**
+**Next: Phase C, Prompt 12 — Gate C loops (preference feedback, evidence
+challenges, re-divergence mini-loop) + S8 synthesis with the citation pass.**
