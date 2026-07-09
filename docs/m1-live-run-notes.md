@@ -112,9 +112,21 @@ workspace itself is the full audit trail (gitignored, kept locally).
    (NUL is a character device), asks the confirm question, and declines on
    EOF. Harmless but surprising; a `--non-interactive` flag would make the
    mode explicit instead of stdin-shape-dependent.
-9. **Console mojibake:** em-dashes render as `�` under cp1252 consoles
-   (git-bash default). Cosmetic; consider ASCII-safe punctuation in emit
-   strings or forcing UTF-8 output.
+9. **Console mojibake — and worse, a hard crash on cp1252 stdout.** Em-dashes
+   render as `�` under cp1252 consoles (git-bash default) — cosmetic. But
+   observed during Prompt 11 verification (2026-07-09, a mock `deeper resume`
+   with piped output): S6's emit strings contain `Δ` (e.g. "re-score 4.5
+   (Δ0)"), which cp1252 cannot encode at all — rich's legacy-Windows renderer
+   dies with `UnicodeEncodeError: 'charmap' codec can't encode character
+   'Δ'`, an unhandled traceback mid-stage that violates the
+   pause-don't-crash rule (state stays resumable, but the run stops ugly and
+   the remaining stage output is lost). Pytest never sees it because CliRunner
+   captures text without console encoding. Fixes, either/both: force UTF-8 on
+   the CLI's output streams (e.g. `PYTHONUTF8`/`reconfigure(encoding="utf-8",
+   errors="replace")` at CLI entry) so no emit string can ever raise, and/or
+   keep emit strings ASCII-safe (`delta` for `Δ`). Repro: pipe any
+   S6-reaching `deeper resume` under a cp1252 console without
+   `PYTHONIOENCODING=utf-8`.
 
 10. **ADDRESSED — The shortlist rule does not concentrate: 26 "finalists"
    out of 52.** Quick profile, shortlist_size 3 — and 26 options advanced,
