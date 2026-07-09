@@ -30,6 +30,24 @@ From the raw cartographer reports plus the brief and destination model, produce:
   their *option sets* would substantially coincide, whatever they were called.
   When in doubt, keep them separate — Gate A can merge; it cannot see what you
   silently collapsed. Resolve near-synonyms to the clearest name, not the first.
+- **You are the adoption-space filter.** A raw "angle" that is really a
+  feature, an implementation technique, or a quality dimension of the
+  solutions themselves (index family, durability model, quantization, metadata
+  filtering) is not a region anyone can adopt from — it is a way options
+  *differ*. Do not keep it as an angle: fold its insight into a `rubric-weight`
+  strategic note, and point its dedup entry at the merged angle whose options
+  would actually exhibit that dimension (the region it was secretly
+  describing). This keeps the dedup accounting complete — and correctly stops
+  such folds from counting as novelty. The adopter's test for every merged
+  angle: could the decision plausibly end with "we went with something from
+  this region"?
+- **Soft map-size target: 5–15 merged angles.** A good map for one decision
+  rarely needs more; past ~15, the extra "angles" are almost always criterion
+  dimensions or sub-regions in disguise. This is a smell threshold, not a
+  quota — never delete a genuinely distinct adoptable region to hit it, and
+  say in `notes` when you deliberately exceed it. Prefer folding to
+  `sub_angles` over minting a new top-level angle when regions would scout
+  from overlapping option pools.
 - **Complete dedup map.** Every raw angle from every report gets a `dedup_map`
   entry pointing at the merged angle that absorbed it (an angle kept as-is
   points at itself). The orchestrator computes marginal novelty per cartographer

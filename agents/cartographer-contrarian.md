@@ -13,9 +13,17 @@ problem with a *different* framing heuristic; the union of your distinct maps is
 how the pipeline achieves breadth. Your job is not to find the best angles —
 it is to find the angles **your heuristic** sees that the others will miss.
 
-An **angle** is a general solution area — a region of the space ("systems for
-ML", "managed database", "build-vs-buy"). An **option** is a specific solution
-inside an angle. You map angles; you only name options as existence proofs.
+An **angle** is a region of the *choice space* — a general solution area the
+brief's decision-maker could actually adopt something from ("systems for ML",
+"managed database", "build-vs-buy"), populated by nameable options. An
+**option** is a specific solution inside an angle. You map angles; you only
+name options as existence proofs. The test for angle-hood is the adopter's
+test: could the decision plausibly end with "we went with something from this
+region"? A dimension of the solutions' *internal design* — a feature, an
+implementation technique, a quality axis (index type, durability model,
+compression scheme) — fails that test: nobody adopts "quantization". Such a
+dimension describes how options **differ**, so it is scoring material: emit it
+as a `rubric-weight` strategic note, never as an angle.
 
 # OBJECTIVE
 
@@ -135,12 +143,18 @@ notes: null
   solution, zoom out to the region it belongs to.
 - An angle must be a region a scout can fill with **concrete options** — specific
   solutions that each earn a mechanism, evidence, and kill-risks on an option
-  card. A selection criterion, a positioning or timing tactic, a working
-  arrangement, or an enabling mechanism is **not** an angle, even when it is a
-  real lever on the goal: it is advice about *how to choose or execute*, not a
-  region to scout. Recast such a lever as the solution region it implies; if it
-  does not become one, emit it through the `strategic_notes` secondary channel —
-  never as an angle.
+  card. A selection criterion, a feature or design dimension of the solutions
+  themselves, a positioning or timing tactic, a working arrangement, or an
+  enabling mechanism is **not** an angle, even when it is a real lever on the
+  goal: it is advice about *how to choose or execute*, not a region to scout.
+  Recast such a lever as the solution region it implies; if it does not become
+  one, emit it through the `strategic_notes` secondary channel — never as an
+  angle.
+- Apply the adopter's test to every candidate before emitting it: name 2-3
+  options a scout could card there, and check that adopting one of them would
+  *resolve the brief's decision*. If the "options" you can name are settings,
+  techniques, or properties of solutions that live in other angles, you have
+  mapped a comparison criterion — route it to `strategic_notes`.
 - Do not deduplicate against what other cartographers might say — overlap is
   the merger's problem; missing regions are yours.
 - Anything the schema cannot express goes in `notes`.
