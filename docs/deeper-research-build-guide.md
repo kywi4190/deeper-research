@@ -413,9 +413,9 @@ Read CLAUDE.md, README.md. The full pipeline S0→S8 exists in mock. This sessio
 
 1. Extend tests/test_e2e_mock.py to a full S0→S8 walk including one Gate-C preference-feedback loop; assert the final report validates and the spend ledger reconciles (sum of per-agent = per-stage = total).
 
-2. Pre-live hardening pass: audit every live failure path (agent timeout, network error, SDK exception, schema double-failure) — all must land in PAUSED_ATTENTION with transcript + a `deeper resume` that retries the failed sub-work only. Add exponential backoff w/ jitter to dispatch. Add --max-spend-usd defaults per profile (quick 5, standard 25, exhaustive 75) with the pause behavior from Prompt 9.
+2. Pre-live hardening pass: audit every live failure path (agent timeout, network error, SDK exception, schema double-failure) — all must land in PAUSED_ATTENTION with transcript + a `deeper resume` that retries the failed sub-work only. (Exponential backoff w/ jitter and the per-profile --max-spend-usd defaults with Prompt 9's pause behavior already landed early — see README "Design deviations"; verify them in the audit rather than re-adding.)
 
-3. Here is my triage list from the M1 live run (weak agent outputs, awkward CLI moments, anything that annoyed me): [PASTE YOUR NOTES HERE — prompt-quality issues should be fixed by editing agents/*.md, not by adding code]. Address each; for prompt edits, explain the failure-mode reasoning in the commit message.
+3. Read docs/m1-live-run-notes.md — my full triage list (weak agent outputs, awkward CLI moments, anything that annoyed me, plus items recorded since: the cp1252 console crash on S6's 'Δ' emit, and plan usage-limit exhaustion needing its own pause cause with the reset time in the message and NO auto-resume, per finding 11's recorded scope). Address every finding not marked ADDRESSED/landed (for those, verify rather than redo). Prompt-quality issues should be fixed by editing agents/*.md, not by adding code; for prompt edits, explain the failure-mode reasoning in the commit message.
 
 4. Update README (Current status: M2 complete; "Cost expectations" table per profile from the ledger of my runs). Commit.
 ```
