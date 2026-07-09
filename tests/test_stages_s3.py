@@ -56,6 +56,37 @@ def test_returned_units_only_for_early_stopped_angles():
     assert returned_units(1, 6, 90, stop_pct=40) == 0  # never negative
 
 
+def test_dedupe_option_ids_suffixes_cross_angle_collisions():
+    """Finding 6: option ids are global (scores/dossiers/tournament key on
+    them), and two scouts genuinely can card the same thing — the collision is
+    resolved by deterministic suffixing at write time, never a re-dispatch."""
+    from deeper.stages.s3_scouting import dedupe_option_ids
+
+    def card(card_id: str) -> dict:
+        return {
+            "id": card_id,
+            "name": card_id,
+            "angle_id": "pure-python",
+            "description": "d",
+            "mechanism": "m",
+            "preliminary_evidence": [
+                {"text": "works", "source": {"url": "https://example.com", "tier": "T2"}}
+            ],
+            "uncertainties": ["u"],
+        }
+
+    card_set = OptionCardSet(angle_id="pure-python", cards=[card("sqlite-vec"), card("faiss")])
+    deduped, renames = dedupe_option_ids(card_set, taken={"sqlite-vec", "chroma"})
+    assert renames == [("sqlite-vec", "sqlite-vec-pure-python")]
+    assert [c.id for c in deduped.cards] == ["sqlite-vec-pure-python", "faiss"]
+    # Still colliding after the suffix (pathological): the counter disambiguates.
+    _, renames = dedupe_option_ids(card_set, taken={"sqlite-vec", "sqlite-vec-pure-python"})
+    assert renames == [("sqlite-vec", "sqlite-vec-pure-python-2")]
+    # No collision, no rewrite: the set is returned untouched.
+    same, renames = dedupe_option_ids(card_set, taken={"chroma"})
+    assert renames == [] and same is card_set
+
+
 def test_needs_revision_ignores_missed_options():
     clean = CardCritique(angle_id="a", redundancy_pct=0, missed_options=["a miss"])
     assert not needs_revision(clean)  # misses are the reflow pool's business

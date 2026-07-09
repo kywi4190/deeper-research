@@ -21,8 +21,11 @@ from .dispatch import (
     BillingAuthError,
     Dispatcher,
     LiveDispatcher,
+    LiveDispatchError,
     SpendCapExceeded,
+    UsageLimitReached,
     create_dispatcher,
+    usage_limit_notice,
 )
 from .hooks import (
     PREFERENCE_READERS,
@@ -45,12 +48,14 @@ __all__ = [
     "ContractError",
     "DEFAULT_FIXTURES_DIR",
     "Dispatcher",
+    "LiveDispatchError",
     "LiveDispatcher",
     "MockDispatcher",
     "MockFixtureMissing",
     "PREFERENCE_READERS",
     "SpendCapExceeded",
     "SpendLedger",
+    "UsageLimitReached",
     "assemble_prompt",
     "build_hooks",
     "cache_web_fetch",
@@ -59,5 +64,6 @@ __all__ = [
     "parse_artifacts",
     "quarantine_gate",
     "sanitize_source_text",
+    "usage_limit_notice",
     "write_scope_gate",
 ]

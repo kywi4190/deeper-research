@@ -52,6 +52,14 @@ SCORES_PATH = "screening/scores.yaml"
 SHORTLIST_PATH = "screening/shortlist.md"
 
 
+def batch_path(angle_id: str) -> str:
+    """Where one angle's screener batch persists the moment it passes its
+    integrity checks (M1 finding 7: a merge-time failure used to discard all
+    12 paid batches; resume re-paid every one). Wiped with the rest of
+    screening/ on invalidation."""
+    return f"screening/batches/{angle_id}.yaml"
+
+
 class ScreeningStage(StageBase):
     stage = StageEnum.S5
     required_inputs = (
@@ -131,8 +139,13 @@ class ScreeningStage(StageBase):
                 self._batch_contract(rubric, card_sets[0], base_inputs),
                 errors=(
                     "option ids collide across angles, so the merged screening "
-                    f"result cannot be built: {dupes}. Two scouts produced cards "
-                    "with the same id — rerun S3 for one of the angles."
+                    f"result cannot be built: {dupes}. The cheap fix: hand-rename "
+                    "one colliding card id in its options/<angle>/cards.yaml (and "
+                    "in its screening/batches/<angle>.yaml if present), then "
+                    "`deeper resume` — a full angle re-scout is NOT needed. S3 now "
+                    "auto-suffixes collisions at write time, so this arises only "
+                    "in hand-edited workspaces. The overlap itself is signal the "
+                    "two angles may partially overlap — worth a Gate A look."
                 ),
                 raw_output="",
             )
@@ -174,7 +187,13 @@ class ScreeningStage(StageBase):
         all_ids: dict[str, str],
     ) -> ScreeningResult:
         """One angle's screening batch, integrity-checked against that angle's
-        cards alone (the per-batch checks union to full-map integrity)."""
+        cards alone (the per-batch checks union to full-map integrity).
+        Persisted per angle the moment it passes, so a later failure (a
+        cross-angle collision, a sibling batch, a crash) never re-pays it."""
+        persisted = self._existing_batch(ctx, rubric, card_set)
+        if persisted is not None:
+            ctx.emit(f"S5: {card_set.angle_id} batch already valid — skipping (persisted)")
+            return persisted
         contract = self._batch_contract(rubric, card_set, base_inputs)
         result = await ctx.dispatcher.run_agent(contract)
         screening = result.artifacts["screening-result"]
@@ -214,7 +233,22 @@ class ScreeningStage(StageBase):
                 ),
                 raw_output=result.raw_text,
             )
+        ctx.workspace.write_artifact(batch_path(card_set.angle_id), batch)
         return batch  # problems empty implies batch == kept exactly
+
+    def _existing_batch(
+        self, ctx: StageContext, rubric: Rubric, card_set: OptionCardSet
+    ) -> ScreeningResult | None:
+        """A persisted batch counts only while it still coheres with the
+        current rubric and cards — a Gate-B rubric edit or an angle re-scout
+        silently invalidates it into a re-dispatch."""
+        try:
+            batch = ctx.workspace.read_artifact(batch_path(card_set.angle_id), ScreeningResult)
+        except Exception:  # noqa: BLE001 — absent/invalid means re-screen
+            return None
+        if verify_screening(batch, rubric, [card_set]):
+            return None
+        return batch
 
     def _report(self, ctx: StageContext, shortlist: Shortlist) -> None:
         by_id = {d.option_id: d for d in shortlist.decisions}

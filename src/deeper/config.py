@@ -139,6 +139,13 @@ class RunConfig(ArtifactModel):
         "(design §11 runaway-cost mitigation). Raise it and resume to continue.",
     )
     deep_dive_unit_cap: int = Field(ge=1, description="S6 per-option research budget in units.")
+    dispatch_timeout_s: float = Field(
+        default=1200.0,
+        gt=0,
+        description="Per-invocation wall-clock timeout: a hung SDK call (observed "
+        "live: 50 minutes) becomes a normal transient dispatch failure — backoff "
+        "retries, then a resumable pause — instead of hanging the run forever.",
+    )
     concurrency: int = Field(ge=1, description="Max simultaneous agent invocations.")
     size_classes: dict[SizeClass, SizeClassSpec]
     caps: HardCaps = Field(default_factory=HardCaps)
@@ -188,6 +195,12 @@ def _size_classes(
 
 # Shipped defaults (design §8): quick ≈ sanity pass, standard = the design's
 # defaults, exhaustive = wider ensemble, flatter gamma, deeper dossiers.
+# Spend caps are calibrated against the M1 live run's ledger (finding 4: the
+# old $5 quick cap tripped three times before Gate B on a run that honestly
+# costs $20-25 post-fixes) — the cap is a runaway guard, not a target.
+# Quick also caps cartography at ONE expansion pass (3 initial + 1): the
+# sanity profile must not fund a saturation loop to the global 8-invocation
+# ceiling the way the M1 run did.
 PROFILES: dict[str, dict[str, Any]] = {
     "quick": {
         "profile": "quick",
@@ -198,10 +211,11 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 3,
         "shortlist_size": 3,
         "shortlist_threshold": 3.5,
-        "max_spend_usd": 5.0,
+        "max_spend_usd": 30.0,
         "deep_dive_unit_cap": 2,
         "concurrency": 4,
         "size_classes": _size_classes((2, 4000), (6, 8000), (12, 16000)),
+        "caps": {"max_cartographers": 4},
     },
     "standard": {
         "profile": "standard",
@@ -212,7 +226,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 5,
         "shortlist_size": 5,
         "shortlist_threshold": 3.5,
-        "max_spend_usd": 25.0,
+        "max_spend_usd": 100.0,
         "deep_dive_unit_cap": 4,
         "concurrency": 4,
         "size_classes": _size_classes((3, 4000), (12, 16000), (25, 32000)),
@@ -226,7 +240,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "initial_cartographers": 6,
         "shortlist_size": 7,
         "shortlist_threshold": 3.25,
-        "max_spend_usd": 60.0,
+        "max_spend_usd": 200.0,
         "deep_dive_unit_cap": 6,
         "concurrency": 4,
         "size_classes": _size_classes((4, 4000), (18, 24000), (35, 48000)),

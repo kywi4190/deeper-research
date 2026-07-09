@@ -69,6 +69,19 @@
           "title": "Output Tokens",
           "type": "integer"
         },
+        "failed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set when the dispatch attempt died in flight (the error, truncated): a zero-cost marker entry \u2014 the real token spend is unknowable, but the audit trail must show the attempt happened.",
+          "title": "Failed"
+        },
         "at": {
           "format": "date-time",
           "title": "At",

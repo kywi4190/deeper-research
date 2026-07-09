@@ -33,6 +33,7 @@ from deeper.agents_runtime import (
     AgentDispatchFailed,
     AgentOutputInvalid,
     SpendCapExceeded,
+    UsageLimitReached,
     create_dispatcher,
 )
 from deeper.config import RunConfig
@@ -195,7 +196,12 @@ class Engine:
             except (NotImplementedYet, StageInterrupted) as err:
                 self.emit(str(err))
                 return False
-            except (AgentOutputInvalid, AgentDispatchFailed, SpendCapExceeded) as err:
+            except (
+                AgentOutputInvalid,
+                AgentDispatchFailed,
+                SpendCapExceeded,
+                UsageLimitReached,
+            ) as err:
                 self._pause_on_agent_error(stage, err)
                 return False
             instance.evaluate_stop_rules(ctx)
@@ -217,11 +223,39 @@ class Engine:
             )
 
     def _pause_on_agent_error(
-        self, stage: Stage, err: AgentOutputInvalid | AgentDispatchFailed | SpendCapExceeded
+        self,
+        stage: Stage,
+        err: AgentOutputInvalid | AgentDispatchFailed | SpendCapExceeded | UsageLimitReached,
     ) -> None:
         """Route any agent failure — from a stage or a Gate-C loop — into the
         one resumable pause path."""
-        if isinstance(err, AgentOutputInvalid):
+        if isinstance(err, UsageLimitReached):
+            # Finding 11's recorded scope: the pause message with the reset
+            # time IS the whole feature — resuming stays an explicit human
+            # action (never an automatic sleep/wait), like every other pause.
+            reset_line = (
+                f"The limit resets at: {err.resets_at}.\n"
+                if err.resets_at
+                else "The CLI's notice did not carry a machine-readable reset time — "
+                "subscription limits reset on a rolling window (typically hours).\n"
+            )
+            self._pause_attention(
+                stage,
+                role=err.contract.role,
+                reason="Claude plan usage limit reached",
+                detail=(
+                    "Your Claude plan's session usage limit was reached — this is not "
+                    "an error in the run, and nothing is lost: completed work is saved "
+                    f"and re-entry skips it.\n{reset_line}"
+                    f"When the limit has reset, run: deeper resume {self.workspace.root}\n"
+                    "(The run does NOT resume automatically.)"
+                ),
+                transcript=(
+                    f"# {stage.value} '{err.contract.role}' — Claude plan usage limit "
+                    f"reached\n\n{err}\n\n## The notice as received\n\n{err.notice}\n"
+                ),
+            )
+        elif isinstance(err, AgentOutputInvalid):
             self._pause_attention(
                 stage,
                 role=err.contract.role,
@@ -432,7 +466,12 @@ class Engine:
                 frame_check = self.workspace.read_artifact(FRAME_CHECK_PATH, FrameCheck)
                 assert frame_check.proposal is not None  # validated above
                 rerun_s7 = await run_mini_loop(ctx, frame_check.proposal)
-        except (AgentOutputInvalid, AgentDispatchFailed, SpendCapExceeded) as err:
+        except (
+            AgentOutputInvalid,
+            AgentDispatchFailed,
+            SpendCapExceeded,
+            UsageLimitReached,
+        ) as err:
             self._pause_on_agent_error(self.workspace.load_state().stage, err)
             return False
 

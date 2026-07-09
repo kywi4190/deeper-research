@@ -21,6 +21,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from deeper.allocation import feasibility_problem
 from deeper.schemas import (
     Angle,
     AngleMap,
@@ -147,6 +148,21 @@ def apply_gate_a_actions(workspace: Workspace, decision: GateADecision) -> Apply
             f"gate-a: prior of '{angle.id}' {angle.relevance_prior} -> {adjustment.new_prior}"
         )
         angle.relevance_prior = adjustment.new_prior
+    config = workspace.load_config()
+    infeasible = feasibility_problem(
+        len(angles),
+        total_budget_units=config.total_budget_units,
+        floor=config.floor,
+        per_angle_cap_pct=config.per_angle_cap_pct,
+    )
+    if infeasible is not None:
+        # Warn, don't block: the decision is still applied (the human may
+        # intend to fix config.yaml next), and S2 pauses on the same check
+        # before any budget is spent.
+        messages.append(
+            f"gate-a: WARNING — the post-edit map is infeasible for this budget: "
+            f"{infeasible}. S2 will pause until it fits."
+        )
     workspace.write_artifact(
         "angles/map.yaml", AngleMap(angles=angles, dedup_map=dedup, notes=angle_map.notes)
     )

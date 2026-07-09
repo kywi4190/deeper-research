@@ -110,7 +110,9 @@ def _expansion_fixtures(fixtures: Path) -> None:
 async def test_high_novelty_spawns_the_most_novel_heuristics(tmp_path):
     fixtures = tmp_path / "fixtures"
     _expansion_fixtures(fixtures)
-    ws = make_workspace(tmp_path, profile="quick")
+    # The global cap, not quick's own (finding 4 pins quick to ONE expansion
+    # invocation) — this test exercises the two-heuristic expansion mechanism.
+    ws = make_workspace(tmp_path, profile="quick", caps={"max_cartographers": 8})
     write_s0_artifacts(ws)
     emitted: list[str] = []
     ctx = make_ctx(ws, emitted=emitted, fixtures_dir=fixtures)

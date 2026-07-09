@@ -66,6 +66,33 @@ def _validate_inputs(
     return cap_units
 
 
+def feasibility_problem(
+    n_angles: int,
+    *,
+    total_budget_units: int,
+    floor: int,
+    per_angle_cap_pct: float,
+) -> str | None:
+    """The map-size feasibility check as a message, not an exception — what
+    Gate A prints as a warning before S2 would pause on it (M1 finding 2: a
+    41-angle approved map × floor 1 > B=16 was an unhandled crash)."""
+    if n_angles * floor > total_budget_units:
+        return (
+            f"{n_angles} angles × floor {floor} = {n_angles * floor} units exceeds "
+            f"the total budget of {total_budget_units} — remove angles or raise "
+            "total_budget_units"
+        )
+    cap_units = math.floor(per_angle_cap_pct * total_budget_units / 100 + _EPS)
+    if n_angles * cap_units < total_budget_units:
+        return (
+            f"{n_angles} angles × per-angle cap {cap_units} = {n_angles * cap_units} "
+            f"units cannot absorb the total budget of {total_budget_units} — the map "
+            "is too small for the budget; add angles, lower total_budget_units, or "
+            "raise per_angle_cap_pct"
+        )
+    return None
+
+
 def _continuous_extra(weights: list[float], extra: float, extra_caps: list[float]) -> list[float]:
     """Water-fill `extra` proportionally to `weights`, respecting per-angle caps.
 

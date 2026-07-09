@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -94,6 +95,75 @@ class AgentDispatchFailed(Exception):
         self.cause = cause
 
 
+class LiveDispatchError(Exception):
+    """A live invocation died, enriched with the CLI's own result
+    subtype/detail when one was streamed before the failure (finding 3: the
+    SDK's wrapper text alone can be actively misleading — 'error result:
+    success' was output-token exhaustion). Transient class: retried with
+    backoff, then wrapped as AgentDispatchFailed."""
+
+
+def _cli_result_detail(subtype: str | None, result_text: str | None, is_error: bool) -> str:
+    parts = []
+    if subtype is not None:
+        parts.append(f"CLI result subtype={subtype!r}")
+    if is_error:
+        parts.append("is_error=true")
+    if result_text:
+        parts.append(f"result: {result_text[:2000]}")
+    return "; ".join(parts)
+
+
+class UsageLimitReached(Exception):
+    """The Claude plan's session usage limit was hit (billing: subscription).
+    Deterministic until the limit window resets — never backed off, never
+    schema-retried (each retry would just rediscover the limit). The
+    orchestrator pauses the run; resuming is an explicit human action
+    (`deeper resume` at/after the reset time), never automatic."""
+
+    def __init__(self, contract: AgentContract, notice: str, resets_at: str | None) -> None:
+        reset_part = f" (resets: {resets_at})" if resets_at else ""
+        super().__init__(
+            f"the Claude plan's usage limit was reached while dispatching "
+            f"'{contract.role}' ({contract.stage.value}){reset_part}"
+        )
+        self.contract = contract
+        self.notice = notice
+        self.resets_at = resets_at
+
+
+# The M1 triage (finding 11) could not pin down the exact shape the SDK/CLI
+# surfaces a plan-limit hit in, so detection is deliberately broad over the two
+# known families: the API-style marker "usage limit reached|<epoch>" and the
+# CLI's prose notices ("...limit reached ∙ resets 3pm"). Matched against BOTH
+# exception text and (short, artifact-free) reply text.
+_LIMIT_EPOCH_RE = re.compile(r"usage limit reached\|(\d{9,13})", re.IGNORECASE)
+_LIMIT_TEXT_RE = re.compile(
+    r"usage limit (?:reached|hit|exceeded)"
+    r"|(?:\d+\s*-?\s*hour|session|weekly|daily) limit reached"
+    r"|reached your (?:usage|session|plan) limit",
+    re.IGNORECASE,
+)
+_LIMIT_RESET_RE = re.compile(r"resets?(?:\s+at)?[:\s]+([^\n|]+)", re.IGNORECASE)
+
+
+def usage_limit_notice(text: str) -> tuple[bool, str | None]:
+    """(is a plan-usage-limit notice, reset time if stated). The epoch form
+    carries a machine-readable reset; prose forms carry it as free text."""
+    match = _LIMIT_EPOCH_RE.search(text)
+    if match:
+        resets = (
+            datetime.fromtimestamp(int(match.group(1)), tz=UTC)
+            .astimezone()
+            .isoformat(timespec="minutes")
+        )
+        return True, resets
+    if _LIMIT_TEXT_RE.search(text):
+        reset = _LIMIT_RESET_RE.search(text)
+        return True, (reset.group(1).strip() or None) if reset else None
+    return False, None
+
+
 class BillingAuthError(Exception):
     """The run's `billing` setting and the actual auth path disagree — a
     deterministic misconfiguration, never retried. Raised fast at dispatcher
@@ -143,22 +213,60 @@ class _BaseDispatcher:
     async def _guarded_invoke(self, prompt: str, contract: AgentContract, attempt: int):
         """Every raw invocation passes here: the spend guard runs first (an
         in-flight batch may have crossed the cap since the stage started), then
-        the semaphore, then _invoke — transient infrastructure failures are
-        retried with backoff, and only then wrapped so the orchestrator can
-        pause instead of crash."""
+        the semaphore, then _invoke under the per-invocation timeout — transient
+        infrastructure failures are retried with backoff, and only then wrapped
+        so the orchestrator can pause instead of crash. Deterministic failures
+        (billing mismatch, plan usage limit) skip the backoff entirely: retrying
+        them re-spends on the wrong meter or rediscovers the same limit."""
         total = self.ledger.total_usd()
         if total >= self.config.max_spend_usd:
             raise SpendCapExceeded(contract, total, self.config.max_spend_usd)
         async with self._semaphore():
             for backoff in (*self.DISPATCH_RETRY_BACKOFF_S, None):
                 try:
-                    return await self._invoke(prompt, contract, attempt)
+                    inv = await asyncio.wait_for(
+                        self._invoke(prompt, contract, attempt),
+                        timeout=self.config.dispatch_timeout_s,
+                    )
                 except Exception as err:  # noqa: PERF203 — retry loop is the point
-                    # A billing/auth mismatch is deterministic — retrying it
-                    # would just spend on the wrong meter again.
+                    # The tokens a failed attempt consumed are unknowable, but
+                    # the attempt itself must reach the audit trail (M1 finding
+                    # 5b: three full-prompt dispatch deaths, zero ledger trace).
+                    self._record_failed_attempt(contract, err)
+                    limit, resets_at = usage_limit_notice(str(err))
+                    if limit:
+                        raise UsageLimitReached(contract, str(err), resets_at) from err
                     if backoff is None or isinstance(err, BillingAuthError):
                         raise AgentDispatchFailed(contract, err) from err
                     await asyncio.sleep(backoff + random.random())
+                else:
+                    # A plan-limit notice can also arrive as a "successful"
+                    # short text reply instead of an exception (M1 finding 11:
+                    # it then burns the whole schema-retry loop as a bogus
+                    # parse failure). Artifact-bearing replies are never
+                    # limit notices.
+                    if "### artifact:" not in inv.text and len(inv.text) < 2000:
+                        limit, resets_at = usage_limit_notice(inv.text)
+                        if limit:
+                            raise UsageLimitReached(contract, inv.text.strip(), resets_at)
+                    return inv
+
+    def _record_failed_attempt(self, contract: AgentContract, err: BaseException) -> None:
+        """Zero-cost marker SpendEntry for a dispatch attempt that died in
+        flight — the real token spend is unknowable from here, but the audit
+        trail must show the attempt happened."""
+        self.ledger.record(
+            SpendEntry(
+                stage=contract.stage,
+                role=contract.role,
+                context=contract.context,
+                usd=0.0,
+                input_tokens=0,
+                output_tokens=0,
+                failed=f"{type(err).__name__}: {err}"[:500],
+                at=datetime.now(UTC),
+            )
+        )
 
     async def run_agent(self, contract: AgentContract) -> AgentResult:
         prompt = assemble_prompt(contract)  # raises on drift before any spend
@@ -191,6 +299,7 @@ class _BaseDispatcher:
                 artifacts = parse_artifacts(inv.text, contract.output_schemas)
             except ArtifactParseError as err:
                 raw, feedback = inv.text, err.report
+                self._log_failed_attempt(contract, attempt, feedback, raw)
                 continue
             return AgentResult(
                 role=contract.role,
@@ -205,6 +314,31 @@ class _BaseDispatcher:
                 retries_used=attempt,
             )
         raise AgentOutputInvalid(contract, errors=feedback, raw_output=raw)
+
+    def _log_failed_attempt(
+        self, contract: AgentContract, attempt: int, feedback: str, raw: str
+    ) -> None:
+        """Persist every schema-invalid attempt to logs/retries/ — even when the
+        retry then succeeds. Recovered failures are the §10 prompt-iteration
+        evidence (schema-failure rates AND causes); before this, the invalid
+        output that triggered a successful retry was silently discarded (M1
+        finding 5)."""
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        context = f"-{contract.context}" if contract.context else ""
+        relpath = (
+            f"logs/retries/{stamp}-{contract.stage.value}-{contract.role}"
+            f"{context}-attempt{attempt}.md"
+        )
+        target = self.workspace.path(relpath)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            f"# {contract.stage.value} '{contract.role}'"
+            f"{f' ({contract.context})' if contract.context else ''} — invalid attempt "
+            f"{attempt} (recovered attempts land here too)\n\n"
+            f"## Validation errors\n\n{feedback}\n\n## Raw output\n\n{raw}\n",
+            encoding="utf-8",
+            newline="\n",
+        )
 
     async def run_interview(
         self,
@@ -253,6 +387,7 @@ class _BaseDispatcher:
                     artifacts = parse_artifacts(inv.text, contract.output_schemas)
                 except ArtifactParseError as err:
                     retries += 1
+                    self._log_failed_attempt(contract, retries, err.report, inv.text)
                     if retries > self.config.caps.max_schema_retries:
                         raise AgentOutputInvalid(
                             contract, errors=err.report, raw_output=inv.text
@@ -284,6 +419,7 @@ class _BaseDispatcher:
                     "or emit all three artifacts."
                 )
                 retries += 1
+                self._log_failed_attempt(contract, retries, problem, inv.text)
                 if retries > self.config.caps.max_schema_retries:
                     raise AgentOutputInvalid(contract, errors=problem, raw_output=inv.text)
                 self.ledger.bump_retry(retry_key)
@@ -423,21 +559,47 @@ class LiveDispatcher(_BaseDispatcher):
         input_tokens = output_tokens = num_turns = 0
         duration_ms = 0
         session_id: str | None = None
+        # The CLI's result subtype/text is the real diagnosis when the SDK dies
+        # with an opaque wrapper ("error result: success" was output-token
+        # exhaustion on the M1 run, finding 3) — capture it as we stream so a
+        # raised exception can carry it.
+        result_subtype: str | None = None
+        result_text: str | None = None
+        result_is_error = False
         started = time.monotonic()
-        async for message in query(prompt=prompt, options=options):
-            self._check_auth_source(message)
-            for block in getattr(message, "content", None) or []:
-                text = getattr(block, "text", None)
-                if text:
-                    chunks.append(text)
-            if type(message).__name__ == "ResultMessage":
-                usd = getattr(message, "total_cost_usd", None) or 0.0
-                usage = getattr(message, "usage", None) or {}
-                input_tokens = int(usage.get("input_tokens") or 0)
-                output_tokens = int(usage.get("output_tokens") or 0)
-                num_turns = getattr(message, "num_turns", 0) or 0
-                duration_ms = getattr(message, "duration_ms", 0) or 0
-                session_id = getattr(message, "session_id", None)
+        try:
+            async for message in query(prompt=prompt, options=options):
+                self._check_auth_source(message)
+                for block in getattr(message, "content", None) or []:
+                    text = getattr(block, "text", None)
+                    if text:
+                        chunks.append(text)
+                if type(message).__name__ == "ResultMessage":
+                    result_subtype = getattr(message, "subtype", None)
+                    result_text = getattr(message, "result", None)
+                    result_is_error = bool(getattr(message, "is_error", False))
+                    usd = getattr(message, "total_cost_usd", None) or 0.0
+                    usage = getattr(message, "usage", None) or {}
+                    input_tokens = int(usage.get("input_tokens") or 0)
+                    output_tokens = int(usage.get("output_tokens") or 0)
+                    num_turns = getattr(message, "num_turns", 0) or 0
+                    duration_ms = getattr(message, "duration_ms", 0) or 0
+                    session_id = getattr(message, "session_id", None)
+        except BillingAuthError:
+            raise
+        except Exception as err:
+            detail = _cli_result_detail(result_subtype, result_text, result_is_error)
+            raise LiveDispatchError(
+                f"{type(err).__name__}: {err}" + (f" [{detail}]" if detail else "")
+            ) from err
+        if result_is_error or (result_subtype not in (None, "success")):
+            # An error result the SDK did NOT raise for: surfacing it here (with
+            # the CLI's own words) beats letting an empty/garbled reply burn the
+            # schema-retry loop as a bogus parse failure.
+            raise LiveDispatchError(
+                "the CLI reported an error result: "
+                + _cli_result_detail(result_subtype, result_text, result_is_error)
+            )
         if not duration_ms:
             duration_ms = int((time.monotonic() - started) * 1000)
         return _Invocation(

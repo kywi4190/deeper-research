@@ -216,6 +216,7 @@ async def test_full_mock_run_end_to_end(tmp_path):
     } <= roles
     assert any(r.startswith("cartographer-") for r in roles)
     assert not any(e.stage is Stage.S2 for e in state.spend)  # S2 is pure code
+    assert not any(e.failed for e in state.spend)  # a clean run ledgers no failures
     assert all(e.usd >= 0 and e.output_tokens > 0 for e in state.spend)
     assert state.total_usd() <= config.max_spend_usd
 
@@ -341,6 +342,28 @@ async def test_full_mock_run_end_to_end(tmp_path):
         assert heading in text
     assert "[c-sae-precedent](#claim-sae-feature-atlas--c-sae-precedent)" in text
     assert "### Claims index" in text
+
+    # ---- the spend ledger reconciles: per-agent = per-stage = total -------------
+    # The aggregations are computed views over the same entry list, so this
+    # asserts no entry is dropped or double-counted by either grouping — in
+    # USD and in tokens (mock USD is uniformly 0.0; tokens are the
+    # non-degenerate check).
+    assert state.spend
+    assert sum(state.spend_by_role().values()) == pytest.approx(state.total_usd())
+    assert sum(state.spend_by_stage().values()) == pytest.approx(state.total_usd())
+    tokens_by_role: dict[str, int] = {}
+    tokens_by_stage: dict[str, int] = {}
+    for entry in state.spend:
+        tokens = entry.input_tokens + entry.output_tokens
+        tokens_by_role[entry.role] = tokens_by_role.get(entry.role, 0) + tokens
+        tokens_by_stage[entry.stage.value] = tokens_by_stage.get(entry.stage.value, 0) + tokens
+    total_tokens = sum(e.input_tokens + e.output_tokens for e in state.spend)
+    assert total_tokens > 0
+    assert sum(tokens_by_role.values()) == total_tokens
+    assert sum(tokens_by_stage.values()) == total_tokens
+    # Every role and stage that dispatched appears in its aggregation view.
+    assert set(state.spend_by_role()) == {e.role for e in state.spend}
+    assert set(state.spend_by_stage()) == {e.stage.value for e in state.spend}
 
     # ---- terminal idempotency: re-running changes nothing ----------------------
     history_before = ws.history()

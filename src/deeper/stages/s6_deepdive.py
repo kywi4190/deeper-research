@@ -280,13 +280,15 @@ class DeepDiveStage(StageBase):
             log = log.model_copy(update={"rounds": [*log.rounds, entry], "status": status})
             ctx.workspace.write_artifact(rounds_path(option_id), log)
             blockers = f", low-confidence load-bearing: {low_conf}" if low_conf else ""
+            # Emit strings stay ASCII-safe: 'Δ' cannot survive a cp1252 console
+            # (M1 finding 9 — a hard UnicodeEncodeError mid-stage, not mojibake).
             ctx.emit(
                 f"S6: {option_id} round {r} re-score "
-                f"{rescore.weighted_point:g} (Δ{delta:g}{blockers})"
+                f"{rescore.weighted_point:g} (delta {delta:g}{blockers})"
             )
             if status is DeepDiveStatus.CONVERGED:
                 ctx.emit(
-                    f"S6: {option_id} converged after {r} round(s) — Δ{delta:g} < "
+                    f"S6: {option_id} converged after {r} round(s) — delta {delta:g} < "
                     f"{delta_stop:g} and no low-confidence load-bearing claims"
                 )
             elif status is DeepDiveStatus.BUDGET_CAPPED:

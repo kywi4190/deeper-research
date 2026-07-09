@@ -32,6 +32,24 @@ from .engine import Engine, Node, node_of
 from .gates import GATE_SPECS
 from .rerun import RerunError, invalidate
 
+
+def _force_utf8_output() -> None:
+    """No emit string may ever crash the console (M1 finding 9: S6's 'Δ' emit
+    killed a cp1252 stdout mid-stage with UnicodeEncodeError — an unhandled
+    traceback, violating pause-don't-crash). reconfigure mutates the stream in
+    place, so Rich's Console picks it up; errors='replace' is the floor —
+    worst case mojibake, never a crash."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):  # detached/closed stream: nothing to fix
+                pass
+
+
+_force_utf8_output()
+
 app = typer.Typer(
     name="deeper",
     help="Gated multi-agent research pipeline: deterministic kernel, LLM subagents.",
@@ -88,9 +106,12 @@ def _terminal_ask_user() -> Callable[[str], str] | None:
     return ask
 
 
-def _run_engine(workspace: Workspace, *, resume: bool = False) -> Node:
+def _run_engine(
+    workspace: Workspace, *, resume: bool = False, non_interactive: bool = False
+) -> Node:
+    ask_user = None if non_interactive else _terminal_ask_user()
     try:
-        engine = Engine(workspace, emit=_emit, ask_user=_terminal_ask_user())
+        engine = Engine(workspace, emit=_emit, ask_user=ask_user)
     except BillingAuthError as err:  # billing: api without a key — before any work
         raise _fail(str(err)) from err
     return asyncio.run(engine.resume() if resume else engine.run())
@@ -114,9 +135,18 @@ def new(
         typer.Option(
             "--max-spend-usd",
             help="USD spend guard: the run pauses when the ledger crosses this "
-            "(default: the profile's, e.g. 5.0 for quick).",
+            "(default: the profile's, e.g. 30.0 for quick).",
         ),
     ] = None,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive",
+            help="Skip all terminal questions (S0 interview, confirmations) even "
+            "when stdin looks like a terminal — the explicit form of piping from "
+            "a non-tty (on Windows, `< NUL` still LOOKS interactive).",
+        ),
+    ] = False,
 ) -> None:
     """Create a run, execute S0, and advance until the first gate."""
     try:
@@ -144,7 +174,7 @@ def new(
     console.print(
         f"created run [bold]{workspace.root}[/bold] (profile={profile}, mode={config.mode})"
     )
-    _run_engine(workspace)
+    _run_engine(workspace, non_interactive=non_interactive)
 
 
 @app.command()
@@ -196,6 +226,13 @@ def resume(
             "a spend-cap pause).",
         ),
     ] = None,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive",
+            help="Skip all terminal questions even when stdin looks like a terminal.",
+        ),
+    ] = False,
 ) -> None:
     """Continue a run from wherever it paused (gate, attention, or crash)."""
     workspace = _open_run(run)
@@ -213,7 +250,7 @@ def resume(
             commit_message=f"spend cap {old.max_spend_usd:g} -> {max_spend_usd:g} USD",
         )
         console.print(f"spend cap: ${old.max_spend_usd:g} -> ${max_spend_usd:g}")
-    _run_engine(workspace, resume=True)
+    _run_engine(workspace, resume=True, non_interactive=non_interactive)
 
 
 @app.command()
@@ -223,6 +260,13 @@ def rerun(
     angle: Annotated[
         str | None, typer.Option("--angle", help="Scope an S3 rerun to one angle (id or name).")
     ] = None,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive",
+            help="Skip all terminal questions even when stdin looks like a terminal.",
+        ),
+    ] = False,
 ) -> None:
     """Surgically re-execute a stage: invalidate its outputs (git-tracked) and
     everything downstream, then run forward again."""
@@ -238,7 +282,7 @@ def rerun(
     except RerunError as err:
         raise _fail(str(err)) from err
     console.print(f"invalidated: {', '.join(removed) if removed else 'nothing to remove'}")
-    _run_engine(workspace)
+    _run_engine(workspace, non_interactive=non_interactive)
 
 
 @app.command()

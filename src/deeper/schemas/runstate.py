@@ -59,6 +59,12 @@ class SpendEntry(ArtifactModel):
     usd: float = Field(ge=0)
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
+    failed: str | None = Field(
+        default=None,
+        description="Set when the dispatch attempt died in flight (the error, "
+        "truncated): a zero-cost marker entry — the real token spend is "
+        "unknowable, but the audit trail must show the attempt happened.",
+    )
     at: datetime
 
 

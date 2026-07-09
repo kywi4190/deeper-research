@@ -17,7 +17,7 @@ from deeper.schemas import (
 )
 from deeper.stages.s3_scouting import ScoutingStage
 from deeper.stages.s4_rubric import RubricStage
-from deeper.stages.s5_screening import ScreeningStage
+from deeper.stages.s5_screening import ScreeningStage, batch_path
 
 from .helpers import (
     RecordingMockDispatcher,
@@ -174,6 +174,35 @@ async def test_reexecution_reuses_scores_and_reapplies_pure_code(run):
     await stage.execute(ctx)
     assert stage.is_complete(ctx)
     assert sum(1 for r, _c, _p in dispatcher.invocations if r == "screener") == 8
+
+
+async def test_batches_persist_per_angle_and_are_not_repaid(run):
+    """Finding 7: every batch lands at screening/batches/{angle}.yaml the
+    moment it passes its integrity checks, and a re-screen (scores.yaml lost
+    before the merge settled) re-dispatches nothing."""
+    ws, ctx, _stage, dispatcher, emitted = run
+    batch_files = sorted(ws.path("screening/batches").glob("*.yaml"))
+    assert len(batch_files) == 8  # one persisted batch per allocated angle
+    ws.path("screening/scores.yaml").unlink()  # the merge itself was lost
+    await ScreeningStage().execute(ctx)
+    assert sum(1 for r, _c, _p in dispatcher.invocations if r == "screener") == 8
+    assert any("already valid — skipping (persisted)" in m for m in emitted)
+    assert ws.path("screening/scores.yaml").is_file()
+
+
+async def test_stale_batch_is_rescreened_not_trusted(run):
+    """A persisted batch that no longer coheres (here: hand-mangled) silently
+    re-dispatches instead of poisoning the merge."""
+    ws, ctx, _stage, dispatcher, _ = run
+    target = ws.path(batch_path("interpretability-research"))
+    scores = ws.read_artifact(batch_path("interpretability-research"), ScreeningResult)
+    mangled = scores.model_copy(update={"options": scores.options[1:]})  # a card unscored
+    target.write_text(mangled.dump_yaml(), encoding="utf-8")
+    ws.path("screening/scores.yaml").unlink()
+    before = sum(1 for r, _c, _p in dispatcher.invocations if r == "screener")
+    await ScreeningStage().execute(ctx)
+    after = sum(1 for r, _c, _p in dispatcher.invocations if r == "screener")
+    assert after == before + 1  # exactly the mangled angle's batch re-ran
 
 
 async def test_incoherent_screening_pauses_instead_of_shortlisting(tmp_path):

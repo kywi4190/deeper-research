@@ -270,3 +270,79 @@ def test_subscription_billing_refuses_a_foreign_auth_source(ws: Workspace, monke
     LiveDispatcher(ws, config)._check_auth_source(LoginInit())  # no raise
     api_config = ws.load_config().model_copy(update={"mode": "live", "billing": "api"})
     LiveDispatcher(ws, api_config)._check_auth_source(SystemMessage())  # no raise
+
+
+def test_usage_limit_notice_recognizes_known_shapes() -> None:
+    """Finding 11's detector, over both families the CLI is known to emit; the
+    exact live shape is unconfirmed (the triage's planned probe), so the
+    matcher is deliberately broad — but not so broad ordinary prose trips it."""
+    from deeper.agents_runtime import usage_limit_notice
+
+    hit, resets = usage_limit_notice("Claude AI usage limit reached|1751986800")
+    assert hit and resets is not None  # epoch marker -> local ISO reset time
+    assert resets[:2] == "20"  # a formatted timestamp, not the raw epoch
+
+    hit, resets = usage_limit_notice("5-hour limit reached ∙ resets 3am")
+    assert hit and resets == "3am"
+
+    hit, resets = usage_limit_notice("You've reached your usage limit for this session.")
+    assert hit and resets is None  # detected, no reset time to echo
+
+    for benign in (
+        "the vendor imposes rate limits on bulk exports",
+        "### artifact: option-card-set (usage notes: none)",
+        "the budget limit reached by S3 was 16 units",
+    ):
+        hit, _ = usage_limit_notice(benign)
+        assert not hit, f"false positive on: {benign}"
+
+
+async def test_live_invoke_enriches_sdk_failures_with_cli_result_detail(
+    ws: Workspace, monkeypatch
+) -> None:
+    """Finding 3: when the SDK raises an opaque wrapper, the exception that
+    reaches the transcript carries the CLI's own result subtype/text (the M1
+    run's 'error result: success' was really output-token exhaustion)."""
+    import claude_agent_sdk
+
+    from deeper.agents_runtime import LiveDispatchError
+
+    class ResultMessage:
+        subtype = "error_during_execution"
+        result = "response exceeded the 32000 output token maximum"
+        is_error = True
+
+    async def fake_query(*, prompt, options):
+        yield ResultMessage()
+        raise RuntimeError("Claude Code returned an error result: success")
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    dispatcher = LiveDispatcher(ws, config)
+    with pytest.raises(LiveDispatchError) as excinfo:
+        await dispatcher._invoke("p", scout_contract(), 0)
+    message = str(excinfo.value)
+    assert "error result: success" in message  # the SDK's wrapper survives
+    assert "error_during_execution" in message  # ...enriched with the subtype
+    assert "32000 output token" in message  # ...and the CLI's real diagnosis
+
+
+async def test_live_invoke_surfaces_unraised_error_results(ws: Workspace, monkeypatch) -> None:
+    """An is_error ResultMessage the SDK does NOT raise for must fail the
+    dispatch (transient class) instead of burning schema retries on garbage."""
+    import claude_agent_sdk
+
+    from deeper.agents_runtime import LiveDispatchError
+
+    class ResultMessage:
+        subtype = "error_max_turns"
+        result = "stopped: maximum turns exceeded"
+        is_error = True
+
+    async def fake_query(*, prompt, options):
+        yield ResultMessage()
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    with pytest.raises(LiveDispatchError, match="error_max_turns"):
+        await LiveDispatcher(ws, config)._invoke("p", scout_contract(), 0)

@@ -64,6 +64,55 @@ def test_removal_drops_angle_and_its_dedup_entries_and_logs_reason(tmp_path):
     assert all(e.merged_into != "training-efficiency" for e in angle_map.dedup_map)
 
 
+def test_infeasible_post_edit_map_warns_but_still_applies(tmp_path):
+    """Finding 2: a 41-angle map × floor 1 > B crashed S2 unhandled on the M1
+    run. Gate A now warns at apply time (S2 pauses on the same check); the
+    decision itself still lands — the human may intend to fix config next."""
+    ws = ws_with_map(tmp_path)
+    additions = [
+        AngleAddition(name=f"Filler angle {i}", note="breadth stress") for i in range(20)
+    ]  # map fixture has 8 angles; 28 × floor 1 > B=16 (quick)
+    messages, problem = apply_gate_a_actions(ws, decision(added_angles=additions))
+    assert problem is None  # warn, never block
+    assert any("WARNING" in m and "infeasible" in m for m in messages)
+    angle_map = ws.read_artifact("angles/map.yaml", AngleMap)
+    assert len(angle_map.angles) == 28  # the edits were applied regardless
+
+
+async def test_infeasible_map_pauses_s2_cleanly(tmp_path):
+    """S2 catches allocate() infeasibility and interrupts with the exact fix
+    instead of an unhandled traceback; state stays resumable at S2."""
+    import pytest
+
+    from deeper.stages import StageInterrupted
+    from deeper.stages.s2_allocation import AllocationStage
+
+    from .helpers import make_ctx
+
+    ws = ws_with_map(tmp_path)
+    angle_map = ws.read_artifact("angles/map.yaml", AngleMap)
+    filler = [
+        angle_map.angles[0].model_copy(update={"id": f"filler-{i}", "name": f"Filler {i}"})
+        for i in range(20)
+    ]
+    ws.write_artifact(
+        "angles/map.yaml",
+        AngleMap(
+            angles=[*angle_map.angles, *filler],
+            dedup_map=angle_map.dedup_map,
+            notes=angle_map.notes,
+        ),
+    )
+    ctx = make_ctx(ws)
+    with pytest.raises(StageInterrupted) as excinfo:
+        await AllocationStage().execute(ctx)
+    message = str(excinfo.value)
+    assert "infeasible" in message
+    assert "total_budget_units" in message  # the fix is named
+    assert "deeper resume" in message
+    assert not ws.path("allocation.yaml").exists()  # nothing half-written
+
+
 def test_addition_enters_map_with_human_provenance_and_default_prior(tmp_path):
     ws = ws_with_map(tmp_path)
     messages, problem = apply_gate_a_actions(

@@ -13,7 +13,7 @@ from __future__ import annotations
 from deeper.allocation import allocate
 from deeper.schemas import AllocationTable, AngleMap, Stage
 
-from .base import StageBase, StageContext
+from .base import StageBase, StageContext, StageInterrupted
 
 
 def table_lines(table: AllocationTable) -> list[str]:
@@ -47,13 +47,24 @@ class AllocationStage(StageBase):
     async def execute(self, ctx: StageContext) -> None:
         angle_map = ctx.workspace.read_artifact("angles/map.yaml", AngleMap)
         priors = {a.id: a.relevance_prior for a in angle_map.angles}
-        table = allocate(
-            priors,
-            total_budget_units=ctx.config.total_budget_units,
-            floor=ctx.config.floor,
-            gamma=ctx.config.gamma,
-            per_angle_cap_pct=ctx.config.per_angle_cap_pct,
-        )
+        try:
+            table = allocate(
+                priors,
+                total_budget_units=ctx.config.total_budget_units,
+                floor=ctx.config.floor,
+                gamma=ctx.config.gamma,
+                per_angle_cap_pct=ctx.config.per_angle_cap_pct,
+            )
+        except ValueError as err:
+            # An approved map the budget formula cannot satisfy is a human
+            # decision, not a crash (M1 finding 2): pause cleanly with the
+            # exact fix, before any S3 spend. State stays resumable at S2.
+            raise StageInterrupted(
+                f"S2: the approved angle map is infeasible for this run's budget — "
+                f"{err}.\nEither remove angles (edit angles/map.yaml directly, or "
+                f"`deeper rerun <run> --stage S1` for a fresh map) or raise "
+                f"total_budget_units in config.yaml, then `deeper resume <run>`."
+            ) from err
         ctx.workspace.write_artifact("allocation.yaml", table)
         for line in table_lines(table):
             ctx.emit(line)

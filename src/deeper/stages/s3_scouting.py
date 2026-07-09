@@ -87,6 +87,38 @@ def needs_revision(critique: CardCritique) -> bool:
     return bool(critique.completeness_issues or critique.distinctness_issues)
 
 
+def dedupe_option_ids(
+    card_set: OptionCardSet, taken: set[str]
+) -> tuple[OptionCardSet, list[tuple[str, str]]]:
+    """Make the set's card ids globally unique against `taken` (every OTHER
+    angle's ids on disk) by deterministic suffixing: `id` -> `id-{angle_id}`
+    (-2, -3, ... if still colliding). The option-id namespace is global —
+    scores, dossiers, and the tournament key on bare option ids — and two
+    scouts genuinely can card the same thing (M1 finding 6: `sqlite-vec`
+    belonged to both the SQLite-extension and pure-Python angles). Returns the
+    (possibly rewritten) set and the renames applied."""
+    own = {c.id for c in card_set.cards}
+    renames: list[tuple[str, str]] = []
+    cards = []
+    for card in card_set.cards:
+        new_id = card.id
+        if new_id in taken:
+            new_id = f"{card.id}-{card_set.angle_id}"
+            n = 2
+            while new_id in taken or new_id in own:
+                new_id = f"{card.id}-{card_set.angle_id}-{n}"
+                n += 1
+            own.add(new_id)
+            renames.append((card.id, new_id))
+        cards.append(card.model_copy(update={"id": new_id}) if new_id != card.id else card)
+    if not renames:
+        return card_set, []
+    return (
+        OptionCardSet(angle_id=card_set.angle_id, cards=cards, notes=card_set.notes),
+        renames,
+    )
+
+
 class ScoutingStage(StageBase):
     stage = StageEnum.S3
     required_inputs = (
@@ -102,6 +134,29 @@ class ScoutingStage(StageBase):
             return ctx.workspace.read_artifact(relpath, model)
         except (WorkspaceError, ValidationError, yaml.YAMLError):
             return None
+
+    def _write_cards(self, ctx: StageContext, card_set: OptionCardSet) -> OptionCardSet:
+        """The single write path for any angle's cards.yaml: card ids are made
+        globally unique against every other angle's cards on disk before the
+        write (deterministic code, never a re-dispatch). Safe under the
+        parallel fan-out: the check-and-write is one synchronous stretch of the
+        single event loop."""
+        taken: set[str] = set()
+        for path in sorted(ctx.workspace.path("options").glob("*/cards.yaml")):
+            if path.parent.name == card_set.angle_id:
+                continue
+            other = self._try_read(ctx, f"options/{path.parent.name}/cards.yaml", OptionCardSet)
+            if other is not None:
+                taken.update(c.id for c in other.cards)
+        card_set, renames = dedupe_option_ids(card_set, taken)
+        for old_id, new_id in renames:
+            ctx.emit(
+                f"S3: {card_set.angle_id} option id '{old_id}' collides with another "
+                f"angle's card — renamed to '{new_id}' (option ids are global; the "
+                "overlap itself may be signal the two angles partially overlap)"
+            )
+        ctx.workspace.write_artifact(cards_path(card_set.angle_id), card_set)
+        return card_set
 
     # -- engine protocol ------------------------------------------------------
 
@@ -179,7 +234,7 @@ class ScoutingStage(StageBase):
                 ),
                 input_artifacts={**base_inputs, "angle": angle_yaml},
             )
-            ctx.workspace.write_artifact(cards_path(angle_id), card_set)
+            card_set = self._write_cards(ctx, card_set)
             ctx.emit(f"S3: {angle_id} scout done ({len(card_set.cards)} cards)")
 
         cards = ctx.workspace.read_artifact(cards_path(angle_id), OptionCardSet)
@@ -238,7 +293,7 @@ class ScoutingStage(StageBase):
                     "critique": critique.dump_yaml(),
                 },
             )
-            ctx.workspace.write_artifact(cards_path(angle_id), revised)
+            revised = self._write_cards(ctx, revised)
             ctx.emit(f"S3: {angle_id} revision applied ({len(revised.cards)} cards)")
         ctx.workspace.write_artifact(critique_path(angle_id), critique)
         ctx.emit(f"S3: {angle_id} critique written (redundancy {critique.redundancy_pct:g}%)")
@@ -394,8 +449,8 @@ class ScoutingStage(StageBase):
         merged = OptionCardSet(
             angle_id=angle_id, cards=[*existing.cards, *new_cards], notes=existing.notes
         )
-        ctx.workspace.write_artifact(cards_path(angle_id), merged)
+        merged = self._write_cards(ctx, merged)
         ctx.emit(
             f"S3: {angle_id} top-up merged {len(new_cards)} card(s): "
-            + ", ".join(c.id for c in new_cards)
+            + ", ".join(c.id for c in merged.cards[len(existing.cards) :])
         )
