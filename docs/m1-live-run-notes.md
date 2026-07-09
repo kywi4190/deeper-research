@@ -38,7 +38,10 @@ workspace itself is the full audit trail (gitignored, kept locally).
 
 ## Findings to fix (ordered by pain)
 
-1. **Cartography explodes on design-space decomposition.** The
+All findings below are now ADDRESSED (Prompt 13, 2026-07-09) unless a line
+says otherwise; the original text is kept as the record of what was observed.
+
+1. **ADDRESSED — Cartography explodes on design-space decomposition.** The
    first-principles cartographer maps the *engineering design space* (index
    families, WAL durability, quantization, metadata filtering) instead of the
    *adoption space* (regions a scout can populate with adoptable options).
@@ -51,13 +54,23 @@ workspace itself is the full audit trail (gitignored, kept locally).
    options"; tell the merger to fold feature/criterion dimensions into
    strategic notes (rubric-weight kind) instead of keeping them as angles;
    consider a soft map-size target (5–15) in the merger prompt.
-2. **An infeasible approved map crashes S2.** With 41 angles × floor 1 >
+   **Landed:** all six cartographer prompts define an angle by the adopter's
+   test ("could the decision end with 'we went with something from this
+   region'?"), first-principles' coordinate-system step now distinguishes
+   choice dimensions from design dimensions, and the merger is the
+   adoption-space filter (fold criterion dimensions into rubric-weight notes
+   with the dedup entry pointing at the real region — which correctly
+   depresses novelty — plus the 5–15 soft target). Quick additionally caps
+   cartography at one expansion pass (finding 4).
+2. **ADDRESSED — An infeasible approved map crashes S2.** With 41 angles × floor 1 >
    B=16, `allocate()` raises and the engine has no handler — an unhandled
    traceback, violating the pause-don't-crash rule. Only my Gate A pruning
    avoided it. Fix in code: S2 should catch infeasibility and pause with
    "remove angles or raise total_budget_units", and/or Gate A approval should
    warn when the post-edit map is infeasible for the run's budget.
-3. **The `error result: success` SDK failure was output-token exhaustion,
+   **Landed:** both — S2 pauses cleanly (StageInterrupted, fix named, state
+   resumable at S2) and Gate A warns at apply time without blocking.
+3. **ADDRESSED — The `error result: success` SDK failure was output-token exhaustion,
    and it was invisible.** Three S5 dispatch failures in a row reported only
    `Exception: Claude Code returned an error result: success` — the real
    cause (found in the subagent's CLI session log: `stop_reason: max_tokens`,
@@ -70,32 +83,44 @@ workspace itself is the full audit trail (gitignored, kept locally).
    the CLI result subtype/detail when available, and add retry-with-backoff
    for the genuinely transient class (one S3 scout failure of the same shape
    succeeded on plain re-resume). Keep the pause as the final fallback.
-3b. **Single-call screening does not scale — fixed during the run.** 52
+   **Landed:** (b) too — `LiveDispatchError` wraps any live failure with the
+   streamed ResultMessage's subtype/result text, an error result the SDK does
+   NOT raise for is surfaced instead of burning schema retries, and every
+   invocation runs under `dispatch_timeout_s` (default 20 min) so a hung CLI
+   becomes a normal transient failure. Backoff had landed early (verified).
+3b. **ADDRESSED — Single-call screening does not scale — fixed during the run.** 52
    options × 7 criteria needs a >64k-token reply (hit the model output
    ceiling even after the env fix, then the CLI hung for 50 minutes); one
    mega-call also re-pays the whole prompt on every retry. **Landed:** S5 now
    dispatches one screener batch per angle (mirroring S3's fan-out), verifies
    integrity per batch, filters over-scoped options, and merges in code with
    a cross-angle duplicate-id guard; mock full-fixture fallback handled by
-   the filter. Remaining for Prompt 13: see finding 7 (persist batches).
-4. **Quick-profile cost reality vs the $5 default cap.** This run cost ~$13
+   the filter. Remaining for Prompt 13: see finding 7 (persist batches) —
+   since landed.
+4. **ADDRESSED — Quick-profile cost reality vs the $5 default cap.** This run cost ~$13
    to Gate A and ~$31+ through S3 — the saturation loop multiplied
    cartography (8 invocations, and the merger re-reads *all* raw reports each
    expansion pass: $0.84 → $1.62 per merge). Either quick should constrain
    expansion (e.g. cap cartography passes at 1 expansion for quick), shrink
    size-class search budgets, or ship a more honest default cap (~$25–40).
    Revisit after the cartography prompt fix — a sane map may halve total cost.
-5. **Failed-but-recovered retry attempts leave no artifact.** Retry counts
+   **Landed:** both levers — quick ships `caps.max_cartographers: 4` (one
+   expansion pass) and the default caps are now quick $30 / standard $100 /
+   exhaustive $200, calibrated against this run's ledger (README "Cost
+   expectations" carries the table).
+5. **ADDRESSED — Failed-but-recovered retry attempts leave no artifact.** Retry counts
    persist, but the invalid outputs that triggered them are discarded, so
    there's nothing to study for prompt iteration (the §10 quality metric
    wants schema-failure rates *and* causes). Log every failed attempt to
-   `logs/retries/` even when the retry succeeds.
-5b. **Failed dispatches are not ledgered.** A dispatch that dies in flight
+   `logs/retries/` even when the retry succeeds. **Landed** exactly so, for
+   both `run_agent` and the interview loop's violations.
+5b. **ADDRESSED — Failed dispatches are not ledgered.** A dispatch that dies in flight
    (all three S5 failures, each a full ~50-card prompt) records no
    SpendEntry — the tokens were consumed but the ledger undercounts them.
    Record a SpendEntry (estimated or zero-cost marker) for failed attempts
-   too, so the audit trail shows the money went somewhere.
-6. **Cross-angle option-id collisions are real.** Two scouts independently
+   too, so the audit trail shows the money went somewhere. **Landed** as a
+   zero-cost marker (`SpendEntry.failed` carries the error text).
+6. **ADDRESSED — Cross-angle option-id collisions are real.** Two scouts independently
    carded `sqlite-vec` (it genuinely belongs to both the SQLite-extension and
    pure-Python angles); the S5 merge guard (added during the run) caught it
    and paused. Resolved by hand-renaming one card id. Fix for S3: make the
@@ -103,16 +128,23 @@ workspace itself is the full audit trail (gitignored, kept locally).
    time (deterministic code), and/or note in the S5 guard message that
    renaming a card id is the cheap fix (not a full angle re-scout). Overlap
    like this is also signal the two angles partially overlap — worth
-   surfacing to Gate A.
-7. **S5 batch results are not persisted per angle.** All 12 screening
+   surfacing to Gate A. **Landed:** every cards.yaml write (scout, revision,
+   top-up merge) deterministically auto-suffixes collisions `id-{angle}` and
+   emits the overlap as signal; the S5 guard message now names the
+   hand-rename fix and survives as a backstop for hand-edited workspaces.
+7. **ADDRESSED — S5 batch results are not persisted per angle.** All 12 screening
    batches completed and were paid for, then the merge-time collision threw
    everything away — resume re-paid all 12. Persist per-angle batch results
-   (like S3's per-angle cards) and skip valid ones on re-entry.
-8. **Windows `isatty` quirk:** `deeper new < NUL` still looks interactive
+   (like S3's per-angle cards) and skip valid ones on re-entry. **Landed** at
+   `screening/batches/{angle}.yaml`, written the moment a batch passes its
+   integrity checks; a persisted batch is trusted only while it coheres with
+   the current rubric and cards.
+8. **ADDRESSED — Windows `isatty` quirk:** `deeper new < NUL` still looks interactive
    (NUL is a character device), asks the confirm question, and declines on
    EOF. Harmless but surprising; a `--non-interactive` flag would make the
-   mode explicit instead of stdin-shape-dependent.
-9. **Console mojibake — and worse, a hard crash on cp1252 stdout.** Em-dashes
+   mode explicit instead of stdin-shape-dependent. **Landed** on
+   `deeper new`, `resume`, and `rerun`.
+9. **ADDRESSED — Console mojibake — and worse, a hard crash on cp1252 stdout.** Em-dashes
    render as `�` under cp1252 consoles (git-bash default) — cosmetic. But
    observed during Prompt 11 verification (2026-07-09, a mock `deeper resume`
    with piped output): S6's emit strings contain `Δ` (e.g. "re-score 4.5
@@ -126,7 +158,9 @@ workspace itself is the full audit trail (gitignored, kept locally).
    errors="replace")` at CLI entry) so no emit string can ever raise, and/or
    keep emit strings ASCII-safe (`delta` for `Δ`). Repro: pipe any
    S6-reaching `deeper resume` under a cp1252 console without
-   `PYTHONIOENCODING=utf-8`.
+   `PYTHONIOENCODING=utf-8`. **Landed:** both — the CLI reconfigures
+   stdout/stderr to UTF-8 with `errors="replace"` at entry (worst case
+   mojibake, never a crash), and S6's emits say `delta` now.
 
 10. **ADDRESSED — The shortlist rule does not concentrate: 26 "finalists"
    out of 52.** Quick profile, shortlist_size 3 — and 26 options advanced,
@@ -146,7 +180,7 @@ workspace itself is the full audit trail (gitignored, kept locally).
    at the absolute threshold and hard-capped at `caps.max_finalists` (new cut
    cause `below-cutoff`; recorded as a Design deviation in the README).
 
-11. **Plan usage-limit exhaustion is not recognized as its own pause cause.**
+11. **ADDRESSED — Plan usage-limit exhaustion is not recognized as its own pause cause.**
    Live runs default to `billing: subscription` (metering the Claude plan),
    so a long run can hit the plan's session usage limit mid-stage. Today the
    run *does* pause safely — every dispatch failure lands in a committed,
@@ -172,7 +206,14 @@ workspace itself is the full audit trail (gitignored, kept locally).
    an explicit human action, like every other pause. First step is a small
    live probe at the limit boundary to pin down exactly how the SDK surfaces
    the condition (exception vs. text result, and whether the reset timestamp
-   is machine-readable).
+   is machine-readable). **Landed** per the recorded scope:
+   `UsageLimitReached` is detected in `_guarded_invoke` against BOTH shapes
+   (exception text, and short artifact-free reply text — so it can never burn
+   the schema-retry loop), skips backoff entirely, and pauses with the reset
+   time in the message (parsed from the `|<epoch>` marker or the prose
+   "resets ..." tail) and an explicit no-auto-resume statement. The detector
+   is deliberately broad because the probe has NOT been run yet — it remains
+   the open sub-item, to tighten the matchers against the real SDK surface.
 
 Final cost: **$65.20** total — S0 $0.75, S1 $12.34 (41-angle bloat), S3
 $21.99, S4 $1.32, S5 $20.06 (~$12 of which was re-paid discarded batches),

@@ -13,24 +13,30 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**The full pipeline is built — S0–S8 runs end-to-end in mock (live-smoke through
-S5), from `deeper new` to a citation-linked decision report.** The extended M1/M2
-walk is proven by `tests/test_e2e_mock.py`: one test drives a full mock run S0 →
-Gate A (approved with a prior adjustment) → S2 → S3 → S4 → Gate B (weight
-override) → S5 → S6 deep dives → S7 tournament → Gate C (a preference-feedback
-loop that moves the preference-adjusted board and provably not the
-destination-only one, then approval) → S8 synthesis → DONE, asserting every
-artifact validates, the git log carries one commit per stage, gate, and Gate-C
-loop, the spend ledger is populated and under the cap, and `rerun --stage S3
+**M2 complete.** The full pipeline S0–S8 runs end-to-end in mock (live-smoke
+through S5), from `deeper new` to a citation-linked decision report, and the
+Prompt 13 pre-live hardening pass has landed: every M1 triage finding is
+addressed, and every live failure path — agent timeout, network error, SDK
+exception, schema double-failure, spend cap, plan usage-limit exhaustion —
+lands in a resumable `PAUSED_ATTENTION` with a transcript, never a crash. The
+extended M1/M2 walk is proven by `tests/test_e2e_mock.py`: one test drives a
+full mock run S0 → Gate A (approved with a prior adjustment) → S2 → S3 → S4 →
+Gate B (weight override) → S5 → S6 deep dives → S7 tournament → Gate C (a
+preference-feedback loop that moves the preference-adjusted board and provably
+not the destination-only one, then approval) → S8 synthesis → DONE, asserting
+every artifact validates, the git log carries one commit per stage, gate, and
+Gate-C loop, the spend ledger is populated, under the cap, and reconciles
+(per-role = per-stage = total, in USD and tokens), and `rerun --stage S3
 --angle X` invalidates exactly that subtree before reconverging.
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip,
 an LLM-facing validation-error formatter, and a generated JSON Schema in
 `schemas/`; the versioned agent prompts for stages 0–8 live in `agents/`. The
 kernel is live-run hardened: `deeper doctor` preflights the environment, every
 run carries a `max_spend_usd` guard the dispatcher enforces before each
-invocation, and every agent failure path (schema-retry exhaustion, SDK/network
-error, spend cap) lands in a resumable `PAUSED_ATTENTION` with a transcript in
-`logs/` — never a crash. The stages themselves: S0 is an interactive terminal
+invocation, every raw invocation runs under a wall-clock timeout, and every
+agent failure path (schema-retry exhaustion, SDK/network error, hung call,
+spend cap, plan usage limit) lands in a resumable `PAUSED_ATTENTION` with a
+transcript in `logs/` — never a crash. The stages themselves: S0 is an interactive terminal
 interview with a confirm-before-write step; S1 runs the parallel cartographer
 ensemble plus the §5/S1 saturation rule; Gate A applies all five review actions
 to the map on resume; S2 prints the allocation table at the gate exit; S3 runs
@@ -74,15 +80,20 @@ selection question) exercised the whole kernel: three spend-cap pauses each
 resumed cleanly, real SDK failures paused-not-crashed, gates materially
 changed the outcome (a 41→12 angle prune at Gate A, a weight swap at Gate B),
 and the shortlist's kill list carried specific checkable receipts. Its triage
-findings live in [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md);
-the worst one — screener band inflation turning the "shortlist" into 26
-finalists — is fixed: the screener prompt is calibrated (anchored levels as
-written, bands as genuine uncertainty) and the shortlist rule is now
-relative (top-k by UCB + a dark-horse margin) so it concentrates regardless
-of band width. Live-run billing is also pinned: runs authorize via the
-Claude Code login by default (`billing: subscription`), never a stray
-ANTHROPIC_API_KEY. The remaining findings (cartography over-decomposition,
-per-batch persistence) feed the Prompt 13 hardening pass.
+findings live in [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md),
+and **every finding is now addressed**: the screener is calibrated and the
+shortlist rule (top-k by UCB + a dark-horse margin) concentrates regardless
+of band width; billing is pinned to the Claude Code login by default
+(`billing: subscription`), never a stray ANTHROPIC_API_KEY; the cartography
+prompts map the *adoption space* instead of the engineering design space
+(the 41-angle blowup); an infeasible approved map pauses S2 with the fix
+named instead of crashing; dispatch failures carry the CLI's own result
+detail; failed dispatch attempts are ledgered and recovered schema retries
+logged to `logs/retries/`; option ids are globally unique by construction;
+S5 batches persist per angle and are never re-paid; `--non-interactive`
+makes the stdin shape explicit; the CLI forces UTF-8 output (the cp1252 'Δ'
+crash); and plan usage-limit exhaustion is its own pause cause with the
+reset time in the message and no auto-resume.
 
 ## Architecture map
 
@@ -105,7 +116,7 @@ state of a run.
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), Gate-C loop actions (`gate_c_loops.py`), the re-divergence mini-loop (`redivergence.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–8 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor suites (930 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor suites (943 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -305,22 +316,40 @@ sequences to exercise the retry loop.
 
 **Spend accounting**: every attempt lands a `SpendEntry` (stage, role, angle/option
 context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
-is what gates report and the orchestrator's cap checks read. Retry counts persist in
-`RunState.retry_counts` keyed `stage:role:context`. The USD figures are the SDK's
-API-equivalent estimates: under the default subscription billing they meter plan
-usage (and still drive the spend guard), not dollars charged.
+is what gates report and the orchestrator's cap checks read. A dispatch attempt
+that dies in flight lands a zero-cost marker entry (`failed: <error>`) — the
+tokens it consumed are unknowable, but the audit trail shows the attempt.
+Retry counts persist in `RunState.retry_counts` keyed `stage:role:context`,
+and every schema-invalid attempt's raw output + validation errors are saved to
+`logs/retries/` even when the retry then succeeds — the §10 prompt-iteration
+evidence. The USD figures are the SDK's API-equivalent estimates: under the
+default subscription billing they meter plan usage (and still drive the spend
+guard), not dollars charged.
 
 **The spend guard and the no-crash rule**: every raw invocation passes through one
 guarded chokepoint. Before dispatch, the ledger total is checked against
-`config.max_spend_usd` (quick 5.0 / standard 25.0 / exhaustive 60.0 by default;
-`--max-spend-usd` overrides at `deeper new`, and `deeper resume --max-spend-usd`
-rewrites it, committed) — crossing it raises `SpendCapExceeded`. Inside dispatch,
-a transient infrastructure exception (SDK stream error, network hiccup) is
+`config.max_spend_usd` (quick 30 / standard 100 / exhaustive 200 by default —
+calibrated against the M1 ledger, see "Cost expectations"; `--max-spend-usd`
+overrides at `deeper new`, and `deeper resume --max-spend-usd` rewrites it,
+committed) — crossing it raises `SpendCapExceeded`. Each `_invoke` runs under
+`config.dispatch_timeout_s` (default 20 min), so a hung SDK call (observed
+live: 50 minutes) becomes an ordinary transient failure. A transient
+infrastructure exception (SDK stream error, network hiccup, timeout) is
 retried on a short backoff schedule (`DISPATCH_RETRY_BACKOFF_S`, 2s/8s +
-jitter) before being wrapped as `AgentDispatchFailed` with the cause attached.
-Both, like `AgentOutputInvalid`, pause the run as `PAUSED_ATTENTION` with a
-transcript in `logs/` — a live run always ends in a resumable pause, never a
-crash or lost work. Live subagents also get their size-class output budget
+jitter) before being wrapped as `AgentDispatchFailed` with the cause attached
+— and a live failure is first enriched with the CLI's own result
+subtype/text (`LiveDispatchError`), because the SDK's wrapper alone can be
+actively misleading (M1's `error result: success` was output-token
+exhaustion). Two failure classes are deterministic and skip the backoff:
+`BillingAuthError`, and `UsageLimitReached` — the Claude plan's session
+limit, detected whether it surfaces as an SDK exception or as a short
+limit-notice reply (which would otherwise burn the schema-retry loop as a
+bogus parse failure). All of them, like `AgentOutputInvalid`, pause the run
+as `PAUSED_ATTENTION` with a transcript in `logs/` — a live run always ends
+in a resumable pause, never a crash or lost work. The usage-limit pause
+states the reset time when the notice carries one and instructs `deeper
+resume` at that time; resuming is always an explicit human action, never an
+automatic wait. Live subagents also get their size-class output budget
 enforced, not just stated: `_live_options` passes `max_output_tokens` as
 `CLAUDE_CODE_MAX_OUTPUT_TOKENS` into the subagent's environment (the CLI's
 default 32k ceiling silently killed long artifact replies before this).
@@ -447,7 +476,10 @@ in `STAGES`. The built stages:
   plan against the files on disk, so a crash mid-expansion resumes mid-plan.
 - **S2 Allocation** runs the budget formula over the post-Gate-A map and prints
   the full table (angle, prior, units, share) at the gate exit — the user sees
-  where budget will go before S3 spends any of it.
+  where budget will go before S3 spends any of it. An approved map the formula
+  cannot satisfy (angles × floor > B, or angles × cap < B) pauses cleanly with
+  the exact fix named — remove angles or raise `total_budget_units` — and Gate
+  A already warns at apply time when a decision produces such a map.
 - **S3 Scouting** runs one pipeline per allocated angle, angles in parallel:
   scout (contract carries "you have ~N units ≈ target 2N option cards" from
   allocation.yaml) → card-critic → one revision round against the critique when
@@ -457,7 +489,11 @@ in `STAGES`. The built stages:
   finish, `reflow()` redistributes the pool over angles whose critics named
   `missed_options` (redundancy-stopped angles excluded), a top-up scout per
   target angle is dispatched with those specific misses as its task, and new
-  cards merge into `options/{angle}/cards.yaml`. Within an angle, critique.md is
+  cards merge into `options/{angle}/cards.yaml`. Every cards.yaml write passes
+  through one chokepoint that keeps card ids **globally unique**: a cross-angle
+  collision (two scouts can genuinely card the same thing — M1's `sqlite-vec`)
+  is auto-suffixed `id-{angle}` deterministically at write time, because
+  option ids key scores, dossiers, and the tournament. Within an angle, critique.md is
   written after any revision (its presence marks the angle settled), and
   `options/reflow.yaml` is written after the top-ups merge — so `is_complete`
   can replay the deterministic pool computation against the files on disk.
@@ -474,8 +510,13 @@ in `STAGES`. The built stages:
   rubric, that angle's cards, and — uniquely in the pipeline —
   `preferences.yaml`. Each batch is integrity-checked against its own angle's
   cards (every card scored on every criterion, ids resolvable; over-scoped
-  options dropped; incoherence pauses the run), code merges the batches (a
-  cross-angle duplicate option id pauses with instructions), the weighted
+  options dropped; incoherence pauses the run) and **persisted the moment it
+  passes** at `screening/batches/{angle}.yaml` — a later failure or crash
+  never re-pays a paid batch, and re-entry re-dispatches only batches that
+  are missing or no longer cohere with the current rubric and cards. Code
+  then merges the batches (a
+  cross-angle duplicate option id pauses with instructions — hand-renaming
+  one card id is the fix, not a re-scout), the weighted
   aggregates are recomputed in code from the rubric weights, and then pure code
   (`stages/shortlist.py`) applies the shortlist rule: a confirmed kill-risk
   eliminates regardless of score; survivors are ranked by their weighted
@@ -629,13 +670,16 @@ still binds; every new option's advance/cut reason is appended to
 `shortlist.md`), the real S6 machinery dives the champion, its final re-score
 merges into `dossiers/scores.yaml`, and S7 is invalidated so the tournament
 reruns over the merged finalists before Gate C reopens. **Every agent failure is a pause, not a crash**: schema-retry
-exhaustion (`AgentOutputInvalid`), a dispatch/SDK failure
-(`AgentDispatchFailed`), or the spend guard (`SpendCapExceeded`) all land the
+exhaustion (`AgentOutputInvalid`), a dispatch/SDK failure or timeout
+(`AgentDispatchFailed`), the spend guard (`SpendCapExceeded`), or the Claude
+plan's usage limit (`UsageLimitReached`) all land the
 run in `PAUSED_ATTENTION` — the failure transcript (validation errors + raw
-output, or the traceback, or the spend table) is saved to
+output, or the traceback, or the spend table, or the limit notice) is saved to
 `logs/attention-<timestamp>-<stage>-<role>.md` and rides the pause commit;
 `deeper resume` re-enters the stage after you fix the cause (for a spend-cap
-pause: `deeper resume <run> --max-spend-usd <higher>`).
+pause: `deeper resume <run> --max-spend-usd <higher>`; for a usage-limit
+pause: just resume at the reset time stated in the message — never
+automatic).
 
 **Surgical rerun** (`deeper rerun <run> --stage S3 [--angle x]`) is git-tracked
 deletion: the target stage's output subtree (angle-scoped for S3) plus everything
@@ -714,8 +758,8 @@ deeper resume <run>
 #     S5:   cut (below-cutoff): 1                  <- above the floor, not near the top-k
 #   then S6 deep-dives the finalists in parallel — every option ends in one of
 #   three visible ways:
-#     S6: sae-feature-atlas round 2 re-score 4.5 (Δ0)
-#     S6: sae-feature-atlas converged after 2 round(s) — Δ0 < 0.15 and no
+#     S6: sae-feature-atlas round 2 re-score 4.5 (delta 0)
+#     S6: sae-feature-atlas converged after 2 round(s) — delta 0 < 0.15 and no
 #         low-confidence load-bearing claims
 #     S6: contamination-robust-benchmark BUDGET-CAPPED after 2 round(s) — 2 open
 #         question(s) listed in the dossier
@@ -806,25 +850,63 @@ prompt parsing (frontmatter, `{{schema}}` placeholder, declared schemas known an
 exported), and `schemas/` exports fresh. It exits 1 on genuine failures only.
 
 Then start small — the `quick` profile is sized as a sanity pass (3 cartographers,
-floor 1, shortlist 3, budget B=16) and carries a $5 spend guard by default:
+floor 1, shortlist 3, budget B=16, cartography capped at one expansion pass)
+and carries a $30 spend guard by default (see "Cost expectations" below):
 
 ```bash
 deeper new "your mid-size question" --profile quick --live
 ```
 
-`--max-spend-usd 3.0` tightens the guard at creation. The run behaves exactly like
-the mock walkthrough above — S0 interviews you in the terminal (live agents may
-also web-search), gates pause for your file edits — with two live-specific rails:
+`--max-spend-usd 10` tightens the guard at creation; `--non-interactive` skips
+the S0 interview and confirmations explicitly (useful for scripted runs — on
+Windows, piping from `NUL` still *looks* interactive). The run behaves exactly
+like the mock walkthrough above — S0 interviews you in the terminal (live
+agents may also web-search), gates pause for your file edits — with three
+live-specific rails:
 
 - **The spend guard.** The dispatcher checks the ledger before every invocation;
   crossing `max_spend_usd` pauses the run with the spend table saved to `logs/`.
   Nothing is lost — raise the cap and continue:
-  `deeper resume <run> --max-spend-usd 8`.
-- **No crash on agent failure.** Schema-retry exhaustion, SDK/network errors, and
+  `deeper resume <run> --max-spend-usd 40`. In-flight calls still land in the
+  ledger after the trip, so expect overshoot of roughly concurrency ×
+  per-call cost.
+- **No crash on agent failure.** Schema-retry exhaustion, SDK/network errors,
+  hung calls (per-invocation timeout, default 20 min), and
   the spend cap all land in `PAUSED_ATTENTION` with a transcript at
   `logs/attention-<timestamp>-<stage>-<role>.md`; `deeper status <run>` shows
   where it stopped, and `deeper resume <run>` re-enters the stage once you've
   fixed the cause.
+- **The plan usage limit is its own pause.** Under subscription billing a long
+  run can exhaust the Claude plan's session limit mid-stage; the run pauses
+  with a message that says exactly that, includes the reset time when the
+  CLI's notice carries one, and tells you to `deeper resume <run>` at that
+  time. It never burns backoff or schema retries rediscovering the limit, and
+  it never auto-resumes — resuming is your explicit action, like every pause.
+
+## Cost expectations
+
+One supervised live quick run has been measured (the M1 vector-store run,
+before the hardening fixes); the ledger's stage split and the fixes' expected
+effect are the basis for these numbers. USD figures are the SDK's
+API-equivalent estimates — under the default subscription billing they meter
+plan usage, not dollars charged.
+
+| Profile | Default cap | Measured | Expected per run (post-fixes) |
+|---|---|---|---|
+| quick | $30 | **$65.20** total — S0 $0.75, S1 $12.34, S3 $21.99, S4 $1.32, S5 $20.06 | **~$20–25** |
+| standard | $100 | not yet run | ~$60–90 (extrapolated: 2.5× budget units, larger size classes) |
+| exhaustive | $200 | not yet run | ~$120–180 (extrapolated) |
+
+The measured $65.20 carried roughly $20 of waste the hardening pass removed:
+the 41-angle cartography blowup (S1 ran to the 8-invocation cap and the merger
+re-read every raw report each pass — fixed by the adoption-space prompts plus
+quick's one-expansion cap) and ~$12 of re-paid screening batches (fixed by
+per-angle batch persistence), on top of unledgered failed dispatches (now
+zero-cost marker entries). S6–S8 costs are not yet measured live — the run
+predates them; expect the quick estimate to shift after the first full live
+run and this table to be updated from its ledger. The caps are runaway
+guards, not targets: a spend-cap pause is cheap (resume with a higher cap
+continues exactly where it stopped).
 
 ## How to test
 
@@ -981,7 +1063,43 @@ canonical `Makefile` is used wherever GNU make is available.
 - **Dispatch retry-with-backoff arrived early.** The build guide schedules
   exponential backoff for Prompt 13; the M1 live run hit repeated one-off SDK
   stream errors, each costing a human resume, so the minimal schedule (2
-  retries, 2s/8s + jitter) landed with the M1-exit hardening.
+  retries, 2s/8s + jitter) landed with the M1-exit hardening. The rest of the
+  failure-path work (per-invocation timeout, CLI result-detail enrichment,
+  failed-attempt ledgering, usage-limit detection) landed with Prompt 13 as
+  planned.
+- **Plan usage-limit exhaustion is a distinct, non-retried pause
+  (`UsageLimitReached`).** The design doc never contemplates subscription
+  billing hitting a plan limit mid-run. Detection is deliberately broad (the
+  `usage limit reached|<epoch>` marker and the CLI's prose notices, matched in
+  both exception text and short artifact-free replies) because the exact live
+  shape is unconfirmed — the M1 triage's planned probe at the limit boundary
+  remains worth doing to tighten the matchers. Per the recorded scope
+  decision: the pause message with the reset time is the whole feature; there
+  is deliberately NO automatic sleep-and-resume.
+- **A failed dispatch attempt is a ledgered `SpendEntry`.** The tokens a
+  dispatch that died in flight consumed are unknowable from our side, so the
+  entry is a zero-cost marker carrying the error text in a new `failed` field
+  — the audit trail shows every attempt without pretending to know its cost.
+- **`logs/retries/` preserves recovered failures.** Design §10 wants
+  schema-failure rates *and causes*; retry counts alone lose the causes when
+  the retry succeeds, so every invalid attempt's raw output + validation
+  errors are persisted even on recovery.
+- **The option-id namespace is global, enforced at S3 write time.** The design
+  scopes nothing about card-id uniqueness across angles, but scores, dossiers,
+  and tournament artifacts key on bare option ids. Cross-angle collisions are
+  deterministically auto-suffixed (`id-{angle}`) at the cards.yaml write
+  chokepoint; the S5 merge guard survives as a backstop for hand-edited
+  workspaces.
+- **`screening/batches/{angle}.yaml` persists paid screener batches.** Not a
+  design §7 artifact: it exists so a merge-time failure or crash never
+  re-pays completed batches (M1 re-paid all 12). A persisted batch is trusted
+  only while it still coheres with the current rubric and cards.
+- **Quick caps cartography at one expansion pass, and the default spend caps
+  are ledger-calibrated.** §12's global 8-invocation cap let the M1 quick run
+  spend ~$13 before Gate A; quick now ships `caps.max_cartographers: 4`
+  (3 initial + 1 expansion), and the profile caps (30/100/200) reflect the
+  measured cost reality instead of the original optimistic 5/25/60 — see
+  "Cost expectations".
 - **Run-level `max_spend_usd` guard.** Design §8 speaks of per-stage caps and
   spend visible at gates; the runaway-cost mitigation here is (additionally) one
   whole-run USD cap the dispatcher checks before every invocation, because a
@@ -1132,12 +1250,15 @@ Following the phases in the build guide:
   judge + the code-computed rubric sensitivity in `sensitivity.py`) ✅ →
   Prompt 12 (Gate C loops: preference feedback, evidence challenges, the
   re-divergence mini-loop; S8 synthesis with the mechanical citation pass;
-  `deeper report`) ✅. **The full pipeline S0→S8 is built.**
-- **Phase D — Evaluation & hardening (M3).**
+  `deeper report`) ✅. **M2 done — the full pipeline S0→S8 is built.**
+- **Phase D — Evaluation & hardening (M3):** Prompt 13 (pre-live hardening:
+  every M1 triage finding addressed, the failure-path audit — timeout,
+  network, SDK, schema double-failure, usage limit — all pausing resumably,
+  ledger reconciliation asserted end-to-end) ✅ → Prompt 14 (benchmark evals)
+  next.
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase D, Prompt 13 — the hardening pass (the triage list includes the
-cp1252 console crash on S6's 'Δ' emit, cartography over-decomposition,
-per-batch persistence, and recognizing plan usage-limit exhaustion as its own
-pause cause with the reset time in the message — no auto-resume), then the
-benchmark evals.**
+**Next: Phase D, Prompt 14 — the benchmark evals (`benchmarks/` question
+specs and the §10 metrics over them), plus a live probe at the plan-limit
+boundary to pin down exactly how the SDK surfaces the usage-limit condition
+(the detector is deliberately broad until then).**
