@@ -1,0 +1,18 @@
+# All sampled claims verified.
+option_id: lab-codebase-takeover
+results:
+- claim_id: c-lab-fit
+  verdict: verified
+  evidence_quote: Source text supports c-lab-fit as stated.
+  note: null
+- claim_id: c-lab-viability
+  verdict: verified
+  evidence_quote: Source text supports c-lab-viability as stated.
+  note: null
+- claim_id: c-lab-cases
+  verdict: verified
+  evidence_quote: Source text supports c-lab-cases as stated.
+  note: null
+sampled_load_bearing_count: 2
+sampled_other_count: 1
+notes: null

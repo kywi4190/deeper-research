@@ -35,7 +35,17 @@ from .common import (
     SourceTier,
     Verdict,
 )
-from .dossier import Claim, Dossier, DossierSection, VerificationReport, VerificationResult
+from .dossier import (
+    Claim,
+    DeepDiveRound,
+    DeepDiveRoundLog,
+    DeepDiveStatus,
+    DeepDiveVerificationRecord,
+    Dossier,
+    DossierSection,
+    VerificationReport,
+    VerificationResult,
+)
 from .export import ARTIFACT_REGISTRY, export_all
 from .gates import (
     AngleAddition,
@@ -162,6 +172,10 @@ __all__ = [
     "UncertaintyBand",
     # S6 dossier
     "Claim",
+    "DeepDiveRound",
+    "DeepDiveRoundLog",
+    "DeepDiveStatus",
+    "DeepDiveVerificationRecord",
     "Dossier",
     "DossierSection",
     "VerificationReport",

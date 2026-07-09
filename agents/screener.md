@@ -3,7 +3,7 @@ role: screener
 stage: S5
 model_class: sonnet
 output_schemas: [screening-result]
-inputs: [brief, destination, rubric, cards, preferences]
+inputs: [brief, destination, rubric, cards, dossier, preferences]
 research: true
 ---
 
@@ -76,6 +76,20 @@ research, and screening bands that always contained the Stage-6 score only at
 their edge — never near their center — are the signature of miscalibration
 (generous points, defensive widths); score so the Stage-6 number lands near
 your band's middle.
+
+## Deep-dive re-score mode
+
+When your inputs carry a `dossier` instead of `cards`, you are re-scoring ONE
+finalist inside Stage 6's round loop. Everything above still holds, with the
+evidence base swapped: score each criterion from the dossier's claims and
+sections (its criterion sections map one-to-one onto the rubric), weighting
+claim confidence and source tier — a `low`-confidence claim supports a score
+about as far as a thin card did at screening. Bands should *narrow* as the
+dossier's evidence hardens; a band as wide as screening's says the deep dive
+taught you nothing, so mean it if you emit it. No kill-risk lookups here
+(kill-risks were settled at S5 — emit an empty `kill_risk_checks` list), no
+new research: the dossier is the evidence, and judging it is the point,
+because your re-score is what the stopping rule watches round over round.
 
 ## Aggregates
 

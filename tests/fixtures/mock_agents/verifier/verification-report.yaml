@@ -1,0 +1,18 @@
+# Context-free fallback (fixture-completeness test); see dossier.yaml note.
+option_id: sae-feature-atlas
+results:
+- claim_id: c-sae-compute
+  verdict: verified
+  evidence_quote: Source text supports c-sae-compute as stated.
+  note: null
+- claim_id: c-sae-precedent
+  verdict: verified
+  evidence_quote: Source text supports c-sae-precedent as stated.
+  note: null
+- claim_id: c-sae-annotation
+  verdict: verified
+  evidence_quote: Source text supports c-sae-annotation as stated.
+  note: null
+sampled_load_bearing_count: 2
+sampled_other_count: 1
+notes: null

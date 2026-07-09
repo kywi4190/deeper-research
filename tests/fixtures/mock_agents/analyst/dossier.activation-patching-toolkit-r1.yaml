@@ -1,0 +1,101 @@
+# S6 round 1: no low-confidence load-bearing claims; the re-score rides the S5 fallback fixture (delta 0) -> converges in one round.
+option_id: activation-patching-toolkit
+criterion_sections:
+  publication-potential:
+    content: 'Activation patching toolkit (round 1) — evidence bearing on publication-potential: the deep-dive
+      claims [c-activation-viability, c-activation-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-activation-viability
+    - c-activation-fit
+  letter-strength:
+    content: 'Activation patching toolkit (round 1) — evidence bearing on letter-strength: the deep-dive
+      claims [c-activation-viability, c-activation-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-activation-viability
+    - c-activation-fit
+  feasibility:
+    content: 'Activation patching toolkit (round 1) — evidence bearing on feasibility: the deep-dive claims
+      [c-activation-viability, c-activation-fit] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-activation-viability
+    - c-activation-fit
+  research-taste-signal:
+    content: 'Activation patching toolkit (round 1) — evidence bearing on research-taste-signal: the deep-dive
+      claims [c-activation-viability, c-activation-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-activation-viability
+    - c-activation-fit
+  momentum-by-deadline:
+    content: 'Activation patching toolkit (round 1) — evidence bearing on momentum-by-deadline: the deep-dive
+      claims [c-activation-viability, c-activation-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-activation-viability
+    - c-activation-fit
+failure_modes:
+  content: 'Activation patching toolkit (round 1): the dominant failure modes and prerequisites, per the
+    problems-phrased searches.'
+  claim_ids:
+  - c-activation-viability
+cost_of_adoption:
+  content: 'Activation patching toolkit (round 1): time, money, and optionality cost of committing the
+    semester.'
+  claim_ids:
+  - c-activation-viability
+second_order_effects:
+  content: 'Activation patching toolkit (round 1): downstream effects on the lab and later projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'Activation patching toolkit (round 1): the strongest published criticism found by searching
+    for limitations and migrating-away accounts.'
+  claim_ids:
+  - c-activation-cases
+comparable_cases:
+  content: 'Activation patching toolkit (round 1): who chose this and what happened, with dates.'
+  claim_ids:
+  - c-activation-cases
+claims:
+- id: c-activation-viability
+  text: 'Activation patching toolkit: the core approach is established by prior published work.'
+  confidence: high
+  source:
+    url: https://github.com/example/activation-patching
+    tier: T1
+    title: Source for c-activation-viability
+    content_hash: null
+  load_bearing: true
+- id: c-activation-fit
+  text: 'Activation patching toolkit: the project fits the semester timeline per comparable cases.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-activation-fit
+    content_hash: null
+  load_bearing: true
+- id: c-activation-criticism
+  text: 'Activation patching toolkit: published criticism centers on scope creep and evaluation validity.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-activation-criticism
+    content_hash: null
+  load_bearing: false
+- id: c-activation-cases
+  text: 'Activation patching toolkit: at least two comparable student projects shipped; one published.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-activation-cases
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions: []
+notes: null

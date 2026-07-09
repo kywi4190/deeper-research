@@ -1,0 +1,380 @@
+{
+  "$defs": {
+    "CriterionScore": {
+      "additionalProperties": false,
+      "properties": {
+        "criterion_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Criterion Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Score",
+          "type": "number"
+        },
+        "band": {
+          "$ref": "#/$defs/UncertaintyBand",
+          "description": "Wider when evidence is thin \u2014 under-information triggers more research, not elimination."
+        },
+        "evidence_pointer": {
+          "description": "Where in the card/dossier the score comes from.",
+          "minLength": 1,
+          "title": "Evidence Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "criterion_id",
+        "score",
+        "band",
+        "evidence_pointer"
+      ],
+      "title": "CriterionScore",
+      "type": "object"
+    },
+    "DeepDiveRound": {
+      "additionalProperties": false,
+      "description": "One research round's re-score, as the stopping rule saw it.",
+      "properties": {
+        "round": {
+          "minimum": 1,
+          "title": "Round",
+          "type": "integer"
+        },
+        "screening": {
+          "$ref": "#/$defs/OptionScreening",
+          "description": "The screener's full re-score of the option from the dossier this round, aggregates recomputed in code."
+        },
+        "delta": {
+          "description": "|weighted_point \u2212 previous round's weighted_point| (round 1 compares against the S5 baseline) \u2014 clause (a) of the stopping rule.",
+          "minimum": 0,
+          "title": "Delta",
+          "type": "number"
+        },
+        "low_confidence_load_bearing": {
+          "description": "Claim ids still low-confidence AND load-bearing (analyst tag unioned with the re-score-diff cross-check) \u2014 clause (b) of the stopping rule blocks stopping while this is non-empty.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Low Confidence Load Bearing",
+          "type": "array"
+        }
+      },
+      "required": [
+        "round",
+        "screening",
+        "delta"
+      ],
+      "title": "DeepDiveRound",
+      "type": "object"
+    },
+    "DeepDiveStatus": {
+      "description": "Where one finalist's round loop stands (design \u00a75/S6 stopping rule).",
+      "enum": [
+        "in-progress",
+        "converged",
+        "budget-capped"
+      ],
+      "title": "DeepDiveStatus",
+      "type": "string"
+    },
+    "DeepDiveVerificationRecord": {
+      "additionalProperties": false,
+      "description": "What the verification pass sampled and what it triggered \u2014 persisted so\nresume never re-samples or re-runs the one targeted revision.",
+      "properties": {
+        "sampled_claim_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sampled Claim Ids",
+          "type": "array"
+        },
+        "contradicted_claim_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Contradicted Claim Ids",
+          "type": "array"
+        },
+        "revision_completed": {
+          "default": false,
+          "description": "True once the ONE targeted analyst revision (triggered only by contradicted claims) and its final re-score have landed.",
+          "title": "Revision Completed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sampled_claim_ids"
+      ],
+      "title": "DeepDiveVerificationRecord",
+      "type": "object"
+    },
+    "KillRiskCheck": {
+      "additionalProperties": false,
+      "description": "Result of the cheap single-lookup check on a card's kill-risk.",
+      "properties": {
+        "fact": {
+          "minLength": 1,
+          "title": "Fact",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/KillRiskOutcome"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "fact",
+        "outcome"
+      ],
+      "title": "KillRiskCheck",
+      "type": "object"
+    },
+    "KillRiskOutcome": {
+      "enum": [
+        "confirmed",
+        "cleared",
+        "unresolved"
+      ],
+      "title": "KillRiskOutcome",
+      "type": "string"
+    },
+    "OptionScreening": {
+      "additionalProperties": false,
+      "description": "One option's full screening record in screening/scores.yaml.",
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "criterion_scores": {
+          "items": {
+            "$ref": "#/$defs/CriterionScore"
+          },
+          "minItems": 1,
+          "title": "Criterion Scores",
+          "type": "array"
+        },
+        "preference_score": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CriterionScore"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The preference-slot score \u2014 the ONLY place tastes enter (P9)."
+        },
+        "kill_risk_checks": {
+          "items": {
+            "$ref": "#/$defs/KillRiskCheck"
+          },
+          "title": "Kill Risk Checks",
+          "type": "array"
+        },
+        "weighted_point": {
+          "description": "Weighted point estimate. Stored so the file alone explains the shortlist decision.",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Weighted Point",
+          "type": "number"
+        },
+        "weighted_ucb": {
+          "description": "Weighted upper confidence bound \u2014 the number the shortlist rule actually compares against the threshold.",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Weighted Ucb",
+          "type": "number"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "option_id",
+        "angle_id",
+        "criterion_scores",
+        "weighted_point",
+        "weighted_ucb"
+      ],
+      "title": "OptionScreening",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "Lightweight per-claim source reference carried inside evidence and claims.",
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/SourceTier"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash linking this reference to the cached copy in sources/, so the verifier can re-check it offline.",
+          "title": "Content Hash"
+        }
+      },
+      "required": [
+        "url",
+        "tier"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "SourceTier": {
+      "description": "T1 primary/official, T2 reputable secondary, T3 forum/anecdote.",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "SourceTier",
+      "type": "string"
+    },
+    "UncertaintyBand": {
+      "additionalProperties": false,
+      "properties": {
+        "lo": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Lo",
+          "type": "number"
+        },
+        "hi": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Hi",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lo",
+        "hi"
+      ],
+      "title": "UncertaintyBand",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "dossiers/{option}-rounds: the code-owned trace of one finalist's deep-dive\nloop. This file is what makes mid-S6 resume honest: rounds recorded here are\nnever re-dispatched, and the verification record marks the revision leg\nsettled. (The design names only the dossier and verification artifacts; the\nlog is a P8 artifact \u2014 the orchestrator's stopping-rule evidence.)",
+  "properties": {
+    "option_id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Option Id",
+      "type": "string"
+    },
+    "baseline": {
+      "$ref": "#/$defs/OptionScreening",
+      "description": "The option's S5 screening record \u2014 round 0 for the delta."
+    },
+    "rounds": {
+      "items": {
+        "$ref": "#/$defs/DeepDiveRound"
+      },
+      "title": "Rounds",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/DeepDiveStatus",
+      "default": "in-progress"
+    },
+    "verification": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DeepDiveVerificationRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "final_screening": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OptionScreening"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The post-revision re-score, present only when a verifier contradiction triggered the targeted revision; otherwise the last round's screening is final."
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "option_id",
+    "baseline"
+  ],
+  "title": "DeepDiveRoundLog",
+  "type": "object"
+}

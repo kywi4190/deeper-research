@@ -1,11 +1,11 @@
 """M1 exit test (design §9): one full mock run through the real stage registry.
 
 A single test drives `deeper new`-equivalent state S0 → Gate A (approved with a
-prior adjustment) → S2 → S3 → S4 → Gate B (one weight override) → S5 → the S6
-stub, then surgically reruns one angle's scouting — asserting the workspace is
-exactly what the design promises at every step: validated artifacts, one commit
-per stage and gate, a populated spend ledger under the cap, resumable state,
-and precisely-scoped invalidation.
+prior adjustment) → S2 → S3 → S4 → Gate B (one weight override) → S5 → S6 deep
+dives → the S7 stub, then surgically reruns one angle's scouting — asserting
+the workspace is exactly what the design promises at every step: validated
+artifacts, one commit per stage and gate, a populated spend ledger under the
+cap, resumable state, and precisely-scoped invalidation.
 """
 
 from __future__ import annotations
@@ -21,8 +21,12 @@ from deeper.schemas import (
     Brief,
     CardCritique,
     CartographerReport,
+    ContradictionLedger,
     CoverageReport,
+    DeepDiveRoundLog,
+    DeepDiveStatus,
     DestinationModel,
+    Dossier,
     GateName,
     GateStatus,
     OptionCardSet,
@@ -33,6 +37,7 @@ from deeper.schemas import (
     ScreeningResult,
     Shortlist,
     Stage,
+    VerificationReport,
 )
 from deeper.workspace import Workspace
 
@@ -93,9 +98,9 @@ async def test_full_mock_run_end_to_end(tmp_path):
 
     # ---- Gate B: approve with one weight adjusted ------------------------------
     ws.path("gates/gate-b.yaml").write_text(GATE_B_DECISION, encoding="utf-8")
-    # S5 runs, then the machine parks cleanly before the unbuilt S6 (Gate C
-    # cannot become pending until S7 exists — S6/S7 arrive in Prompts 10/11).
-    assert await engine.run() is Node.S6
+    # S5 screens, S6 deep-dives every finalist, then the machine parks cleanly
+    # before the unbuilt S7 (Gate C cannot become pending until S7 exists).
+    assert await engine.run() is Node.S7
 
     rubric = ws.read_artifact("rubric.yaml", Rubric)
     weights = {c.id: c.weight for c in rubric.criteria}
@@ -122,10 +127,26 @@ async def test_full_mock_run_end_to_end(tmp_path):
     ws.read_artifact("screening/scores.yaml", ScreeningResult)
     shortlist = ws.read_artifact("screening/shortlist.md", Shortlist)
     assert shortlist.finalist_ids  # the run produced an auditable shortlist
+    for option_id in shortlist.finalist_ids:  # one settled deep dive per finalist
+        ws.read_artifact(f"dossiers/{option_id}.md", Dossier)
+        ws.read_artifact(f"dossiers/{option_id}-verification.md", VerificationReport)
+        log = ws.read_artifact(f"dossiers/{option_id}-rounds.yaml", DeepDiveRoundLog)
+        assert log.status is not DeepDiveStatus.IN_PROGRESS
+    dive_scores = ws.read_artifact("dossiers/scores.yaml", ScreeningResult)
+    assert {o.option_id for o in dive_scores.options} == set(shortlist.finalist_ids)
+    # The scenario exercises all three S6 termination paths in one run.
+    assert ws.read_artifact("dossiers/sae-feature-atlas-rounds.yaml", DeepDiveRoundLog).status is (
+        DeepDiveStatus.CONVERGED
+    )
+    capped = ws.read_artifact("dossiers/contamination-robust-benchmark.md", Dossier)
+    assert capped.budget_capped and capped.open_questions
+    revised = ws.read_artifact("dossiers/backdoor-probe-study-rounds.yaml", DeepDiveRoundLog)
+    assert revised.verification is not None and revised.verification.revision_completed
+    ws.read_artifact("ledger/contradictions.md", ContradictionLedger)
 
-    # ---- state.json: S5 done, gates recorded, spend ledger under the cap -------
+    # ---- state.json: S6 done, gates recorded, spend ledger under the cap -------
     state = ws.load_state()
-    assert state.stage is Stage.S6  # everything through S5 is complete
+    assert state.stage is Stage.S7  # everything through S6 is complete
     assert state.status is RunStatus.RUNNING  # parked, resumable when S6 lands
     assert state.gates[GateName.A] is GateStatus.APPROVED
     assert state.gates[GateName.B] is GateStatus.APPROVED
@@ -134,7 +155,16 @@ async def test_full_mock_run_end_to_end(tmp_path):
 
     assert state.spend, "every agent invocation must land a SpendEntry"
     roles = {e.role for e in state.spend}
-    assert {"interviewer", "merger", "scout", "card-critic", "rubric-builder", "screener"} <= roles
+    assert {
+        "interviewer",
+        "merger",
+        "scout",
+        "card-critic",
+        "rubric-builder",
+        "screener",
+        "analyst",
+        "verifier",
+    } <= roles
     assert any(r.startswith("cartographer-") for r in roles)
     assert not any(e.stage is Stage.S2 for e in state.spend)  # S2 is pure code
     assert all(e.usd >= 0 and e.output_tokens > 0 for e in state.spend)
@@ -150,6 +180,7 @@ async def test_full_mock_run_end_to_end(tmp_path):
         "S3 complete",
         "S4 complete; gate-b pending",
         "S5 complete",
+        "S6 complete",
     ):
         assert expected_subject in subjects, f"missing commit {expected_subject!r}"
     assert any(s.startswith("gate-a: approved") and "1 prior(s) adjusted" in s for s in subjects)
@@ -169,6 +200,8 @@ async def test_full_mock_run_end_to_end(tmp_path):
         "rubric-rationale.md",
         "screening/scores.yaml",
         "screening/shortlist.md",
+        "dossiers/scores.yaml",
+        "dossiers/sae-feature-atlas.md",  # S6 outputs are downstream of S3
         "gates/gate-b.yaml",
     ]
     for relpath in gone:
@@ -195,7 +228,7 @@ async def test_full_mock_run_end_to_end(tmp_path):
     ws.path("gates/gate-b.yaml").write_text(
         "approved: true\npreference_slot_weight: 0.25\n", encoding="utf-8"
     )
-    assert await engine.run() is Node.S6
+    assert await engine.run() is Node.S7
 
     state = ws.load_state()
     assert spend_count(state, "scout", RERUN_ANGLE) == counts_before[("scout", RERUN_ANGLE)] + 1
@@ -207,9 +240,10 @@ async def test_full_mock_run_end_to_end(tmp_path):
     )
     ws.read_artifact(f"options/{RERUN_ANGLE}/cards.yaml", OptionCardSet)
     ws.read_artifact("screening/shortlist.md", Shortlist)
+    ws.read_artifact("dossiers/scores.yaml", ScreeningResult)  # S6 rewalked too
 
     # ---- terminal idempotency: re-running changes nothing ----------------------
     history_before = ws.history()
-    assert await engine.run() is Node.S6
+    assert await engine.run() is Node.S7
     assert ws.history() == history_before
-    assert Workspace.open(ws.root).load_state().stage is Stage.S6
+    assert Workspace.open(ws.root).load_state().stage is Stage.S7

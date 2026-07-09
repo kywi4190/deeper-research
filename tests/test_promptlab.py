@@ -39,6 +39,8 @@ EXPECTED_ROLES = {
     "card-critic",
     "rubric-builder",
     "screener",
+    "analyst",
+    "verifier",
 }
 REQUIRED_META_KEYS = {"role", "stage", "model_class", "output_schemas", "inputs", "research"}
 CONTRACT_SECTIONS = ["# OBJECTIVE", "# OUTPUT FORMAT", "# TOOL & SOURCE GUIDANCE", "# BOUNDARIES"]

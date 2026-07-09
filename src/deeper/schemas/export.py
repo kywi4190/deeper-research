@@ -16,7 +16,7 @@ from .allocation import AllocationTable
 from .angles import AngleMap, CartographerReport, CoverageReport
 from .base import ArtifactModel
 from .common import ContradictionLedger, SourceRecord
-from .dossier import Dossier, VerificationReport
+from .dossier import DeepDiveRoundLog, Dossier, VerificationReport
 from .gates import GateADecision, GateBDecision, GateCDecision
 from .intake import Brief, DestinationModel, Preferences
 from .options import CardCritique, OptionCardSet
@@ -41,6 +41,7 @@ ARTIFACT_REGISTRY: dict[str, type[ArtifactModel]] = {
     "shortlist": Shortlist,
     "dossier": Dossier,
     "verification-report": VerificationReport,
+    "deep-dive-log": DeepDiveRoundLog,
     "prosecution": Prosecution,
     "steelman": Steelman,
     "frame-check": FrameCheck,

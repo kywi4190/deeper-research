@@ -1,0 +1,18 @@
+# All sampled claims verified (budget-capped is about depth, not dishonesty).
+option_id: contamination-robust-benchmark
+results:
+- claim_id: c-cont-rate
+  verdict: verified
+  evidence_quote: Source text supports c-cont-rate as stated.
+  note: null
+- claim_id: c-cont-venues
+  verdict: verified
+  evidence_quote: Source text supports c-cont-venues as stated.
+  note: null
+- claim_id: c-cont-baseline
+  verdict: verified
+  evidence_quote: Source text supports c-cont-baseline as stated.
+  note: null
+sampled_load_bearing_count: 2
+sampled_other_count: 1
+notes: null

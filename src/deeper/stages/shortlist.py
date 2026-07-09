@@ -67,11 +67,12 @@ def confirmed_kill(option: OptionScreening) -> str | None:
 
 
 def recompute_aggregates(
-    screening: ScreeningResult, rubric: Rubric
+    screening: ScreeningResult, rubric: Rubric, *, label: str = "S5"
 ) -> tuple[ScreeningResult, list[str]]:
     """Re-derive weighted_point / weighted_ucb in code (P8: arithmetic is the
     orchestrator's job). Returns the corrected result plus a message per option
-    whose stored numbers drifted beyond AGGREGATE_TOLERANCE."""
+    whose stored numbers drifted beyond AGGREGATE_TOLERANCE. `label` prefixes
+    the drift messages (S6's deep-dive re-scores reuse this machinery)."""
     weights = {c.id: c.weight for c in rubric.criteria}
     w_p = rubric.preference_slot.weight
     corrected: list[OptionScreening] = []
@@ -90,7 +91,7 @@ def recompute_aggregates(
             or abs(ucb - option.weighted_ucb) > AGGREGATE_TOLERANCE
         ):
             drift.append(
-                f"S5: corrected {option.option_id} aggregates — screener said "
+                f"{label}: corrected {option.option_id} aggregates — screener said "
                 f"point {option.weighted_point:g} / ucb {option.weighted_ucb:g}, "
                 f"code computes {point:g} / {ucb:g}"
             )

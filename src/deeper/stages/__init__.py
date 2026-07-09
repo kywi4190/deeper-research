@@ -11,7 +11,6 @@ from .base import (
     StageInterrupted,
 )
 from .not_yet import (
-    DeepDiveStage,
     SynthesisStage,
     TournamentStage,
 )
@@ -21,6 +20,7 @@ from .s2_allocation import AllocationStage
 from .s3_scouting import ScoutingStage
 from .s4_rubric import RubricStage
 from .s5_screening import ScreeningStage
+from .s6_deepdive import DeepDiveStage
 
 STAGES: dict[Stage, type[StageBase]] = {
     Stage.S0: IntakeStage,

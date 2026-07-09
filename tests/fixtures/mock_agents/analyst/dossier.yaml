@@ -1,0 +1,103 @@
+# Context-free fallback (fixture-completeness test): the sae-feature-atlas round-1 dossier. Any other option hitting this fallback fails the option_id integrity check loudly — per-option contexts must have their own fixtures.
+option_id: sae-feature-atlas
+criterion_sections:
+  publication-potential:
+    content: 'SAE feature atlas (round 1) — evidence bearing on publication-potential: the deep-dive claims
+      [c-sae-precedent, c-sae-compute] anchor this criterion; disconfirming searches for limitations and
+      postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-sae-precedent
+    - c-sae-compute
+  letter-strength:
+    content: 'SAE feature atlas (round 1) — evidence bearing on letter-strength: the deep-dive claims
+      [c-sae-precedent, c-sae-compute] anchor this criterion; disconfirming searches for limitations and
+      postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-sae-precedent
+    - c-sae-compute
+  feasibility:
+    content: 'SAE feature atlas (round 1) — evidence bearing on feasibility: the deep-dive claims [c-sae-precedent,
+      c-sae-compute] anchor this criterion; disconfirming searches for limitations and postmortems informed
+      the negative findings noted here.'
+    claim_ids:
+    - c-sae-precedent
+    - c-sae-compute
+  research-taste-signal:
+    content: 'SAE feature atlas (round 1) — evidence bearing on research-taste-signal: the deep-dive claims
+      [c-sae-precedent, c-sae-compute] anchor this criterion; disconfirming searches for limitations and
+      postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-sae-precedent
+    - c-sae-compute
+  momentum-by-deadline:
+    content: 'SAE feature atlas (round 1) — evidence bearing on momentum-by-deadline: the deep-dive claims
+      [c-sae-precedent, c-sae-compute] anchor this criterion; disconfirming searches for limitations and
+      postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-sae-precedent
+    - c-sae-compute
+failure_modes:
+  content: 'SAE feature atlas (round 1): the dominant failure modes and prerequisites, per the problems-phrased
+    searches.'
+  claim_ids:
+  - c-sae-precedent
+cost_of_adoption:
+  content: 'SAE feature atlas (round 1): time, money, and optionality cost of committing the semester.'
+  claim_ids:
+  - c-sae-precedent
+second_order_effects:
+  content: 'SAE feature atlas (round 1): downstream effects on the lab and later projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'SAE feature atlas (round 1): the strongest published criticism found by searching for limitations
+    and migrating-away accounts.'
+  claim_ids:
+  - c-sae-reuse
+comparable_cases:
+  content: 'SAE feature atlas (round 1): who chose this and what happened, with dates.'
+  claim_ids:
+  - c-sae-reuse
+claims:
+- id: c-sae-precedent
+  text: Comparable SAE atlas projects have been published at the target venues within a single semester
+    of work.
+  confidence: high
+  source:
+    url: https://transformer-circuits.pub/2023/monosemantic-features
+    tier: T1
+    title: Source for c-sae-precedent
+    content_hash: null
+  load_bearing: true
+- id: c-sae-compute
+  text: SAE training sweeps at the needed scale fit inside the lab's per-student compute cap with headroom.
+  confidence: low
+  source:
+    url: https://docs.example.dev/compute-policy
+    tier: T2
+    title: Source for c-sae-compute
+    content_hash: null
+  load_bearing: true
+- id: c-sae-annotation
+  text: Feature annotation quality comparable to published atlases is achievable by a single rater with
+    spot checks.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-sae-annotation
+    content_hash: null
+  load_bearing: false
+- id: c-sae-reuse
+  text: An annotated atlas becomes reusable lab infrastructure cited by follow-on projects.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-sae-reuse
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions:
+- Whether SAE training sweeps fit the lab compute cap with real headroom.
+notes: null

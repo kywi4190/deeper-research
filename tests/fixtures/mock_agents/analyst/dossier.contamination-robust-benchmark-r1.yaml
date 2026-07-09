@@ -1,0 +1,104 @@
+# S6 round 1: c-cont-rate low-confidence and load-bearing.
+option_id: contamination-robust-benchmark
+criterion_sections:
+  publication-potential:
+    content: 'Contamination-robust benchmark (round 1) — evidence bearing on publication-potential: the
+      deep-dive claims [c-cont-venues, c-cont-rate] anchor this criterion; disconfirming searches for
+      limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cont-venues
+    - c-cont-rate
+  letter-strength:
+    content: 'Contamination-robust benchmark (round 1) — evidence bearing on letter-strength: the deep-dive
+      claims [c-cont-venues, c-cont-rate] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cont-venues
+    - c-cont-rate
+  feasibility:
+    content: 'Contamination-robust benchmark (round 1) — evidence bearing on feasibility: the deep-dive
+      claims [c-cont-venues, c-cont-rate] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cont-venues
+    - c-cont-rate
+  research-taste-signal:
+    content: 'Contamination-robust benchmark (round 1) — evidence bearing on research-taste-signal: the
+      deep-dive claims [c-cont-venues, c-cont-rate] anchor this criterion; disconfirming searches for
+      limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cont-venues
+    - c-cont-rate
+  momentum-by-deadline:
+    content: 'Contamination-robust benchmark (round 1) — evidence bearing on momentum-by-deadline: the
+      deep-dive claims [c-cont-venues, c-cont-rate] anchor this criterion; disconfirming searches for
+      limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cont-venues
+    - c-cont-rate
+failure_modes:
+  content: 'Contamination-robust benchmark (round 1): the dominant failure modes and prerequisites, per
+    the problems-phrased searches.'
+  claim_ids:
+  - c-cont-venues
+cost_of_adoption:
+  content: 'Contamination-robust benchmark (round 1): time, money, and optionality cost of committing
+    the semester.'
+  claim_ids:
+  - c-cont-venues
+second_order_effects:
+  content: 'Contamination-robust benchmark (round 1): downstream effects on the lab and later projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'Contamination-robust benchmark (round 1): the strongest published criticism found by searching
+    for limitations and migrating-away accounts.'
+  claim_ids:
+  - c-cont-maintenance
+comparable_cases:
+  content: 'Contamination-robust benchmark (round 1): who chose this and what happened, with dates.'
+  claim_ids:
+  - c-cont-maintenance
+claims:
+- id: c-cont-venues
+  text: Contamination-robust benchmark papers have a active publication track at the target venues.
+  confidence: high
+  source:
+    url: https://arxiv.org/abs/eval-contamination-survey
+    tier: T1
+    title: Source for c-cont-venues
+    content_hash: null
+  load_bearing: true
+- id: c-cont-rate
+  text: The proposed contamination-detection protocol replicates at the claimed precision on held-out
+    models.
+  confidence: low
+  source:
+    url: https://example.org/contamination-protocol
+    tier: T2
+    title: Source for c-cont-rate
+    content_hash: null
+  load_bearing: true
+- id: c-cont-baseline
+  text: Standard baselines exist and are runnable within the lab's compute budget.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-cont-baseline
+    content_hash: null
+  load_bearing: false
+- id: c-cont-maintenance
+  text: Benchmark maintenance burden after release is the most cited postmortem regret among benchmark
+    authors.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-cont-maintenance
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions:
+- Whether the detection protocol's precision claim replicates.
+notes: null

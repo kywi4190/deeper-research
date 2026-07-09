@@ -1,0 +1,105 @@
+# S6 round 1: no low-confidence load-bearing claims; the re-score rides the S5 fallback fixture (delta 0) -> converges in one round.
+option_id: cot-hurts-small-models
+criterion_sections:
+  publication-potential:
+    content: 'CoT-hurts-small-models negative result (round 1) — evidence bearing on publication-potential:
+      the deep-dive claims [c-cot-viability, c-cot-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cot-viability
+    - c-cot-fit
+  letter-strength:
+    content: 'CoT-hurts-small-models negative result (round 1) — evidence bearing on letter-strength:
+      the deep-dive claims [c-cot-viability, c-cot-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cot-viability
+    - c-cot-fit
+  feasibility:
+    content: 'CoT-hurts-small-models negative result (round 1) — evidence bearing on feasibility: the
+      deep-dive claims [c-cot-viability, c-cot-fit] anchor this criterion; disconfirming searches for
+      limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cot-viability
+    - c-cot-fit
+  research-taste-signal:
+    content: 'CoT-hurts-small-models negative result (round 1) — evidence bearing on research-taste-signal:
+      the deep-dive claims [c-cot-viability, c-cot-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cot-viability
+    - c-cot-fit
+  momentum-by-deadline:
+    content: 'CoT-hurts-small-models negative result (round 1) — evidence bearing on momentum-by-deadline:
+      the deep-dive claims [c-cot-viability, c-cot-fit] anchor this criterion; disconfirming searches
+      for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-cot-viability
+    - c-cot-fit
+failure_modes:
+  content: 'CoT-hurts-small-models negative result (round 1): the dominant failure modes and prerequisites,
+    per the problems-phrased searches.'
+  claim_ids:
+  - c-cot-viability
+cost_of_adoption:
+  content: 'CoT-hurts-small-models negative result (round 1): time, money, and optionality cost of committing
+    the semester.'
+  claim_ids:
+  - c-cot-viability
+second_order_effects:
+  content: 'CoT-hurts-small-models negative result (round 1): downstream effects on the lab and later
+    projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'CoT-hurts-small-models negative result (round 1): the strongest published criticism found
+    by searching for limitations and migrating-away accounts.'
+  claim_ids:
+  - c-cot-cases
+comparable_cases:
+  content: 'CoT-hurts-small-models negative result (round 1): who chose this and what happened, with dates.'
+  claim_ids:
+  - c-cot-cases
+claims:
+- id: c-cot-viability
+  text: 'CoT-hurts-small-models negative result: the core approach is established by prior published work.'
+  confidence: high
+  source:
+    url: https://arxiv.org/abs/cot-small-models
+    tier: T1
+    title: Source for c-cot-viability
+    content_hash: null
+  load_bearing: true
+- id: c-cot-fit
+  text: 'CoT-hurts-small-models negative result: the project fits the semester timeline per comparable
+    cases.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-cot-fit
+    content_hash: null
+  load_bearing: true
+- id: c-cot-criticism
+  text: 'CoT-hurts-small-models negative result: published criticism centers on scope creep and evaluation
+    validity.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-cot-criticism
+    content_hash: null
+  load_bearing: false
+- id: c-cot-cases
+  text: 'CoT-hurts-small-models negative result: at least two comparable student projects shipped; one
+    published.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-cot-cases
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions: []
+notes: null

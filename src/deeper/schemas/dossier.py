@@ -9,10 +9,13 @@ low-confidence load-bearing claim.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import Field, model_validator
 
 from .base import ArtifactModel, NonEmptyStr, Slug
 from .common import Confidence, SourceRef, Verdict
+from .screening import OptionScreening
 
 
 class Claim(ArtifactModel):
@@ -102,6 +105,102 @@ class VerificationResult(ArtifactModel):
         default=None, description="Quoted source text supporting the verdict."
     )
     note: str | None = None
+
+
+class DeepDiveStatus(StrEnum):
+    """Where one finalist's round loop stands (design §5/S6 stopping rule)."""
+
+    IN_PROGRESS = "in-progress"
+    CONVERGED = "converged"
+    BUDGET_CAPPED = "budget-capped"
+
+
+class DeepDiveRound(ArtifactModel):
+    """One research round's re-score, as the stopping rule saw it."""
+
+    round: int = Field(ge=1)
+    screening: OptionScreening = Field(
+        description="The screener's full re-score of the option from the dossier "
+        "this round, aggregates recomputed in code."
+    )
+    delta: float = Field(
+        ge=0,
+        description="|weighted_point − previous round's weighted_point| (round 1 "
+        "compares against the S5 baseline) — clause (a) of the stopping rule.",
+    )
+    low_confidence_load_bearing: list[Slug] = Field(
+        default_factory=list,
+        description="Claim ids still low-confidence AND load-bearing (analyst tag "
+        "unioned with the re-score-diff cross-check) — clause (b) of the stopping "
+        "rule blocks stopping while this is non-empty.",
+    )
+
+
+class DeepDiveVerificationRecord(ArtifactModel):
+    """What the verification pass sampled and what it triggered — persisted so
+    resume never re-samples or re-runs the one targeted revision."""
+
+    sampled_claim_ids: list[Slug] = Field(min_length=1)
+    contradicted_claim_ids: list[Slug] = Field(default_factory=list)
+    revision_completed: bool = Field(
+        default=False,
+        description="True once the ONE targeted analyst revision (triggered only "
+        "by contradicted claims) and its final re-score have landed.",
+    )
+
+
+class DeepDiveRoundLog(ArtifactModel):
+    """dossiers/{option}-rounds: the code-owned trace of one finalist's deep-dive
+    loop. This file is what makes mid-S6 resume honest: rounds recorded here are
+    never re-dispatched, and the verification record marks the revision leg
+    settled. (The design names only the dossier and verification artifacts; the
+    log is a P8 artifact — the orchestrator's stopping-rule evidence.)"""
+
+    option_id: Slug
+    baseline: OptionScreening = Field(
+        description="The option's S5 screening record — round 0 for the delta."
+    )
+    rounds: list[DeepDiveRound] = Field(default_factory=list)
+    status: DeepDiveStatus = DeepDiveStatus.IN_PROGRESS
+    verification: DeepDiveVerificationRecord | None = None
+    final_screening: OptionScreening | None = Field(
+        default=None,
+        description="The post-revision re-score, present only when a verifier "
+        "contradiction triggered the targeted revision; otherwise the last "
+        "round's screening is final.",
+    )
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> DeepDiveRoundLog:
+        for i, entry in enumerate(self.rounds, start=1):
+            if entry.round != i:
+                raise ValueError(
+                    f"rounds must be contiguous from 1; position {i} carries round "
+                    f"number {entry.round}"
+                )
+        if self.status is not DeepDiveStatus.IN_PROGRESS and not self.rounds:
+            raise ValueError(f"status '{self.status}' requires at least one recorded round")
+        if self.verification is not None and self.status is DeepDiveStatus.IN_PROGRESS:
+            raise ValueError("verification cannot be recorded while the round loop is in-progress")
+        if self.final_screening is not None:
+            if self.verification is None or not self.verification.revision_completed:
+                raise ValueError(
+                    "final_screening exists only after the targeted revision "
+                    "(verification.revision_completed must be true)"
+                )
+        if self.verification is not None and self.verification.revision_completed:
+            if not self.verification.contradicted_claim_ids:
+                raise ValueError(
+                    "revision_completed without contradicted claims — the targeted "
+                    "revision is triggered only by contradicted claims"
+                )
+            if self.final_screening is None:
+                raise ValueError(
+                    "revision_completed requires final_screening (the revision and "
+                    "its final re-score land together)"
+                )
+        return self
 
 
 class VerificationReport(ArtifactModel):

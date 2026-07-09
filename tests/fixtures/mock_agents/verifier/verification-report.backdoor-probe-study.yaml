@@ -1,0 +1,18 @@
+# The load-bearing transfer claim is CONTRADICTED by its own source -> one targeted analyst revision.
+option_id: backdoor-probe-study
+results:
+- claim_id: c-back-prior
+  verdict: verified
+  evidence_quote: Source text supports c-back-prior as stated.
+  note: null
+- claim_id: c-back-transfer
+  verdict: contradicted
+  evidence_quote: Cross-family transfer was weak (AUC 0.62); within-family probes reached 0.93.
+  note: The re-fetched source states the reverse of the claim.
+- claim_id: c-back-datasets
+  verdict: verified
+  evidence_quote: Source text supports c-back-datasets as stated.
+  note: null
+sampled_load_bearing_count: 2
+sampled_other_count: 1
+notes: null

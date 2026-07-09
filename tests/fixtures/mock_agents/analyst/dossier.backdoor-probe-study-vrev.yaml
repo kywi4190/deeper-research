@@ -1,0 +1,105 @@
+# The one targeted revision: ONLY the contradicted transfer claim corrected; rounds_completed unchanged.
+option_id: backdoor-probe-study
+criterion_sections:
+  publication-potential:
+    content: 'Backdoor probe study (revised — transfer claim corrected per the verifier) — evidence bearing
+      on publication-potential: the deep-dive claims [c-back-prior, c-back-transfer] anchor this criterion;
+      disconfirming searches for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-back-prior
+    - c-back-transfer
+  letter-strength:
+    content: 'Backdoor probe study (revised — transfer claim corrected per the verifier) — evidence bearing
+      on letter-strength: the deep-dive claims [c-back-prior, c-back-transfer] anchor this criterion;
+      disconfirming searches for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-back-prior
+    - c-back-transfer
+  feasibility:
+    content: 'Backdoor probe study (revised — transfer claim corrected per the verifier) — evidence bearing
+      on feasibility: the deep-dive claims [c-back-prior, c-back-transfer] anchor this criterion; disconfirming
+      searches for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-back-prior
+    - c-back-transfer
+  research-taste-signal:
+    content: 'Backdoor probe study (revised — transfer claim corrected per the verifier) — evidence bearing
+      on research-taste-signal: the deep-dive claims [c-back-prior, c-back-transfer] anchor this criterion;
+      disconfirming searches for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-back-prior
+    - c-back-transfer
+  momentum-by-deadline:
+    content: 'Backdoor probe study (revised — transfer claim corrected per the verifier) — evidence bearing
+      on momentum-by-deadline: the deep-dive claims [c-back-prior, c-back-transfer] anchor this criterion;
+      disconfirming searches for limitations and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-back-prior
+    - c-back-transfer
+failure_modes:
+  content: 'Backdoor probe study (revised — transfer claim corrected per the verifier): the dominant failure
+    modes and prerequisites, per the problems-phrased searches.'
+  claim_ids:
+  - c-back-prior
+cost_of_adoption:
+  content: 'Backdoor probe study (revised — transfer claim corrected per the verifier): time, money, and
+    optionality cost of committing the semester.'
+  claim_ids:
+  - c-back-prior
+second_order_effects:
+  content: 'Backdoor probe study (revised — transfer claim corrected per the verifier): downstream effects
+    on the lab and later projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'Backdoor probe study (revised — transfer claim corrected per the verifier): the strongest
+    published criticism found by searching for limitations and migrating-away accounts.'
+  claim_ids:
+  - c-back-scope
+comparable_cases:
+  content: 'Backdoor probe study (revised — transfer claim corrected per the verifier): who chose this
+    and what happened, with dates.'
+  claim_ids:
+  - c-back-scope
+claims:
+- id: c-back-prior
+  text: Peer-reviewed probe studies establish the method on comparable model families.
+  confidence: high
+  source:
+    url: https://arxiv.org/abs/probing-prior-work
+    tier: T1
+    title: Source for c-back-prior
+    content_hash: null
+  load_bearing: true
+- id: c-back-transfer
+  text: 'Backdoor probes transfer across the two target model families only weakly: the source reports
+    AUC 0.62, not above 0.9.'
+  confidence: high
+  source:
+    url: https://example.org/probe-transfer-study
+    tier: T2
+    title: Source for c-back-transfer
+    content_hash: null
+  load_bearing: true
+- id: c-back-datasets
+  text: The poisoned-model dataset needed for probing is publicly released.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-back-datasets
+    content_hash: null
+  load_bearing: false
+- id: c-back-scope
+  text: The study scopes to one semester if probing is limited to two model families.
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-back-scope
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions:
+- Whether weak cross-family transfer still supports a publishable negative result.
+notes: null

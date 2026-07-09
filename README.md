@@ -13,15 +13,16 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**M1 complete — kernel S0–S5 runs end-to-end (mock + live-smoke).** The design-doc
-§9 M1 exit is proven by `tests/test_e2e_mock.py`: one test drives a full mock run
-S0 → Gate A (approved with a prior adjustment) → S2 → S3 → S4 → Gate B (weight
-override) → S5, asserting every artifact validates, the git log carries one commit
-per stage and gate, the spend ledger is populated and under the cap, and
-`rerun --stage S3 --angle X` invalidates exactly that subtree before reconverging.
+**M1 complete; Phase C underway — kernel S0–S6 runs end-to-end (mock + live-smoke
+through S5).** The design-doc §9 M1 exit is proven by `tests/test_e2e_mock.py`: one
+test drives a full mock run S0 → Gate A (approved with a prior adjustment) → S2 →
+S3 → S4 → Gate B (weight override) → S5 → S6 deep dives, asserting every artifact
+validates, the git log carries one commit per stage and gate, the spend ledger is
+populated and under the cap, and `rerun --stage S3 --angle X` invalidates exactly
+that subtree before reconverging.
 Every pipeline artifact has a strict Pydantic v2 model with YAML/JSON round-trip,
 an LLM-facing validation-error formatter, and a generated JSON Schema in
-`schemas/`; the versioned agent prompts for stages 0–5 live in `agents/`. The
+`schemas/`; the versioned agent prompts for stages 0–6 live in `agents/`. The
 kernel is live-run hardened: `deeper doctor` preflights the environment, every
 run carries a `max_spend_usd` guard the dispatcher enforces before each
 invocation, and every agent failure path (schema-retry exhaustion, SDK/network
@@ -35,9 +36,14 @@ redundancy early-stop, and budget reflow onto critic-flagged misses; S4 derives
 the rubric from the destination model plus the cards (never preferences) and
 Gate B applies weight/criterion edits and the preference-slot weight on resume;
 S5 screens every card with uncertainty bands and pure code applies the shortlist
-rule with a written reason per option. S6–S8 are registered stubs that report
-cleanly. A full mock run walks `deeper new` → Gate A → Gate B → the shortlist in
-seconds, offline.
+rule with a written reason per option; S6 deep-dives every finalist in analyst
+rounds under the design's three-clause stability stopping rule, re-scoring each
+round with the S5 screening machinery pointed at the dossier, then an
+independent verifier adjudicates every load-bearing claim (plus a seeded 20% of
+the rest) — contradictions land in the §6 ledger and trigger exactly one
+targeted revision. S7–S8 are registered stubs that report cleanly. A full mock
+run walks `deeper new` → Gate A → Gate B → the shortlist → seven settled
+dossiers in seconds, offline.
 
 The **first supervised live run** (quick profile, a real vector-store
 selection question) exercised the whole kernel: three spend-cap pauses each
@@ -67,12 +73,13 @@ state of a run.
 | `src/deeper/workspace.py` | Run workspace: §7 directory tree, git audit trail, schema-checked artifact I/O, state resume | **built** |
 | `src/deeper/config.py` | Run profiles (quick/standard/exhaustive), size-class table, §12 hard caps, config.yaml loader | **built** |
 | `src/deeper/allocation.py` | S2 budget formula + S3 reflow — pure deterministic math | **built** |
+| `src/deeper/contradictions.py` | The §6 contradiction ledger's shared append helper (idempotent by entry id) | **built** |
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
-| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule) and `shortlist.py` (S5 rule + screening arithmetic) are pure math | **S0–S5 built**, S6–S8 stubs (Prompts 10–12) |
+| `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S6 built**, S7–S8 stubs (Prompts 11–12) |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
-| `agents/` | Versioned agent prompt files (one per role), stages 0–5 | **built** |
+| `agents/` | Versioned agent prompt files (one per role), stages 0–6 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5, saturation, shortlist, Gates A/B), end-to-end mock run, live guards, doctor suites (763 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6, saturation, shortlist, depth, contradiction ledger, Gates A/B), end-to-end mock run, live guards, doctor suites (809 tests) |
 | `benchmarks/` | Eval question specs | empty (Prompt 14) |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -119,13 +126,15 @@ each model validates a single file.
 | `screening/shortlist.md` | `Shortlist` (`ShortlistDecision`) | S5 (code) | S6, report appendix |
 | `dossiers/{option}.md` | `Dossier` (`Claim`, `DossierSection`) | S6 analyst | verifier, S7, S8 |
 | `dossiers/{option}-verification.md` | `VerificationReport` | S6 verifier | S8 report |
+| `dossiers/{option}-rounds.yaml` | `DeepDiveRoundLog` (`DeepDiveRound`) | S6 (pure code) | S6 resume, S8 metrics |
+| `dossiers/scores.yaml` | `ScreeningResult` | S6 (code-merged re-scores) | S7 scoreboards, S8 |
 | `tournament/{option}-prosecution.md` | `Prosecution` | S7 prosecutor | Gate C, S8 |
 | `tournament/steelman.md` | `Steelman` | S7 steelman | Gate C, S8 |
 | `tournament/frame-check.md` | `FrameCheck` (`RedivergenceProposal`) | S7 frame-checker | Gate C |
 | `tournament/score-updates.yaml` | `ScoreUpdateLog` | S7 judge | S8 |
 | `gates/gate-{a,b,c}.yaml` | `GateADecision` / `GateBDecision` / `GateCDecision` | human (or viewer) | orchestrator resume |
 | `sources/` records | `SourceRecord` | any research agent | verifier, audit |
-| `ledger/contradictions.md` | `ContradictionLedger` | any detecting agent | verifier, S8 |
+| `ledger/contradictions.md` | `ContradictionLedger` | any detecting stage, via `contradictions.append_contradictions` | verifier, S8 |
 | `state.json` | `RunState` (`SpendEntry`) | orchestrator | orchestrator, CLI |
 
 Notable schema-level invariants (each mirrors a design rule): allocation rows must sum
@@ -133,7 +142,9 @@ exactly to the budget; anchored rubric levels must be exactly 1–5 and criterio
 weights must sum to 1.0 (the preference slot is weighted separately, per P9); a
 screening score must lie inside its uncertainty band; a `gap-found` frame-check must
 carry a re-divergence proposal; a `BUDGET-CAPPED` dossier must list its open
-questions; Gate C approval excludes the loop actions.
+questions; a deep-dive round log's rounds must be contiguous from 1 and its
+final re-score can exist only after a completed revision; Gate C approval
+excludes the loop actions.
 
 ## The agent prompt library
 
@@ -159,11 +170,15 @@ only the screener's `inputs` may include `preferences` — both enforced by test
 | `scout` | S3 | sonnet | `option-card-set` |
 | `card-critic` | S3 | sonnet | `card-critique` |
 | `rubric-builder` | S4 | opus | `rubric` |
-| `screener` | S5 | sonnet | `screening-result` |
+| `screener` | S5 (+ S6 re-scores) | sonnet | `screening-result` |
+| `analyst` | S6 | sonnet | `dossier` |
+| `verifier` | S6 | sonnet | `verification-report` |
 
-Design §6 names merger/rubric-builder as Opus-class and cartographers/scouts as
-Sonnet-class; roles it leaves unlisted are assigned by analogy (interviewer → opus
-because the destination model anchors the whole run; card-critic/screener → sonnet).
+Design §6 names merger/rubric-builder as Opus-class and cartographers/scouts/analysts
+as Sonnet-class; roles it leaves unlisted are assigned by analogy (interviewer → opus
+because the destination model anchors the whole run; card-critic/screener → sonnet;
+verifier → sonnet, because adjudication is more than §6's Haiku-class citation
+checking and the S size class's search budget could not re-fetch a full sample).
 The six cartographers share a skeleton but carry genuinely distinct framing-heuristic
 sections — ensemble diversity is the breadth mechanism (design P3) — and a test
 asserts the sections differ.
@@ -241,7 +256,9 @@ violation, like a schema failure).
 **Mock mode** (`config.yaml mode: mock`, the default) substitutes only the network
 call: `MockDispatcher` renders canned fixtures from
 `tests/fixtures/mock_agents/<role>/<schema>[.<context>].yaml` (a coherent
-senior-project scenario covering all 12 Phase-A roles) into the same marker+fenced-yaml
+senior-project scenario covering all 14 roles, including per-round analyst
+dossiers, deep-dive re-scores, and verifier reports that exercise all three S6
+termination paths) into the same marker+fenced-yaml
 text a live agent emits, then flows through the identical parse/validate/retry/ledger
 path — the whole pipeline runs offline with zero SDK imports (asserted by a
 fresh-interpreter test). `scripted_responses` lets tests inject invalid-then-valid
@@ -359,7 +376,7 @@ validates is not re-run).
 **Stages** (`src/deeper/stages/`) are classes over a small protocol —
 `validate_inputs()` (schema-check required artifacts), `execute(ctx)` (may dispatch
 agents), `evaluate_stop_rules(ctx)`, `outputs(ctx)`, `is_complete(ctx)` — registered
-in `STAGES`. S6–S8 raise `NotImplementedYet`, which the engine reports cleanly,
+in `STAGES`. S7–S8 raise `NotImplementedYet`, which the engine reports cleanly,
 leaving state untouched and resumable. The built stages:
 
 - **S0 Intake** drives the interviewer through the dispatch layer's
@@ -431,6 +448,35 @@ leaving state untouched and resumable. The built stages:
   the highest-UCB option from each unrepresented top-half angle (by prior) is
   added. Every option gets a one-paragraph advanced/cut reason in
   `screening/shortlist.md` — cuts are auditable.
+- **S6 Deep dives** runs one analyst per finalist, all finalists in parallel,
+  each in a round loop the orchestrator (never the analyst) terminates:
+
+  ```
+  baseline = the option's S5 record            (round 0 for the delta)
+  ROUND r = 1, 2, … ≤ deep_dive_unit_cap       (1 round = 1 unit)
+    analyst researches → dossiers/{opt}.md     (claims: confidence+tier+load_bearing;
+    │                                           ≥1 disconfirming search per criterion)
+    screener re-scores from the DOSSIER        (S5 machinery: integrity check +
+    │                                           code-recomputed aggregates)
+    Δ = |weighted_point − last round's|; re-score diff cross-checks load_bearing
+    │  tags (a ≥1-point criterion move promotes its section's claims, tagged or not)
+    STOP if Δ < 0.15 AND no low-confidence load-bearing claim  → CONVERGED
+    else if r = cap → dossier stamped BUDGET-CAPPED, open questions listed
+  VERIFY: independent verifier re-checks ALL load-bearing claims + seeded 20% of
+    the rest → verified/unsupported/contradicted with evidence quotes
+    contradicted → ledger/contradictions.md + exactly ONE targeted analyst
+    revision (those claims only) → final re-score
+  ```
+
+  Every step lands in the code-owned round log (`dossiers/{option}-rounds.yaml`),
+  so a resume never re-dispatches a recorded round, and the finalists' final
+  re-scores merge into `dossiers/scores.yaml` — the post-deep-dive scoreboard S7
+  ranks from. **What BUDGET-CAPPED means for the report:** unfinished depth is
+  visible, never silent — the stamp travels on the dossier itself with the open
+  questions the budget could not close, S8's residual-uncertainty register lists
+  them, and the count of capped dossiers is one of the design-§10 depth metrics.
+  A capped option is not penalized on the merits; its score simply carries wider
+  honest uncertainty into the tournament.
 
 **Gates are file-edit pause states.** Entering a gate writes a commented template
 (`gates/gate-{a,b,c}.yaml`) whose body already parses as a *valid but undecided*
@@ -540,7 +586,17 @@ deeper resume <run>
 #     S5:   finalist model-collapse-dynamics [breadth-guardrail add]
 #     S5:   cut (kill-risk-confirmed): 1           <- the top scorer, killed anyway
 #     S5:   cut (below-cutoff): 1                  <- above the floor, not near the top-k
-#   then reports that S6 is not built yet (arrives in Prompt 10) and exits cleanly
+#   then S6 deep-dives the finalists in parallel — every option ends in one of
+#   three visible ways:
+#     S6: sae-feature-atlas round 2 re-score 4.5 (Δ0)
+#     S6: sae-feature-atlas converged after 2 round(s) — Δ0 < 0.15 and no
+#         low-confidence load-bearing claims
+#     S6: contamination-robust-benchmark BUDGET-CAPPED after 2 round(s) — 2 open
+#         question(s) listed in the dossier
+#     S6: backdoor-probe-study contradicted claim(s) ['c-back-transfer'] — one
+#         targeted analyst revision
+#     S6: backdoor-probe-study final re-score after revision: 3.2 (was 3.6)
+#   and reports that S7 is not built yet (arrives in Prompt 11), exiting cleanly
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
@@ -773,6 +829,47 @@ canonical `Makefile` is used wherever GNU make is available.
   persisted table (never recomputed), leaving other angles' settled top-ups
   untouched. Without this, the re-scouted angle silently loses the coverage the
   reflow decision bought it.
+- **The S6 round log is a new code-owned artifact
+  (`dossiers/{option}-rounds.yaml`).** Design §5/S6 names only the dossier and
+  verification files, but the stopping rule's evidence — each round's re-score,
+  delta, and remaining low-confidence load-bearing claims, the verification
+  sample, and whether the one revision ran — must live somewhere for resume to
+  be honest (P8: replayed rounds are never re-dispatched). It lives under
+  `dossiers/` so the existing S6 rerun invalidation covers it.
+- **`dossiers/scores.yaml` is S6's merged output.** The design has S7 rank "the
+  post-deep-dive" scores without naming their home; S6 merges every finalist's
+  final re-score into one `ScreeningResult` (written last — it marks the stage
+  settled, like S3's reflow table).
+- **Round 0 for the stability delta is the S5 screening score.** "Moved < 0.15
+  across the last round" needs a round-1 comparison point; the option's
+  `screening/scores.yaml` record (already recomputed under the Gate-B rubric) is
+  it. An option whose first deep-dive round confirms its screening — and leaves
+  no low-confidence load-bearing claim — legitimately converges in one round.
+- **1 round = 1 unit.** The design's "per-option budget cap is hit" is
+  quantified in the allocation's own currency: a research round consumes one
+  unit, so `deep_dive_unit_cap` (quick 2 / standard 4 / exhaustive 6) is the
+  maximum round count. Stability is checked before the cap: a final budgeted
+  round that also stabilizes is CONVERGED, not BUDGET-CAPPED.
+- **Effective load-bearing is the union of tag and re-score diff.** The design
+  says the analyst tags load-bearing claims and defines them by the ≥ 1-point
+  criterion move; here the cross-check has teeth: any criterion whose re-score
+  moved ≥ 1 point promotes every claim in its dossier section into the
+  load-bearing set (for clause (b) and verifier sampling) whether tagged or
+  not, and under-tagging is reported. An analyst cannot shrink the verifier's
+  mandatory sample by under-tagging.
+- **The verifier's "random 20%" is a seeded draw.** `ceil(0.2 · n)` of the
+  non-load-bearing claims, drawn by an RNG seeded on the option id — resume
+  re-samples identically (and mock fixtures can be authored against the exact
+  sample). The verifier is Sonnet-class by analogy (§6 leaves it unlisted;
+  adjudication outgrows Haiku-class citation checking, and the S size class's
+  search budget could not re-fetch a full sample).
+- **The BUDGET-CAPPED stamp is code's, with derived open questions.** The
+  design stamps the dossier when the cap hits; here the orchestrator sets
+  `budget_capped` (and re-asserts it after the revision round, so an agent
+  re-emission cannot launder it away). The final budgeted round's contract
+  demands honest `open_questions`; if the analyst still left none, code derives
+  them from the remaining low-confidence load-bearing claims — the schema
+  requires a capped dossier to list them.
 - **Narrative artifacts are structured models.** Design §7 lists `brief.md`,
   `dossiers/{option}.md` etc. as markdown; the schema layer models their *content* as
   structured, YAML-serializable models so validation is uniform (design §6's
@@ -791,10 +888,11 @@ Following the phases in the build guide:
   S0–S2) ✅ → Prompt 8 (S3 scouts + critic + reflow, S4 rubric, Gate B applied
   edits, S5 screening with the shortlist rule) ✅ → Prompt 9 (M1 exit: end-to-end
   integration test, `deeper doctor`, spend guard, live hardening) ✅. **M1 done.**
-- **Phase C — Depth & adversarial (M2):** deep dives, verifier, tournament, Gate C,
-  synthesis.
+- **Phase C — Depth & adversarial (M2):** Prompt 10 (S6 deep dives: analyst
+  rounds under the stability stopping rule, verifier pass, contradiction
+  ledger) ✅ → tournament, Gate C, synthesis.
 - **Phase D — Evaluation & hardening (M3).**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase C, Prompt 10 — S6 deep dives (analysts with the stability stopping
-rule) + verifier.**
+**Next: Phase C, Prompt 11 — S7 tournament (prosecutor, steelman, frame-checker,
+judge) + the code-computed rubric sensitivity.**

@@ -1,0 +1,100 @@
+# S6 round 1: no low-confidence load-bearing claims; the re-score rides the S5 fallback fixture (delta 0) -> converges in one round.
+option_id: lab-codebase-takeover
+criterion_sections:
+  publication-potential:
+    content: 'Lab codebase takeover (round 1) — evidence bearing on publication-potential: the deep-dive
+      claims [c-lab-viability, c-lab-fit] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-lab-viability
+    - c-lab-fit
+  letter-strength:
+    content: 'Lab codebase takeover (round 1) — evidence bearing on letter-strength: the deep-dive claims
+      [c-lab-viability, c-lab-fit] anchor this criterion; disconfirming searches for limitations and postmortems
+      informed the negative findings noted here.'
+    claim_ids:
+    - c-lab-viability
+    - c-lab-fit
+  feasibility:
+    content: 'Lab codebase takeover (round 1) — evidence bearing on feasibility: the deep-dive claims
+      [c-lab-viability, c-lab-fit] anchor this criterion; disconfirming searches for limitations and postmortems
+      informed the negative findings noted here.'
+    claim_ids:
+    - c-lab-viability
+    - c-lab-fit
+  research-taste-signal:
+    content: 'Lab codebase takeover (round 1) — evidence bearing on research-taste-signal: the deep-dive
+      claims [c-lab-viability, c-lab-fit] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-lab-viability
+    - c-lab-fit
+  momentum-by-deadline:
+    content: 'Lab codebase takeover (round 1) — evidence bearing on momentum-by-deadline: the deep-dive
+      claims [c-lab-viability, c-lab-fit] anchor this criterion; disconfirming searches for limitations
+      and postmortems informed the negative findings noted here.'
+    claim_ids:
+    - c-lab-viability
+    - c-lab-fit
+failure_modes:
+  content: 'Lab codebase takeover (round 1): the dominant failure modes and prerequisites, per the problems-phrased
+    searches.'
+  claim_ids:
+  - c-lab-viability
+cost_of_adoption:
+  content: 'Lab codebase takeover (round 1): time, money, and optionality cost of committing the semester.'
+  claim_ids:
+  - c-lab-viability
+second_order_effects:
+  content: 'Lab codebase takeover (round 1): downstream effects on the lab and later projects.'
+  claim_ids: []
+strongest_criticism:
+  content: 'Lab codebase takeover (round 1): the strongest published criticism found by searching for
+    limitations and migrating-away accounts.'
+  claim_ids:
+  - c-lab-cases
+comparable_cases:
+  content: 'Lab codebase takeover (round 1): who chose this and what happened, with dates.'
+  claim_ids:
+  - c-lab-cases
+claims:
+- id: c-lab-viability
+  text: 'Lab codebase takeover: the core approach is established by prior published work.'
+  confidence: high
+  source:
+    url: https://example.edu/lab-infra-notes
+    tier: T1
+    title: Source for c-lab-viability
+    content_hash: null
+  load_bearing: true
+- id: c-lab-fit
+  text: 'Lab codebase takeover: the project fits the semester timeline per comparable cases.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-lab-fit
+    content_hash: null
+  load_bearing: true
+- id: c-lab-criticism
+  text: 'Lab codebase takeover: published criticism centers on scope creep and evaluation validity.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T3
+    title: Source for c-lab-criticism
+    content_hash: null
+  load_bearing: false
+- id: c-lab-cases
+  text: 'Lab codebase takeover: at least two comparable student projects shipped; one published.'
+  confidence: med
+  source:
+    url: https://example.org/evidence
+    tier: T2
+    title: Source for c-lab-cases
+    content_hash: null
+  load_bearing: false
+rounds_completed: 1
+budget_capped: false
+open_questions: []
+notes: null

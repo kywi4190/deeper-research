@@ -1,0 +1,52 @@
+# S6 round-2 re-score: still moving (-0.35 per criterion) at the budget cap — the dossier gets the BUDGET-CAPPED stamp.
+options:
+- option_id: contamination-robust-benchmark
+  angle_id: evaluation-science
+  criterion_scores:
+  - criterion_id: publication-potential
+    score: 3.9
+    band:
+      lo: 3.65
+      hi: 4.15
+    evidence_pointer: Dossier criterion section 'publication-potential' and its cited claims — deep-dive
+      evidence, band narrowed accordingly.
+  - criterion_id: letter-strength
+    score: 3.9
+    band:
+      lo: 3.65
+      hi: 4.15
+    evidence_pointer: Dossier criterion section 'letter-strength' and its cited claims — deep-dive evidence,
+      band narrowed accordingly.
+  - criterion_id: feasibility
+    score: 3.9
+    band:
+      lo: 3.65
+      hi: 4.15
+    evidence_pointer: Dossier criterion section 'feasibility' and its cited claims — deep-dive evidence,
+      band narrowed accordingly.
+  - criterion_id: research-taste-signal
+    score: 3.9
+    band:
+      lo: 3.65
+      hi: 4.15
+    evidence_pointer: Dossier criterion section 'research-taste-signal' and its cited claims — deep-dive
+      evidence, band narrowed accordingly.
+  - criterion_id: momentum-by-deadline
+    score: 3.9
+    band:
+      lo: 3.65
+      hi: 4.15
+    evidence_pointer: Dossier criterion section 'momentum-by-deadline' and its cited claims — deep-dive
+      evidence, band narrowed accordingly.
+  preference_score:
+    criterion_id: preference-slot
+    score: 4.0
+    band:
+      lo: 3.5
+      hi: 4.5
+    evidence_pointer: Scored from preferences.yaml items only, weighted by strengths.
+  kill_risk_checks: []
+  weighted_point: 3.92
+  weighted_ucb: 4.22
+  notes: null
+notes: null
