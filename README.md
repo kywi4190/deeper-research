@@ -1137,5 +1137,7 @@ Following the phases in the build guide:
 - **Phase E — Viewer (M4, optional).**
 
 **Next: Phase D, Prompt 13 — the hardening pass (the triage list includes the
-cp1252 console crash on S6's 'Δ' emit, cartography over-decomposition, and
-per-batch persistence), then the benchmark evals.**
+cp1252 console crash on S6's 'Δ' emit, cartography over-decomposition,
+per-batch persistence, and recognizing plan usage-limit exhaustion as its own
+pause cause with the reset time in the message — no auto-resume), then the
+benchmark evals.**

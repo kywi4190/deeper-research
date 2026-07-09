@@ -146,6 +146,34 @@ workspace itself is the full audit trail (gitignored, kept locally).
    at the absolute threshold and hard-capped at `caps.max_finalists` (new cut
    cause `below-cutoff`; recorded as a Design deviation in the README).
 
+11. **Plan usage-limit exhaustion is not recognized as its own pause cause.**
+   Live runs default to `billing: subscription` (metering the Claude plan),
+   so a long run can hit the plan's session usage limit mid-stage. Today the
+   run *does* pause safely — every dispatch failure lands in a committed,
+   resumable `PAUSED_ATTENTION`, and idempotent re-entry re-dispatches only
+   missing sub-work — but the limit is misdiagnosed on the way down.
+   Depending on how the CLI surfaces it, it presents either as
+   `AgentDispatchFailed` (after two pointless 2s/8s backoff retries — the
+   backoff schedule was built for one-off stream errors, not a limit window
+   measured in hours) or, if the CLI returns the limit notice as reply text,
+   as a *parse* failure that burns the full schema-retry loop before pausing
+   with "output invalid after retries — fix the cause (prompt, fixture, or
+   schema)", sending the user to debug a prompt when they only need to wait.
+   Parallel siblings (concurrency 4) each rediscover the limit and burn their
+   own retries. **For Prompt 13:** detect the usage-limit condition in
+   `_guarded_invoke` (match the CLI/SDK limit error or reply text), skip the
+   backoff and schema retries — a limit is deterministic until reset, like
+   `BillingAuthError` — and pause via a distinct exception (e.g.
+   `UsageLimitReached`) whose message states explicitly that the Claude plan's
+   session limit was reached and instructs: run `deeper resume <run>` at the
+   limit reset time (include the reset time when the CLI's message carries
+   it). Scope decision (2026-07-09): **no automatic sleep/wait-and-resume** —
+   the pause message with the reset time is the whole feature; resuming stays
+   an explicit human action, like every other pause. First step is a small
+   live probe at the limit boundary to pin down exactly how the SDK surfaces
+   the condition (exception vs. text result, and whether the reset timestamp
+   is machine-readable).
+
 Final cost: **$65.20** total — S0 $0.75, S1 $12.34 (41-angle bloat), S3
 $21.99, S4 $1.32, S5 $20.06 (~$12 of which was re-paid discarded batches),
 plus unledgered failed dispatches (finding 5b). A quick-profile run with the
