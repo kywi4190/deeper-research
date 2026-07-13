@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import re
 import sys
+import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -88,9 +89,62 @@ def _emit(line: str) -> None:
     console.print(line, markup=False)
 
 
+def _pending_stdin_input() -> bool:
+    """True when unread input is already buffered on stdin. A human cannot type
+    a whole further line inside the polling window, so pending input right
+    after a line was read is the signature of a multi-line paste."""
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            return bool(msvcrt.kbhit())
+        import select
+
+        ready, _, _ = select.select([sys.stdin], [], [], 0)
+        return bool(ready)
+    except (OSError, ValueError):  # exotic stdin: fall back to single-line reads
+        return False
+
+
+def _paste_pending(has_pending: Callable[[], bool], grace_s: float) -> bool:
+    """Poll for buffered input for up to grace_s — the grace absorbs the
+    terminal delivering a paste in chunks (conpty), while a typed answer
+    (empty buffer) submits after at most one short window."""
+    deadline = time.monotonic() + grace_s
+    while True:
+        if has_pending():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+
+
+def _read_answer(
+    read_line: Callable[[], str],
+    has_pending: Callable[[], bool] = _pending_stdin_input,
+    *,
+    grace_s: float = 0.05,
+) -> str:
+    """One interview answer, multi-line-paste safe (M2 live-run finding 1):
+    lines already buffered when a line is read belong to the SAME answer.
+    Before this, a pasted multi-line answer sent only its first line — the
+    rest sat on stdin and were consumed one per subsequent question, each
+    auto-answering a question the user never saw, deranging the interview.
+    EOF while draining keeps what was read; EOF on the first line propagates
+    (the caller treats it as a decline)."""
+    lines = [read_line()]
+    while _paste_pending(has_pending, grace_s):
+        try:
+            lines.append(read_line())
+        except EOFError:
+            break
+    return "\n".join(lines).strip()
+
+
 def _terminal_ask_user() -> Callable[[str], str] | None:
     """The S0 interview/confirmation channel: prints the agent's question and
-    reads one line back. None when stdin is not a terminal — stages then run
+    reads one answer back — a multi-line paste is one answer, not a queue of
+    future ones. None when stdin is not a terminal — stages then run
     non-interactively (the interviewer finalizes without questions)."""
     if not sys.stdin.isatty():
         return None
@@ -98,8 +152,9 @@ def _terminal_ask_user() -> Callable[[str], str] | None:
     def ask(question: str) -> str:
         console.print()
         console.print(question, markup=False)
+        prompts = iter(["> "])  # continuation lines were pasted: no re-prompt
         try:
-            return input("> ").strip()
+            return _read_answer(lambda: input(next(prompts, "")))
         except EOFError:  # stdin looked like a tty but closed: decline, don't crash
             return ""
 

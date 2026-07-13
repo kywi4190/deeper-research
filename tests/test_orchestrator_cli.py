@@ -210,3 +210,67 @@ def test_commands_resolve_run_names_under_runs_dir(tmp_path, monkeypatch, comman
     run_name = next(p.name for p in (tmp_path / "runs").iterdir())
     result = runner.invoke(app, [*command, run_name])
     assert result.exit_code == 0, result.output
+
+
+# -- multi-line-paste-safe interview input (M2 live-run finding 1) ---------------
+
+
+def _lines(*items):
+    it = iter(items)
+
+    def read_line() -> str:
+        value = next(it)
+        if value is EOFError:
+            raise EOFError
+        return value
+
+    return read_line
+
+
+def _pending(*flags):
+    it = iter(flags)
+    return lambda: next(it, False)
+
+
+def test_read_answer_typed_single_line_submits_immediately():
+    from deeper.orchestrator.cli import _read_answer
+
+    answer = _read_answer(_lines("  just one line  "), _pending(False), grace_s=0)
+    assert answer == "just one line"
+
+
+def test_read_answer_drains_a_multiline_paste_into_one_answer():
+    """The observed live failure: a pasted block sent line 1 as the answer and
+    the buffered rest auto-answered the NEXT questions unseen. Buffered lines
+    are one answer — interior blank lines (a multi-paragraph paste) included."""
+    from deeper.orchestrator.cli import _read_answer
+
+    answer = _read_answer(
+        _lines("first paragraph line", "", "second paragraph line"),
+        _pending(True, True, False),
+        grace_s=0,
+    )
+    assert answer == "first paragraph line\n\nsecond paragraph line"
+
+
+def test_read_answer_eof_while_draining_keeps_what_was_read():
+    from deeper.orchestrator.cli import _read_answer
+
+    answer = _read_answer(_lines("kept line", EOFError), _pending(True), grace_s=0)
+    assert answer == "kept line"
+
+
+def test_read_answer_eof_on_first_line_propagates():
+    """The caller (ask) turns a first-line EOF into a decline — the pre-fix
+    behavior, preserved."""
+    from deeper.orchestrator.cli import _read_answer
+
+    with pytest.raises(EOFError):
+        _read_answer(_lines(EOFError), _pending(False), grace_s=0)
+
+
+def test_paste_pending_grace_window_polls_until_input_arrives():
+    from deeper.orchestrator.cli import _paste_pending
+
+    assert _paste_pending(_pending(False, False, True), grace_s=0.5) is True
+    assert _paste_pending(_pending(), grace_s=0) is False

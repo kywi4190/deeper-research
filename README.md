@@ -453,7 +453,9 @@ in `STAGES`. The built stages:
   `run_interview` loop — the system's only multi-turn dispatch. Each turn
   re-invokes the agent with the transcript; a reply without artifact markers is a
   question printed to the terminal (answer captured via the CLI's `ask_user`
-  channel), a reply with markers is the final emission, validated with the same
+  channel — a multi-line paste is one answer: lines already buffered on stdin
+  are drained into it, never leaked as auto-answers to later questions), a
+  reply with markers is the final emission, validated with the same
   schema-retry discipline as any dispatch. The question budget
   (`caps.max_interview_questions`, default 8) is enforced by code: an over-budget
   question never reaches the user — it is fed back as a violation. The stage
