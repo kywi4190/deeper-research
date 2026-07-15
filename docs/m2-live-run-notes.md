@@ -24,5 +24,32 @@ spent), to be restarted.
    (multi-paragraph pastes) are preserved; EOF mid-drain keeps what was
    read. Unit-tested with injected fakes in `test_orchestrator_cli.py`.
 
+2. **ADDRESSED — A near-cap angle's single screener batch overflows the size
+   class's output ceiling.** Restarted run (standard profile), S5: 88 cards
+   across 16 angles. One angle's batch reply exceeded the M class's 16k
+   output-token maximum — per-angle batching (the M1 finding-3b fix) bounds
+   the *number* of batches, but a single angle allocated near the 25% cap can
+   carry ~20 cards (~2× units), and 20 cards × every criterion × bands +
+   evidence pointers is legitimately >16k tokens of YAML on any profile.
+   Three Prompt 13 mechanisms visibly worked on the way down, worth keeping:
+   the run paused cleanly (no crash), the enriched dispatch error showed the
+   REAL cause in the terminal (`result: API Error: Claude's response exceeded
+   the 16000 output token maximum` — in M1 this identical failure was an
+   opaque `error result: success`; note the CLI reported `subtype='success'`
+   WITH `is_error=true`, a shape worth remembering), and the persisted
+   batches meant resume re-paid only the failed angle, not all 16.
+   *Immediate mitigation used mid-run:* raise the M class's
+   `max_output_tokens` 16000 → 32000 in the run's `config.yaml`, resume.
+   **Landed (2026-07-14), the durable fix:** an angle with more than
+   `screener_batch_max_cards` (new config knob, default 10) cards is
+   screened in balanced sub-batches (`chunk_cards`: fewest chunks of ≤ max,
+   near-equal sizes, deterministic), each integrity-checked against exactly
+   its own cards and persisted at `screening/batches/{angle}.partN.yaml` the
+   moment it passes, then merged in code into the same settled
+   `screening/batches/{angle}.yaml` — reply size is bounded by construction
+   instead of racing per-profile ceilings, and the on-disk contract is
+   unchanged (a mid-flight run's already-settled batches stay valid). A
+   crash mid-angle resumes from the completed parts.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

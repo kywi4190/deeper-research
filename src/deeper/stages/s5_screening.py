@@ -11,7 +11,12 @@ Screening is dispatched as ONE BATCH PER ANGLE (mirroring S3's fan-out), not
 one monolithic call: the M1 live run proved a full-map reply (52 options × 7
 criteria) exceeds even a 64k output-token ceiling, and a single mega-call
 re-pays the whole prompt on every retry. Each batch is integrity-checked
-against its own angle's cards, then code merges the batches.
+against its own angle's cards, then code merges the batches. An angle whose
+card count exceeds `screener_batch_max_cards` is itself split into balanced
+SUB-BATCHES (M2 live run: a 25%-cap angle's ~20-card reply overflowed the M
+class's 16k output ceiling — per-angle batching bounds the number of batches,
+not one batch's size), each persisted as a part file the moment it passes its
+chunk-scoped checks, then merged in code into the angle's settled batch file.
 
 Everything after dispatch is deterministic code: cross-artifact integrity is
 verified (a failure pauses the run — schema-valid but incoherent output is
@@ -25,6 +30,7 @@ crash between the two resumes into pure code, never a re-spend.
 from __future__ import annotations
 
 import asyncio
+import math
 
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
 from deeper.config import SizeClass
@@ -58,6 +64,32 @@ def batch_path(angle_id: str) -> str:
     12 paid batches; resume re-paid every one). Wiped with the rest of
     screening/ on invalidation."""
     return f"screening/batches/{angle_id}.yaml"
+
+
+def part_path(angle_id: str, part: int) -> str:
+    """One sub-batch of an oversized angle, persisted the moment IT passes —
+    a crash mid-angle resumes from the completed parts. Parts are deleted
+    once the angle's settled batch file is written (angle ids are slugs, so
+    the `.part` suffix cannot collide with another angle's batch file)."""
+    return f"screening/batches/{angle_id}.part{part}.yaml"
+
+
+def chunk_cards(cards: list, max_cards: int) -> list[list]:
+    """Split an angle's cards into the fewest balanced, order-preserving
+    chunks of at most `max_cards` (21 cards, max 10 -> 7/7/7 rather than
+    10/10/1 — near-equal replies, no rump dispatch). Deterministic, so a
+    resume recomputes the same chunk boundaries."""
+    n = len(cards)
+    if n <= max_cards:
+        return [list(cards)]
+    k = math.ceil(n / max_cards)
+    base, extra = divmod(n, k)
+    chunks, start = [], 0
+    for i in range(k):
+        size = base + (1 if i < extra else 0)
+        chunks.append(list(cards[start : start + size]))
+        start += size
+    return chunks
 
 
 class ScreeningStage(StageBase):
@@ -122,7 +154,8 @@ class ScreeningStage(StageBase):
         n_cards = sum(len(s.cards) for s in card_sets)
         ctx.emit(
             f"S5: screener scoring {n_cards} cards across {len(card_sets)} angles "
-            "(one batch per angle)…"
+            f"(one batch per angle; angles over {ctx.config.screener_batch_max_cards} "
+            "cards sub-batched)…"
         )
         # Ids of every OTHER angle's cards, per angle: a batch reply naming one
         # of those is over-scoping (or the mock full-scenario fixture fallback)
@@ -160,8 +193,20 @@ class ScreeningStage(StageBase):
         return screening
 
     def _batch_contract(
-        self, rubric: Rubric, card_set: OptionCardSet, base_inputs: dict[str, str]
+        self,
+        rubric: Rubric,
+        card_set: OptionCardSet,
+        base_inputs: dict[str, str],
+        *,
+        part: int | None = None,
+        n_parts: int = 1,
     ) -> AgentContract:
+        scope = (
+            "Other angles are screened by parallel batches"
+            if part is None
+            else f"This is sub-batch {part} of {n_parts} for this angle — its other "
+            "cards, and other angles, are screened by parallel batches"
+        )
         return AgentContract(
             role="screener",
             stage=StageEnum.S5,
@@ -169,13 +214,13 @@ class ScreeningStage(StageBase):
             output_schemas=("screening-result",),
             size_class=SizeClass.M,
             budget_line=(
-                f"Score all {len(card_set.cards)} cards of this angle against every "
+                f"Score all {len(card_set.cards)} cards in your inputs against every "
                 "rubric criterion at screening confidence. Kill-risk checks are single "
                 "cheap lookups, done FIRST; beyond those, only spot-confirm where a "
-                "score pivots on one dubious claim — depth is Stage 6's budget. Other "
-                "angles are screened by parallel batches — score ONLY these cards."
+                "score pivots on one dubious claim — depth is Stage 6's budget. "
+                f"{scope} — score ONLY these cards."
             ),
-            context=card_set.angle_id,
+            context=(card_set.angle_id if part is None else f"{card_set.angle_id}-part{part}"),
         )
 
     async def _screen_angle(
@@ -189,16 +234,90 @@ class ScreeningStage(StageBase):
         """One angle's screening batch, integrity-checked against that angle's
         cards alone (the per-batch checks union to full-map integrity).
         Persisted per angle the moment it passes, so a later failure (a
-        cross-angle collision, a sibling batch, a crash) never re-pays it."""
+        cross-angle collision, a sibling batch, a crash) never re-pays it.
+        An angle over `screener_batch_max_cards` is dispatched as balanced
+        sub-batches (the reply of ONE call is bounded by construction — a
+        near-cap angle's single reply overflowed the M-class output ceiling
+        on the M2 live run), merged in code into the same settled file."""
         persisted = self._existing_batch(ctx, rubric, card_set)
         if persisted is not None:
             ctx.emit(f"S5: {card_set.angle_id} batch already valid — skipping (persisted)")
             return persisted
-        contract = self._batch_contract(rubric, card_set, base_inputs)
+        max_cards = ctx.config.screener_batch_max_cards
+        chunks = chunk_cards(card_set.cards, max_cards)
+        if len(chunks) == 1:
+            parts = [
+                await self._screen_chunk(ctx, rubric, card_set, chunks[0], base_inputs, all_ids)
+            ]
+        else:
+            ctx.emit(
+                f"S5: {card_set.angle_id} has {len(card_set.cards)} cards > "
+                f"{max_cards} per screener call — splitting into {len(chunks)} "
+                "sub-batches"
+            )
+            parts = await asyncio.gather(
+                *(
+                    self._screen_chunk(
+                        ctx,
+                        rubric,
+                        card_set,
+                        chunk,
+                        base_inputs,
+                        all_ids,
+                        part=i,
+                        n_parts=len(chunks),
+                    )
+                    for i, chunk in enumerate(chunks, start=1)
+                )
+            )
+        notes = "\n".join(p.notes for p in parts if p.notes) or None
+        batch = ScreeningResult(options=[o for p in parts for o in p.options], notes=notes)
+        problems = verify_screening(batch, rubric, [card_set])
+        if problems:
+            # Belt over the chunk-scoped checks (their union should equal this).
+            raise AgentOutputInvalid(
+                self._batch_contract(rubric, card_set, base_inputs),
+                errors=(
+                    "the merged sub-batches do not cohere with the rubric and "
+                    "option cards:\n" + "\n".join(problems)
+                ),
+                raw_output="",
+            )
+        ctx.workspace.write_artifact(batch_path(card_set.angle_id), batch)
+        if len(chunks) > 1:  # the settled file supersedes the parts
+            for i in range(1, len(chunks) + 1):
+                ctx.workspace.path(part_path(card_set.angle_id, i)).unlink(missing_ok=True)
+        return batch
+
+    async def _screen_chunk(
+        self,
+        ctx: StageContext,
+        rubric: Rubric,
+        card_set: OptionCardSet,
+        cards: list,
+        base_inputs: dict[str, str],
+        all_ids: dict[str, str],
+        *,
+        part: int | None = None,
+        n_parts: int = 1,
+    ) -> ScreeningResult:
+        """One screener dispatch over `cards` (the whole angle, or one
+        sub-batch of it), integrity-checked against exactly those cards. A
+        sub-batch persists at its part path the moment it passes, so a crash
+        mid-angle resumes from the completed parts."""
+        chunk_set = OptionCardSet(angle_id=card_set.angle_id, cards=cards, notes=card_set.notes)
+        if part is not None:
+            existing = self._existing_part(ctx, rubric, chunk_set, part)
+            if existing is not None:
+                ctx.emit(
+                    f"S5: {card_set.angle_id} sub-batch {part} already valid — skipping (persisted)"
+                )
+                return existing
+        contract = self._batch_contract(rubric, chunk_set, base_inputs, part=part, n_parts=n_parts)
         result = await ctx.dispatcher.run_agent(contract)
         screening = result.artifacts["screening-result"]
         assert isinstance(screening, ScreeningResult)
-        own_ids = {c.id for c in card_set.cards}
+        own_ids = {c.id for c in cards}
         kept = [o for o in screening.options if o.option_id in own_ids]
         foreign = [
             o.option_id
@@ -207,23 +326,23 @@ class ScreeningStage(StageBase):
         ]
         if foreign:
             ctx.emit(
-                f"S5: {card_set.angle_id} batch scored {len(foreign)} option(s) from "
-                "other angles — dropped (their own batches score them)"
+                f"S5: {contract.context} batch scored {len(foreign)} option(s) covered "
+                "by other batches — dropped (their own batches score them)"
             )
         unknown = [o for o in screening.options if o.option_id not in all_ids]
         if not kept and not unknown:
-            # Every option belonged to other angles: an empty batch cannot even
+            # Every option belonged to other batches: an empty batch cannot even
             # be constructed for the integrity check, so report it directly.
             raise AgentOutputInvalid(
                 contract,
                 errors=(
-                    f"the screening batch for angle '{card_set.angle_id}' scored none "
-                    f"of that angle's cards; score exactly these: {sorted(own_ids)}"
+                    f"the screening batch '{contract.context}' scored none of its "
+                    f"assigned cards; score exactly these: {sorted(own_ids)}"
                 ),
                 raw_output=result.raw_text,
             )
         batch = ScreeningResult(options=kept + unknown, notes=screening.notes)
-        problems = verify_screening(batch, rubric, [card_set])
+        problems = verify_screening(batch, rubric, [chunk_set])
         if problems:
             raise AgentOutputInvalid(
                 contract,
@@ -233,7 +352,8 @@ class ScreeningStage(StageBase):
                 ),
                 raw_output=result.raw_text,
             )
-        ctx.workspace.write_artifact(batch_path(card_set.angle_id), batch)
+        if part is not None:
+            ctx.workspace.write_artifact(part_path(card_set.angle_id, part), batch)
         return batch  # problems empty implies batch == kept exactly
 
     def _existing_batch(
@@ -247,6 +367,22 @@ class ScreeningStage(StageBase):
         except Exception:  # noqa: BLE001 — absent/invalid means re-screen
             return None
         if verify_screening(batch, rubric, [card_set]):
+            return None
+        return batch
+
+    def _existing_part(
+        self, ctx: StageContext, rubric: Rubric, chunk_set: OptionCardSet, part: int
+    ) -> ScreeningResult | None:
+        """Same trust rule as `_existing_batch`, scoped to one sub-batch: a
+        persisted part counts only while it coheres with the current rubric
+        and the (deterministically re-chunked) cards it covered."""
+        try:
+            batch = ctx.workspace.read_artifact(
+                part_path(chunk_set.angle_id, part), ScreeningResult
+            )
+        except Exception:  # noqa: BLE001 — absent/invalid means re-screen
+            return None
+        if verify_screening(batch, rubric, [chunk_set]):
             return None
         return batch
 

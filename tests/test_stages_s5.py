@@ -10,14 +10,16 @@ import pytest
 
 from deeper.agents_runtime import AgentOutputInvalid
 from deeper.schemas import (
+    AllocationTable,
+    OptionCardSet,
     ScreeningResult,
     Shortlist,
     ShortlistCause,
     ShortlistOutcome,
 )
-from deeper.stages.s3_scouting import ScoutingStage
+from deeper.stages.s3_scouting import ScoutingStage, cards_path
 from deeper.stages.s4_rubric import RubricStage
-from deeper.stages.s5_screening import ScreeningStage, batch_path
+from deeper.stages.s5_screening import ScreeningStage, batch_path, chunk_cards, part_path
 
 from .helpers import (
     RecordingMockDispatcher,
@@ -230,3 +232,104 @@ async def test_incoherent_screening_pauses_instead_of_shortlisting(tmp_path):
         await ScreeningStage().execute(bad_ctx)
     assert "does not cohere" in str(excinfo.value.errors)
     assert not ws.path("screening/scores.yaml").exists()  # nothing persisted
+
+
+# -- sub-batching of oversized angles (M2 live-run finding 2) --------------------
+
+
+def test_chunk_cards_balanced_deterministic_and_order_preserving():
+    cards = list(range(21))
+    chunks = chunk_cards(cards, 10)
+    assert [len(c) for c in chunks] == [7, 7, 7]  # balanced, never 10/10/1
+    assert [x for chunk in chunks for x in chunk] == cards
+    assert chunk_cards(list(range(10)), 10) == [list(range(10))]  # at the bound: one
+    assert [len(c) for c in chunk_cards(list(range(11)), 10)] == [6, 5]
+    assert [len(c) for c in chunk_cards(list(range(5)), 2)] == [2, 2, 1]
+
+
+async def _walk_to_s5(tmp_path, max_cards: int):
+    ws = make_workspace(tmp_path, overrides={"screener_batch_max_cards": max_cards})
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    emitted: list[str] = []
+    dispatcher = RecordingMockDispatcher(ws, ws.load_config())
+    ctx = make_ctx(ws, dispatcher=dispatcher, emitted=emitted)
+    await ScoutingStage().execute(ctx)
+    await RubricStage().execute(ctx)
+    return ws, ctx, dispatcher, emitted
+
+
+def _screener_contexts(dispatcher) -> list[str]:
+    return [c for role, c, _ in dispatcher.invocations if role == "screener"]
+
+
+async def test_oversized_angles_screen_in_balanced_sub_batches(tmp_path):
+    """An angle over screener_batch_max_cards dispatches one screener call per
+    chunk (bounded reply size by construction — the M2 live run overflowed the
+    M-class output ceiling on a single ~20-card batch), and the code-merged
+    result is indistinguishable from unchunked screening."""
+    ws, ctx, dispatcher, emitted = await _walk_to_s5(tmp_path, max_cards=2)
+    await ScreeningStage().execute(ctx)
+
+    table = ws.read_artifact("allocation.yaml", AllocationTable)
+    expected: list[str] = []
+    for row in table.rows:
+        if row.units <= 0:
+            continue
+        cards = ws.read_artifact(cards_path(row.angle_id), OptionCardSet).cards
+        chunks = chunk_cards(cards, 2)
+        if len(chunks) == 1:
+            expected.append(row.angle_id)
+        else:
+            expected += [f"{row.angle_id}-part{i}" for i in range(1, len(chunks) + 1)]
+    got = _screener_contexts(dispatcher)
+    assert sorted(got) == sorted(expected)  # exactly the deterministic chunk plan
+    assert any("-part" in c for c in got)  # the scenario really exercised chunking
+    assert any("splitting into" in m for m in emitted)
+
+    scores = ws.read_artifact("screening/scores.yaml", ScreeningResult)
+    assert len(scores.options) == 22  # every card scored exactly once, as unchunked
+    ws.read_artifact("screening/shortlist.md", Shortlist)
+    # Settled per-angle batch files supersede the parts: none remain.
+    assert not list(ws.path("screening/batches").glob("*.part*.yaml"))
+    assert ScreeningStage().is_complete(ctx)
+
+
+async def test_crash_mid_angle_resumes_from_persisted_parts(tmp_path):
+    """A crash after some sub-batches passed re-pays only the missing chunks:
+    parts persist the moment they pass, and the deterministic chunker
+    recomputes the same boundaries on re-entry."""
+    ws, ctx, dispatcher, _ = await _walk_to_s5(tmp_path, max_cards=2)
+    await ScreeningStage().execute(ctx)
+
+    table = ws.read_artifact("allocation.yaml", AllocationTable)
+    angle = next(
+        row.angle_id
+        for row in table.rows
+        if row.units > 0
+        and len(ws.read_artifact(cards_path(row.angle_id), OptionCardSet).cards) > 2
+    )
+    cards = ws.read_artifact(cards_path(angle), OptionCardSet).cards
+    settled = ws.read_artifact(batch_path(angle), ScreeningResult)
+    part1_ids = {c.id for c in chunk_cards(cards, 2)[0]}
+    part1 = ScreeningResult(
+        options=[o for o in settled.options if o.option_id in part1_ids], notes=None
+    )
+    # Simulate the crash: the angle's settled batch and the merge are gone,
+    # but sub-batch 1 survived on disk.
+    ws.path("screening/scores.yaml").unlink()
+    ws.path(batch_path(angle)).unlink()
+    ws.write_artifact(part_path(angle, 1), part1)
+
+    emitted: list[str] = []
+    resumed = RecordingMockDispatcher(ws, ws.load_config())
+    ctx2 = make_ctx(ws, dispatcher=resumed, emitted=emitted)
+    await ScreeningStage().execute(ctx2)
+
+    contexts = _screener_contexts(resumed)
+    assert f"{angle}-part1" not in contexts  # the persisted part was not re-paid
+    assert f"{angle}-part2" in contexts  # the missing chunk was
+    assert all(c.startswith(angle) for c in contexts)  # other angles' batches skipped
+    assert any("sub-batch 1 already valid" in m for m in emitted)
+    assert len(ws.read_artifact("screening/scores.yaml", ScreeningResult).options) == 22
+    assert not list(ws.path("screening/batches").glob("*.part*.yaml"))

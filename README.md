@@ -510,7 +510,13 @@ in `STAGES`. The built stages:
   (mirroring S3's fan-out — the M1 live run proved a full-map single call
   exceeds even a 64k output-token ceiling), each with the Gate-B-approved
   rubric, that angle's cards, and — uniquely in the pipeline —
-  `preferences.yaml`. Each batch is integrity-checked against its own angle's
+  `preferences.yaml`. An angle with more than `screener_batch_max_cards` (10)
+  cards is itself split into balanced sub-batches — per-angle batching bounds
+  the *number* of calls, not one call's reply, and the M2 live run overflowed
+  the M class's 16k output ceiling on a single near-cap ~20-card angle — each
+  sub-batch persisted as a part file the moment it passes (a crash mid-angle
+  resumes from the completed parts; the deterministic chunker recomputes the
+  same boundaries), then merged in code into the angle's settled batch file. Each batch is integrity-checked against its own angle's
   cards (every card scored on every criterion, ids resolvable; over-scoped
   options dropped; incoherence pauses the run) and **persisted the moment it
   passes** at `screening/batches/{angle}.yaml` — a later failure or crash
@@ -1055,13 +1061,19 @@ canonical `Makefile` is used wherever GNU make is available.
   `rubric` (the design's rationale file has no schema of its own); S4 renders
   the rationale markdown from the validated rubric's definitions, measurement
   methods, and weight justifications, so the two files cannot disagree.
-- **S5 screening is batched per angle.** Design §5/S5 reads as one screener
-  pass over all cards; the M1 live run (52 options × 7 criteria) needed a
-  reply beyond even a 64k output-token ceiling and hung the CLI. S5 now
-  dispatches one batch per angle and merges in code — like-for-like scoring
-  is preserved because every batch carries the same rubric and anchored
-  levels; the per-batch integrity checks union to the design's full-map
-  check.
+- **S5 screening is batched per angle, and oversized angles are
+  sub-batched.** Design §5/S5 reads as one screener pass over all cards; the
+  M1 live run (52 options × 7 criteria) needed a reply beyond even a 64k
+  output-token ceiling and hung the CLI. S5 now dispatches one batch per
+  angle and merges in code — like-for-like scoring is preserved because
+  every batch carries the same rubric and anchored levels; the per-batch
+  integrity checks union to the design's full-map check. The M2 live run
+  then showed per-angle batching still leaves one batch's size unbounded (a
+  25%-cap angle's ~20-card reply overflowed the M class's 16k ceiling), so
+  an angle over `screener_batch_max_cards` (default 10) splits into
+  balanced sub-batches — bounded replies by construction instead of chasing
+  per-profile token ceilings — each persisted as a part file until the
+  angle's settled batch file supersedes them.
 - **Dispatch retry-with-backoff arrived early.** The build guide schedules
   exponential backoff for Prompt 13; the M1 live run hit repeated one-off SDK
   stream errors, each costing a human resume, so the minimal schedule (2

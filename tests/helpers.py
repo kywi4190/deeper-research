@@ -31,11 +31,14 @@ def make_workspace(
     profile: str = "quick",
     goal: str = "pick a senior research project",
     caps: dict | None = None,
+    overrides: dict | None = None,
 ) -> Workspace:
     data = profile_config(profile).model_dump(mode="json")
     data["goal"] = goal
     if caps:
         data["caps"].update(caps)
+    if overrides:
+        data.update(overrides)
     return Workspace.create(tmp_path / "run", RunConfig.model_validate(data))
 
 

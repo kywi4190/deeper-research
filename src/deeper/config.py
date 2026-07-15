@@ -124,6 +124,16 @@ class RunConfig(ArtifactModel):
         "absolute-threshold rule, kept relative so screener band inflation cannot "
         "advance the whole field (M1 live run: 26 'finalists' of 52).",
     )
+    screener_batch_max_cards: int = Field(
+        default=10,
+        ge=1,
+        description="S5 dispatch bound: an angle with more cards than this is "
+        "screened in balanced sub-batches of at most this many cards, merged and "
+        "integrity-checked in code — one batch's reply length is bounded by "
+        "construction instead of racing the size class's output-token ceiling "
+        "(M2 live run: a 25%-cap angle's ~20-card batch overflowed the M class's "
+        "16k ceiling).",
+    )
     preference_slot_default_weight: float = Field(
         default=0.20,
         ge=0,
