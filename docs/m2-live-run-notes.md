@@ -162,5 +162,30 @@ spent), to be restarted.
    via Read on the cached binary — prompt guidance that already works,
    worth keeping verbatim.
 
+7. **ADDRESSED — "Fatal error in message reader": the SDK's 1MB
+   stdout-message buffer kills a dispatch when one streamed tool result
+   exceeds it.** Restarted run, S6 (2026-07-16 ~18:00Z): two scary `Fatal
+   error in message reader: ... JSON message exceeded maximum buffer size
+   of 1048576 bytes` lines mid-run. The line itself is just the SDK's
+   `logger.error` leaking to the terminal; the Prompt 13 machinery did its
+   job — each death became a transient `LiveDispatchError`, was ledgered as
+   a zero-cost failed marker, backoff-retried, and the run never paused
+   (the other parallel finalists' progress kept printing in between, which
+   is why it looked interleaved and alarming). Root cause: the SDK reads
+   the CLI's stdout as newline-delimited JSON with a 1MB per-message buffer
+   (`_DEFAULT_MAX_BUFFER_SIZE`), and a research agent's WebFetch of a big
+   page/PDF flows through as one such message. The rub is in the ledger:
+   the `implicit-bias-max-margin` verifier died on the SAME >1MB fetch
+   twice in a row (18:01, 18:04) before attempt 3 hit the session limit —
+   the failure is near-deterministic when the agent re-walks the same
+   source, so "transient" backoff retries mostly re-pay the same death.
+   **Landed (2026-07-16):** `_live_options` now passes
+   `max_buffer_size=MAX_SDK_MESSAGE_BYTES` (32MB) to `ClaudeAgentOptions` —
+   clears any plausible tool result, still bounds a runaway stream.
+   Asserted in `test_live_options_enforce_size_class_budgets`. For Prompt
+   14's context: nothing needs prompt work here, but when reading ledgers
+   remember failed markers at the same context minutes apart are usually
+   ONE cause retried, not independent flakes.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

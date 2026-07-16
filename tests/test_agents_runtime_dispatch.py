@@ -258,6 +258,13 @@ def test_live_options_enforce_size_class_budgets(ws: Workspace) -> None:
     assert options.permission_mode == "dontAsk"
     assert "Bash" in options.disallowed_tools
     assert options.cwd == str(ws.root)
+    # The SDK's default 1MB stdout-message buffer kills a dispatch whenever one
+    # streamed JSON message (a big WebFetch tool result) exceeds it — the M2
+    # live run's verifier died twice on the same fetch (finding 7).
+    from deeper.agents_runtime.dispatch import MAX_SDK_MESSAGE_BYTES
+
+    assert options.max_buffer_size == MAX_SDK_MESSAGE_BYTES
+    assert MAX_SDK_MESSAGE_BYTES >= 16 * 1024 * 1024
 
 
 def test_subscription_billing_blanks_the_api_key(ws: Workspace, monkeypatch) -> None:

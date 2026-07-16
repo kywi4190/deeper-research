@@ -361,7 +361,11 @@ resume` at that time; resuming is always an explicit human action, never an
 automatic wait. Live subagents also get their size-class output budget
 enforced, not just stated: `_live_options` passes `max_output_tokens` as
 `CLAUDE_CODE_MAX_OUTPUT_TOKENS` into the subagent's environment (the CLI's
-default 32k ceiling silently killed long artifact replies before this).
+default 32k ceiling silently killed long artifact replies before this), and
+raises the SDK's per-message stdout buffer to `MAX_SDK_MESSAGE_BYTES` (32MB —
+the default 1MB kills a dispatch whenever one streamed WebFetch tool result
+exceeds it, near-deterministically when the agent re-walks the same big
+source on retry).
 
 ## The prompt-lab (`deeper-lab`)
 

@@ -42,6 +42,15 @@ RESEARCH_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]
 NON_RESEARCH_TOOLS = ["Read"]
 DISALLOWED_TOOLS = ["Bash", "Task", "Agent"]
 
+# The SDK reads the CLI's stdout as newline-delimited JSON and kills the
+# dispatch when ONE message exceeds its buffer (default 1MB) — and a research
+# agent's WebFetch of a large page/PDF flows through as exactly such a message.
+# The M2 live run's verifier died twice on the same >1MB fetch before the
+# session limit cut the third attempt (finding 7): near-deterministic, so
+# backoff retries mostly re-pay the same failure. 32MB clears any plausible
+# tool result while still bounding a runaway stream.
+MAX_SDK_MESSAGE_BYTES = 32 * 1024 * 1024
+
 _RETRY_TEMPLATE = (
     "{prompt}\n"
     "# PREVIOUS ATTEMPT (INVALID — shown so you can correct it)\n"
@@ -554,6 +563,7 @@ class LiveDispatcher(_BaseDispatcher):
             max_turns=2 * spec.max_searches + 6,
             hooks=build_hooks(contract, self.workspace),
             env=env,
+            max_buffer_size=MAX_SDK_MESSAGE_BYTES,
         )
 
     def _check_auth_source(self, message: object) -> None:
