@@ -15,6 +15,7 @@ import os
 import random
 import re
 import time
+from collections import deque
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
 from typing import NamedTuple, Protocol, cast
@@ -531,7 +532,9 @@ class LiveDispatcher(_BaseDispatcher):
                 "(the default) to use the Claude Code CLI's stored login"
             )
 
-    def _live_options(self, contract: AgentContract):
+    def _live_options(
+        self, contract: AgentContract, *, on_stderr: Callable[[str], None] | None = None
+    ):
         """The full option set for one live subagent process. Size-class
         budgets are enforced here, not just stated in the prompt: the CLI's
         default 32k output ceiling kills long single-reply artifacts (observed
@@ -568,6 +571,9 @@ class LiveDispatcher(_BaseDispatcher):
             hooks=build_hooks(contract, self.workspace),
             env=env,
             max_buffer_size=MAX_SDK_MESSAGE_BYTES,
+            # Piped to the host, never inherited by the operator's terminal
+            # (M2 finding 9) — the terminal shows pipeline emits only.
+            stderr=on_stderr,
         )
 
     def _check_auth_source(self, message: object) -> None:
@@ -587,10 +593,33 @@ class LiveDispatcher(_BaseDispatcher):
                 "to meter an API account; set billing: api if that is intended"
             )
 
+    def _stderr_detail(self, contract: AgentContract, attempt: int, stderr_tail: deque[str]) -> str:
+        """Persist the captured subprocess stderr next to the retries logs and
+        return the suffix the enriched failure text carries — the stderr the
+        terminal used to spew is usually the diagnosis (M2 finding 9)."""
+        if not stderr_tail:
+            return ""
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        context = f"-{contract.context}" if contract.context else ""
+        relpath = (
+            f"logs/stderr/{stamp}-{contract.stage.value}-{contract.role}"
+            f"{context}-attempt{attempt}.log"
+        )
+        target = self.workspace.path(relpath)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("\n".join(stderr_tail) + "\n", encoding="utf-8", newline="\n")
+        tail = " | ".join(list(stderr_tail)[-12:])
+        return f" [subagent stderr tail: {tail}; full capture: {relpath}]"
+
     async def _invoke(self, prompt: str, contract: AgentContract, attempt: int) -> _Invocation:
         from claude_agent_sdk import query
 
-        options = self._live_options(contract)
+        # maxlen bounds memory (~400KB worst case per in-flight dispatch);
+        # per-line cap because minified-JS stack lines run to megabytes.
+        stderr_tail: deque[str] = deque(maxlen=200)
+        options = self._live_options(
+            contract, on_stderr=lambda line: stderr_tail.append(line[:2000])
+        )
         chunks: list[str] = []
         usd = 0.0
         input_tokens = output_tokens = num_turns = 0
@@ -630,7 +659,9 @@ class LiveDispatcher(_BaseDispatcher):
         except Exception as err:
             detail = _cli_result_detail(result_subtype, result_text, result_is_error)
             raise LiveDispatchError(
-                f"{type(err).__name__}: {err}" + (f" [{detail}]" if detail else "")
+                f"{type(err).__name__}: {err}"
+                + (f" [{detail}]" if detail else "")
+                + self._stderr_detail(contract, attempt, stderr_tail)
             ) from err
         finally:
             # PEP 533: async-for does not close its iterator when the body
@@ -646,6 +677,7 @@ class LiveDispatcher(_BaseDispatcher):
             raise LiveDispatchError(
                 "the CLI reported an error result: "
                 + _cli_result_detail(result_subtype, result_text, result_is_error)
+                + self._stderr_detail(contract, attempt, stderr_tail)
             )
         if not duration_ms:
             duration_ms = int((time.monotonic() - started) * 1000)

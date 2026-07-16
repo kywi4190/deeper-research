@@ -381,6 +381,92 @@ async def test_live_invoke_enriches_sdk_failures_with_cli_result_detail(
     assert "32000 output token" in message  # ...and the CLI's real diagnosis
 
 
+def test_live_options_wire_the_stderr_callback(ws: Workspace) -> None:
+    """The CLI subprocess's stderr must be piped to the host (options.stderr),
+    never inherited by the operator's terminal (M2 finding 9: minified-JS hook
+    dumps and SDK reader errors spewing mid-run)."""
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    dispatcher = LiveDispatcher(ws, config)
+
+    def sink(line: str) -> None:  # pragma: no cover — wiring test
+        pass
+
+    assert dispatcher._live_options(scout_contract(), on_stderr=sink).stderr is sink
+    assert dispatcher._live_options(scout_contract()).stderr is None
+
+
+async def test_live_invoke_failure_carries_and_persists_the_stderr_tail(
+    ws: Workspace, monkeypatch
+) -> None:
+    """When a dispatch dies, the subprocess's captured stderr is the diagnosis
+    that used to spew into the terminal — it must land in logs/stderr/ and the
+    enriched failure text must carry the tail + the file's relpath."""
+    import claude_agent_sdk
+
+    from deeper.agents_runtime import LiveDispatchError
+
+    async def fake_query(*, prompt, options):
+        options.stderr("Error in hook callback hook_0: minified js " + "x" * 5000)
+        options.stderr("error: Stream closed")
+        raise RuntimeError("boom")
+        yield  # pragma: no cover — makes this an async generator
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    with pytest.raises(LiveDispatchError) as excinfo:
+        await LiveDispatcher(ws, config)._invoke("p", scout_contract(), 0)
+    message = str(excinfo.value)
+    assert "error: Stream closed" in message  # the tail rides the failure text
+    assert "logs/stderr/" in message  # ...naming the full capture
+    logs = list(ws.path("logs/stderr").glob("*-S3-scout-interpretability-research-attempt0.log"))
+    assert len(logs) == 1
+    text = logs[0].read_text(encoding="utf-8")
+    assert "error: Stream closed" in text
+    assert len(text) < 5000  # long lines are stored truncated (2000-char cap)
+
+
+async def test_live_invoke_error_result_also_carries_the_stderr_tail(
+    ws: Workspace, monkeypatch
+) -> None:
+    import claude_agent_sdk
+
+    from deeper.agents_runtime import LiveDispatchError
+
+    class ResultMessage:
+        subtype = "error_during_execution"
+        result = "something died"
+        is_error = True
+
+    async def fake_query(*, prompt, options):
+        options.stderr("Fatal error in message reader: whatever")
+        yield ResultMessage()
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    with pytest.raises(LiveDispatchError) as excinfo:
+        await LiveDispatcher(ws, config)._invoke("p", scout_contract(), 0)
+    assert "Fatal error in message reader" in str(excinfo.value)
+    assert list(ws.path("logs/stderr").glob("*.log"))
+
+
+async def test_live_invoke_success_discards_the_stderr_buffer(ws: Workspace, monkeypatch) -> None:
+    import claude_agent_sdk
+
+    class ResultMessage:
+        subtype = "success"
+        result = "ok"
+        is_error = False
+
+    async def fake_query(*, prompt, options):
+        options.stderr("harmless chatter")
+        yield ResultMessage()
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    await LiveDispatcher(ws, config)._invoke("p", scout_contract(), 0)
+    assert not ws.path("logs/stderr").exists()  # nothing persisted on success
+
+
 async def test_live_invoke_closes_the_generator_when_the_loop_body_raises(
     ws: Workspace, monkeypatch
 ) -> None:
