@@ -51,5 +51,28 @@ spent), to be restarted.
    unchanged (a mid-flight run's already-settled batches stay valid). A
    crash mid-angle resumes from the completed parts.
 
+3. **ADDRESSED — Even a sub-batched (≤10-card) screener reply overflows a
+   16k M-class ceiling.** Restarted run, S5 resume (2026-07-15): with the
+   finding-2 sub-batching active (terminal confirmed "angles over 10 cards
+   sub-batched"), a screener dispatch still died on `Claude's response
+   exceeded the 16000 output token maximum`. So 10 cards × every rubric
+   criterion × bands + evidence pointers does not reliably fit in 16k when
+   the cards are verbose — the finding-2 estimate ("~20 cards > 16k") was
+   optimistic by ~2×. Also confirmed the run had never picked up the 32k
+   mitigation: the run's own `config.yaml` (the only source the dispatcher
+   reads — `_live_options` injects it as `CLAUDE_CODE_MAX_OUTPUT_TOKENS`)
+   still carried M=16000; the mid-M2 hand-edit applied to the aborted first
+   attempt's workspace, and the shipped `standard` profile still defaulted
+   to 16000. *Mitigation used mid-run:* same hand-edit, M 16000 → 32000 in
+   this run's `config.yaml`, resume. **Landed (2026-07-15), the durable
+   fix:** live profiles now ship M-class `max_output_tokens` = 32000
+   (`standard` 16000 → 32000, `exhaustive` 24000 → 32000 so the deeper
+   profile is never below standard; `quick` deliberately untouched — its
+   tight ceilings are the sanity-pass trade-off). The ceiling is a runaway
+   guard like the spend cap: output tokens cost nothing unless produced.
+   Pinned by `test_live_profile_m_class_ceiling_fits_a_full_screener_batch`.
+   Existing runs keep their own `config.yaml` — a mid-flight run wanting the
+   new ceiling needs the one-line hand-edit.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

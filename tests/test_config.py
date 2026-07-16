@@ -42,6 +42,18 @@ def test_profile_knobs_match_design_section_8():
     assert exhaustive.deep_dive_unit_cap > standard.deep_dive_unit_cap > quick.deep_dive_unit_cap
 
 
+def test_live_profile_m_class_ceiling_fits_a_full_screener_batch():
+    """The restarted M2 live run (2026-07-15) overflowed a 16k M-class output
+    ceiling on a single sub-batched (≤10-card) screener reply — sub-batching
+    bounds the cards per reply, but a full batch of verbose cards scored
+    against every rubric criterion needs 32k of headroom. The live profiles
+    (standard, exhaustive) must ship with it; quick's tighter ceilings are the
+    sanity-pass trade-off, left as-is deliberately."""
+    for name in ("standard", "exhaustive"):
+        m_class = profile_config(name).size_classes[SizeClass.M]
+        assert m_class.max_output_tokens >= 32000, name
+
+
 def test_hard_caps_match_design_section_12():
     caps = profile_config("standard").caps
     assert caps.max_cartographers == 8

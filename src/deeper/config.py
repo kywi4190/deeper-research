@@ -211,6 +211,10 @@ def _size_classes(
 # Quick also caps cartography at ONE expansion pass (3 initial + 1): the
 # sanity profile must not fund a saturation loop to the global 8-invocation
 # ceiling the way the M1 run did.
+# M-class output ceilings on the live profiles are 32k: the restarted M2 run
+# (2026-07-15) overflowed 16k on a single ≤10-card screener sub-batch, so even
+# a bounded-by-construction reply needs the headroom. The ceiling is a runaway
+# guard like the spend cap — output tokens cost nothing unless produced.
 PROFILES: dict[str, dict[str, Any]] = {
     "quick": {
         "profile": "quick",
@@ -239,7 +243,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "max_spend_usd": 100.0,
         "deep_dive_unit_cap": 4,
         "concurrency": 4,
-        "size_classes": _size_classes((3, 4000), (12, 16000), (25, 32000)),
+        "size_classes": _size_classes((3, 4000), (12, 32000), (25, 32000)),
     },
     "exhaustive": {
         "profile": "exhaustive",
@@ -253,7 +257,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "max_spend_usd": 200.0,
         "deep_dive_unit_cap": 6,
         "concurrency": 4,
-        "size_classes": _size_classes((4, 4000), (18, 24000), (35, 48000)),
+        "size_classes": _size_classes((4, 4000), (18, 32000), (35, 48000)),
     },
 }
 

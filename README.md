@@ -396,6 +396,11 @@ so a corrupted file raises instead of propagating. `Workspace.open` re-validates
 γ=1.0, 5 cartographers, shortlist 5), **exhaustive** (B=80, floor 3, γ=0.8, 6
 cartographers, shortlist 7) — plus the size-class table S/M/L → (model, max_searches,
 max_output_tokens) and every §12 hard cap as a number code can enforce (`HardCaps`).
+The live profiles ship M-class output ceilings of 32k: the M2 live run showed even a
+sub-batched (≤10-card) screener reply can overflow 16k, and the ceiling is a runaway
+guard, not a target — output tokens cost nothing unless produced. (Existing runs keep
+the table snapshotted in their own `config.yaml`; raising a mid-flight run's ceiling
+is a one-line edit there.)
 A run's `config.yaml` names a profile and overrides any field; `load_config` deep-merges
 and validates the whole thing (contradictions like a per-angle cap below the floor are
 rejected at load, not discovered mid-run).
