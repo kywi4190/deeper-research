@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from deeper.agents_runtime import AgentOutputInvalid
+from deeper.config import profile_config
 from deeper.contradictions import LEDGER_PATH
 from deeper.schemas import (
     Claim,
@@ -198,11 +199,16 @@ async def test_rescore_corrects_an_agent_guessed_angle_id(tmp_path):
     wrong = finalist.baseline.model_copy(update={"angle_id": "a-plausible-wrong-angle"})
 
     class OneShotDispatcher:
-        async def run_agent(self, contract):
-            return SimpleNamespace(
+        async def run_agent(self, contract, validate=None):
+            result = SimpleNamespace(
                 artifacts={"screening-result": ScreeningResult(options=[wrong])},
                 raw_text="stub",
             )
+            if validate is not None:
+                # normalize_rescore corrects the stray angle before verifying,
+                # so a wrong angle alone is never a retryable problem.
+                assert validate(result.artifacts) is None
+            return result
 
     emitted: list[str] = []
     rescore_ctx = make_ctx(ws, dispatcher=OneShotDispatcher(), emitted=emitted)
@@ -214,6 +220,38 @@ async def test_rescore_corrects_an_agent_guessed_angle_id(tmp_path):
     )
     assert result.angle_id == finalist.baseline.angle_id
     assert any("corrected" in m and "a-plausible-wrong-angle" in m for m in emitted)
+
+
+# -- an analyst dossier off its assignment is retried with feedback ------------------
+
+
+async def test_analyst_wrong_round_is_retried_with_feedback(tmp_path):
+    """A dossier stamped with the wrong rounds_completed (schema-valid,
+    assignment-incoherent) gets a feedback retry via run_agent's validate
+    loop; the retry (fixture fallback) satisfies the round check."""
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    ctx0 = make_ctx(ws)
+    await ScoutingStage().execute(ctx0)
+    await RubricStage().execute(ctx0)
+    await ScreeningStage().execute(ctx0)
+    stage = DeepDiveStage()
+    finalist = next(f for f in stage._finalists(ctx0) if f.option_id == CONVERGER)
+    rubric = ws.read_artifact("rubric.yaml", Rubric)
+    fixture = (FIXTURES / "analyst" / f"dossier.{CONVERGER}-r1.yaml").read_text(encoding="utf-8")
+    wrong = fixture.replace("rounds_completed: 1", "rounds_completed: 2")
+    assert wrong != fixture  # the fixture stamps round 1 today; keep the test honest
+    ctx = make_ctx(
+        ws,
+        scripted_responses={
+            f"analyst:{CONVERGER}-r1": [f"### artifact: dossier\n```yaml\n{wrong}```\n"]
+        },
+    )
+    log = DeepDiveRoundLog(option_id=CONVERGER, baseline=finalist.baseline)
+    dossier = await stage._dispatch_analyst(ctx, finalist, rubric, {}, log, 1)
+    assert dossier.rounds_completed == 1
+    assert ws.load_state().retry_counts[f"S6:analyst:{CONVERGER}-r1"] == 1
 
 
 # -- a verifier that misses a sampled claim is retried with feedback -----------------
@@ -417,18 +455,25 @@ async def test_resume_replays_only_the_unsettled_tail(run):
 # -- cross-artifact integrity is enforced, not assumed -------------------------------
 
 
-async def test_wrong_option_dossier_is_rejected(tmp_path):
+async def test_wrong_option_dossier_exhausts_retries_then_pauses(tmp_path):
+    """Integrity is enforced, not assumed: an analyst that persists in
+    delivering another option's dossier burns its feedback retries and then
+    pauses the run — every attempt schema-valid, every attempt incoherent."""
     ws = make_workspace(tmp_path)
     write_s0_artifacts(ws)
     write_s1_s2_artifacts(ws)
     emitted: list[str] = []
     # Serve the sae-feature-atlas fallback dossier to the CAPPED option's
-    # analyst: schema-valid, wrong option_id — the stage must reject it.
+    # analyst on EVERY attempt: schema-valid, wrong option_id throughout.
     wrong = (FIXTURES / "analyst" / "dossier.yaml").read_text(encoding="utf-8")
-    scripted = {f"analyst:{CAPPED}-r1": [f"### artifact: dossier\n```yaml\n{wrong}\n```"]}
+    attempts = profile_config("quick").caps.max_schema_retries + 1
+    scripted = {
+        f"analyst:{CAPPED}-r1": [f"### artifact: dossier\n```yaml\n{wrong}\n```"] * attempts
+    }
     ctx = make_ctx(ws, emitted=emitted, scripted_responses=scripted)
     await ScoutingStage().execute(ctx)
     await RubricStage().execute(ctx)
     await ScreeningStage().execute(ctx)
     with pytest.raises(AgentOutputInvalid, match="does not cohere"):
         await DeepDiveStage().execute(ctx)
+    assert ws.load_state().retry_counts[f"S6:analyst:{CAPPED}-r1"] == attempts - 1

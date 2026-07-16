@@ -22,6 +22,7 @@ from deeper.stages.s4_rubric import RubricStage
 from deeper.stages.s5_screening import ScreeningStage, batch_path, chunk_cards, part_path
 
 from .helpers import (
+    FIXTURES,
     RecordingMockDispatcher,
     make_ctx,
     make_workspace,
@@ -205,6 +206,51 @@ async def test_stale_batch_is_rescreened_not_trusted(run):
     await ScreeningStage().execute(ctx)
     after = sum(1 for r, _c, _p in dispatcher.invocations if r == "screener")
     assert after == before + 1  # exactly the mangled angle's batch re-ran
+
+
+async def test_one_incoherent_screening_reply_is_retried_with_feedback(tmp_path):
+    """A single incoherent reply costs a feedback retry, not a paused run —
+    the chunk's coherence check rides run_agent's validate loop and the retry
+    (fixture fallback) completes the stage."""
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    ctx = make_ctx(ws)
+    await ScoutingStage().execute(ctx)
+    await RubricStage().execute(ctx)
+    incoherent = (
+        "### artifact: screening-result\n```yaml\n"
+        "options:\n"
+        "  - option_id: no-such-card\n"
+        "    angle_id: interpretability-research\n"
+        "    criterion_scores:\n"
+        "      - {criterion_id: publication-potential, score: 3.0,\n"
+        "         band: {lo: 2.0, hi: 4.0}, evidence_pointer: made up}\n"
+        "    weighted_point: 3.0\n"
+        "    weighted_ucb: 4.0\n"
+        "```\n"
+    )
+    retry_ctx = make_ctx(ws, scripted_responses={"screener": [incoherent]})
+    await ScreeningStage().execute(retry_ctx)
+    assert ws.path("screening/scores.yaml").exists()
+    counts = ws.load_state().retry_counts
+    assert sum(v for k, v in counts.items() if k.startswith("S5:screener:")) == 1
+
+
+def test_normalize_chunk_drops_foreign_keeps_unknown():
+    """Pure: options covered by other batches are dropped (their own batches
+    score them); ids matching nothing survive so verify_screening reports the
+    incoherence."""
+    from deeper.stages.s5_screening import normalize_chunk
+
+    fixture = FIXTURES / "screener" / "screening-result.yaml"
+    screening = ScreeningResult.from_yaml_file(fixture)
+    ids = [o.option_id for o in screening.options]
+    own_ids = {ids[0]}
+    all_ids = dict.fromkeys(ids[:-1], "some-angle")  # last id: unknown everywhere
+    batch, foreign = normalize_chunk(screening, own_ids, all_ids)
+    assert [o.option_id for o in batch.options] == [ids[0], ids[-1]]
+    assert foreign == ids[1:-1]
 
 
 async def test_incoherent_screening_pauses_instead_of_shortlisting(tmp_path):

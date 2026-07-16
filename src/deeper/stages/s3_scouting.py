@@ -28,7 +28,7 @@ import math
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.agents_runtime import AgentContract
 from deeper.aio import gather_strict
 from deeper.allocation import reflow
 from deeper.config import SizeClass
@@ -249,18 +249,22 @@ class ScoutingStage(StageBase):
             ),
             context=angle_id,
         )
-        result = await ctx.dispatcher.run_agent(critic_contract)
-        critique = result.artifacts["card-critique"]
-        assert isinstance(critique, CardCritique)
-        if critique.angle_id != angle_id:
-            raise AgentOutputInvalid(
-                critic_contract,
-                errors=(
+
+        def check_critic_assignment(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5):
+            # a wrong angle gets corrective feedback, not a paused run.
+            critique = artifacts["card-critique"]
+            assert isinstance(critique, CardCritique)
+            if critique.angle_id != angle_id:
+                return (
                     f"card-critique.angle_id is '{critique.angle_id}' but this critic "
                     f"was assigned angle '{angle_id}'"
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(critic_contract, validate=check_critic_assignment)
+        critique = result.artifacts["card-critique"]
+        assert isinstance(critique, CardCritique)
         stop_pct = ctx.config.caps.scout_redundancy_stop_pct
         if critique.redundancy_pct > stop_pct:
             ctx.emit(
@@ -319,18 +323,21 @@ class ScoutingStage(StageBase):
             budget_line=budget_line,
             context=context,
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        card_set = result.artifacts["option-card-set"]
-        assert isinstance(card_set, OptionCardSet)
-        if card_set.angle_id != angle_id:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+
+        def check_scout_assignment(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            card_set = artifacts["option-card-set"]
+            assert isinstance(card_set, OptionCardSet)
+            if card_set.angle_id != angle_id:
+                return (
                     f"option-card-set.angle_id is '{card_set.angle_id}' but this scout "
                     f"was assigned angle '{angle_id}'"
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_scout_assignment)
+        card_set = result.artifacts["option-card-set"]
+        assert isinstance(card_set, OptionCardSet)
         return card_set
 
     # -- reflow ---------------------------------------------------------------

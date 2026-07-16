@@ -98,6 +98,63 @@ def test_needs_revision_ignores_missed_options():
     assert needs_revision(flagged)
 
 
+# -- assignment checks ride the dispatcher retry loop (M2 finding 5 follow-up) -------
+
+
+async def test_scout_wrong_angle_is_retried_with_feedback(tmp_path):
+    """A schema-valid card set for the WRONG angle gets a feedback retry, not
+    a paused run — the per-dispatch check rides run_agent's validate loop."""
+    from .helpers import FIXTURES
+
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    fixture = (FIXTURES / "scout" / "option-card-set.interpretability-research.yaml").read_text(
+        encoding="utf-8"
+    )
+    wrong = fixture.replace("interpretability-research", "a-different-angle")
+    ctx = make_ctx(
+        ws,
+        scripted_responses={
+            "scout": [f"### artifact: option-card-set\n```yaml\n{wrong}```\n"]
+        },  # the retry falls back to the correct fixture
+    )
+    card_set = await ScoutingStage()._dispatch_scout(
+        ctx,
+        context="interpretability-research",
+        angle_id="interpretability-research",
+        task_objective="",
+        budget_line="b",
+        input_artifacts={"angle": "x"},
+    )
+    assert card_set.angle_id == "interpretability-research"
+    assert ws.load_state().retry_counts["S3:scout:interpretability-research"] == 1
+
+
+async def test_critic_wrong_angle_is_retried_with_feedback(tmp_path):
+    from .helpers import FIXTURES
+
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    fixture = (FIXTURES / "card-critic" / "card-critique.interpretability-research.yaml").read_text(
+        encoding="utf-8"
+    )
+    wrong = fixture.replace("interpretability-research", "a-different-angle")
+    ctx = make_ctx(
+        ws,
+        scripted_responses={
+            "card-critic:interpretability-research": [
+                f"### artifact: card-critique\n```yaml\n{wrong}```\n"
+            ]
+        },
+    )
+    await ScoutingStage().execute(ctx)
+    assert ws.load_state().retry_counts["S3:card-critic:interpretability-research"] == 1
+    critique = ws.read_artifact(critique_path("interpretability-research"), CardCritique)
+    assert critique.angle_id == "interpretability-research"
+
+
 # -- the full mock walk ---------------------------------------------------------------
 
 

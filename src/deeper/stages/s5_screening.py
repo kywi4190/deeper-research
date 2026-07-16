@@ -74,6 +74,28 @@ def part_path(angle_id: str, part: int) -> str:
     return f"screening/batches/{angle_id}.part{part}.yaml"
 
 
+def normalize_chunk(
+    screening: ScreeningResult, own_ids: set[str], all_ids: dict[str, str]
+) -> tuple[ScreeningResult | None, list[str]]:
+    """Pure: drop options covered by OTHER batches (their own batches score
+    them — the mock full-scenario fallback and an over-eager live screener
+    both do this), keep ids matching nothing at all so verify_screening
+    reports them as incoherence. Used twice: inside the dispatch's validate
+    callback, and post-success to build the batch actually persisted.
+    Returns (normalized batch — None when nothing survives — dropped-foreign
+    ids)."""
+    kept = [o for o in screening.options if o.option_id in own_ids]
+    unknown = [o for o in screening.options if o.option_id not in all_ids]
+    foreign = [
+        o.option_id
+        for o in screening.options
+        if o.option_id not in own_ids and o.option_id in all_ids
+    ]
+    if not kept and not unknown:
+        return None, foreign
+    return ScreeningResult(options=kept + unknown, notes=screening.notes), foreign
+
+
 def chunk_cards(cards: list, max_cards: int) -> list[list]:
     """Split an angle's cards into the fewest balanced, order-preserving
     chunks of at most `max_cards` (21 cards, max 10 -> 7/7/7 rather than
@@ -168,6 +190,9 @@ class ScreeningStage(StageBase):
         ids = [o.option_id for o in merged_options]
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         if dupes:
+            # Merge-level check, deliberately NOT a validate= callback: failure
+            # means a code bug or a hand-edited workspace, not retryable agent
+            # output — pause, don't retry (the taxonomy from M2 finding 5).
             raise AgentOutputInvalid(
                 self._batch_contract(rubric, card_sets[0], base_inputs),
                 errors=(
@@ -275,6 +300,8 @@ class ScreeningStage(StageBase):
         problems = verify_screening(batch, rubric, [card_set])
         if problems:
             # Belt over the chunk-scoped checks (their union should equal this).
+            # Merge-level: firing means the chunker or merger has a bug, not
+            # that any one agent misreplied — pause, don't retry.
             raise AgentOutputInvalid(
                 self._batch_contract(rubric, card_set, base_inputs),
                 errors=(
@@ -314,47 +341,41 @@ class ScreeningStage(StageBase):
                 )
                 return existing
         contract = self._batch_contract(rubric, chunk_set, base_inputs, part=part, n_parts=n_parts)
-        result = await ctx.dispatcher.run_agent(contract)
+        own_ids = {c.id for c in cards}
+
+        def check_chunk(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5):
+            # an incoherent reply gets corrective feedback, not a paused run.
+            screening = artifacts["screening-result"]
+            assert isinstance(screening, ScreeningResult)
+            candidate, _foreign = normalize_chunk(screening, own_ids, all_ids)
+            if candidate is None:
+                return (
+                    f"the screening batch '{contract.context}' scored none of its "
+                    f"assigned cards; score exactly these: {sorted(own_ids)}"
+                )
+            problems = verify_screening(candidate, rubric, [chunk_set])
+            if problems:
+                return (
+                    "the screening result validates in isolation but does not cohere "
+                    "with the rubric and option cards:\n" + "\n".join(problems)
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_chunk)
         screening = result.artifacts["screening-result"]
         assert isinstance(screening, ScreeningResult)
-        own_ids = {c.id for c in cards}
-        kept = [o for o in screening.options if o.option_id in own_ids]
-        foreign = [
-            o.option_id
-            for o in screening.options
-            if o.option_id not in own_ids and o.option_id in all_ids
-        ]
+        batch, foreign = normalize_chunk(screening, own_ids, all_ids)
+        assert batch is not None  # check_chunk accepted this reply
         if foreign:
+            # Emitted post-success only: per-attempt evidence lives in logs/retries/.
             ctx.emit(
                 f"S5: {contract.context} batch scored {len(foreign)} option(s) covered "
                 "by other batches — dropped (their own batches score them)"
             )
-        unknown = [o for o in screening.options if o.option_id not in all_ids]
-        if not kept and not unknown:
-            # Every option belonged to other batches: an empty batch cannot even
-            # be constructed for the integrity check, so report it directly.
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    f"the screening batch '{contract.context}' scored none of its "
-                    f"assigned cards; score exactly these: {sorted(own_ids)}"
-                ),
-                raw_output=result.raw_text,
-            )
-        batch = ScreeningResult(options=kept + unknown, notes=screening.notes)
-        problems = verify_screening(batch, rubric, [chunk_set])
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    "the screening result validates in isolation but does not cohere "
-                    "with the rubric and option cards:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
         if part is not None:
             ctx.workspace.write_artifact(part_path(card_set.angle_id, part), batch)
-        return batch  # problems empty implies batch == kept exactly
+        return batch  # check_chunk passing implies batch == the angle's own cards exactly
 
     def _existing_batch(
         self, ctx: StageContext, rubric: Rubric, card_set: OptionCardSet

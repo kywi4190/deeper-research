@@ -26,10 +26,12 @@ input — is written last and marks the stage settled.
 
 from __future__ import annotations
 
+from typing import cast
+
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.agents_runtime import AgentContract
 from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.contradictions import append_contradictions
@@ -82,6 +84,59 @@ def verification_path(option_id: str) -> str:
 
 def rounds_path(option_id: str) -> str:
     return f"dossiers/{option_id}-rounds.yaml"
+
+
+def dossier_problems(
+    dossier: Dossier, option_id: str, rubric: Rubric, expected_round: int
+) -> str | None:
+    """Pure cross-artifact integrity: right option, right round, and sections
+    keyed exactly by the rubric's criteria (design: structured BY RUBRIC
+    CRITERION — the re-score depends on it). Run inside the dispatcher's
+    retry loop (M2 finding 5): a miss gets corrective feedback, not a pause."""
+    problems: list[str] = []
+    if dossier.option_id != option_id:
+        problems.append(
+            f"- dossier.option_id is '{dossier.option_id}' but this analyst "
+            f"was assigned option '{option_id}'"
+        )
+    if dossier.rounds_completed != expected_round:
+        problems.append(
+            f"- rounds_completed is {dossier.rounds_completed}; this dispatch "
+            f"is round {expected_round}, so it must be {expected_round}"
+        )
+    rubric_ids = sorted(c.id for c in rubric.criteria)
+    section_ids = sorted(dossier.criterion_sections)
+    if section_ids != rubric_ids:
+        problems.append(
+            f"- criterion_sections must be keyed by exactly the rubric's "
+            f"criterion ids; expected {rubric_ids}, got {section_ids}"
+        )
+    if problems:
+        return (
+            "the dossier validates in isolation but does not cohere with "
+            "its assignment:\n" + "\n".join(problems)
+        )
+    return None
+
+
+def normalize_rescore(
+    screening: ScreeningResult, option_id: str, angle_id: str
+) -> tuple[ScreeningResult | None, int, list[str]]:
+    """Pure: keep only the assigned option (the mock full-scenario fallback
+    and an over-eager live screener may score others) and correct a stray
+    angle_id — the angle is S3 bookkeeping the dossier does not carry (M2
+    finding 4), never the screener's to decide. Used twice: inside the
+    dispatch's validate callback and post-success. Returns (batch — None when
+    the assigned option is absent — n dropped others, stray angle_ids)."""
+    own = [o for o in screening.options if o.option_id == option_id]
+    strays = sorted({o.angle_id for o in own if o.angle_id != angle_id})
+    own = [
+        o if o.angle_id == angle_id else o.model_copy(update={"angle_id": angle_id}) for o in own
+    ]
+    if not own:
+        return None, len(screening.options), strays
+    batch = ScreeningResult(options=own, notes=screening.notes)
+    return batch, len(screening.options) - len(own), strays
 
 
 class _Finalist:
@@ -427,10 +482,14 @@ class DeepDiveStage(StageBase):
             ),
             context=f"{option_id}-r{r}",
         )
-        result = await ctx.dispatcher.run_agent(contract)
+        result = await ctx.dispatcher.run_agent(
+            contract,
+            validate=lambda artifacts: dossier_problems(
+                cast(Dossier, artifacts["dossier"]), option_id, rubric, r
+            ),
+        )
         dossier = result.artifacts["dossier"]
         assert isinstance(dossier, Dossier)
-        self._check_dossier(contract, dossier, result.raw_text, option_id, rubric, expected_round=r)
         return dossier
 
     async def _dispatch_revision(
@@ -470,59 +529,16 @@ class DeepDiveStage(StageBase):
             ),
             context=f"{option_id}-vrev",
         )
-        result = await ctx.dispatcher.run_agent(contract)
+        expected_round = dossier.rounds_completed
+        result = await ctx.dispatcher.run_agent(
+            contract,
+            validate=lambda artifacts: dossier_problems(
+                cast(Dossier, artifacts["dossier"]), option_id, rubric, expected_round
+            ),
+        )
         revised = result.artifacts["dossier"]
         assert isinstance(revised, Dossier)
-        self._check_dossier(
-            contract,
-            revised,
-            result.raw_text,
-            option_id,
-            rubric,
-            expected_round=dossier.rounds_completed,
-        )
         return revised
-
-    def _check_dossier(
-        self,
-        contract: AgentContract,
-        dossier: Dossier,
-        raw_text: str,
-        option_id: str,
-        rubric: Rubric,
-        *,
-        expected_round: int,
-    ) -> None:
-        """Cross-artifact integrity: right option, right round, and sections
-        keyed exactly by the rubric's criteria (design: structured BY RUBRIC
-        CRITERION — the re-score depends on it)."""
-        problems: list[str] = []
-        if dossier.option_id != option_id:
-            problems.append(
-                f"- dossier.option_id is '{dossier.option_id}' but this analyst "
-                f"was assigned option '{option_id}'"
-            )
-        if dossier.rounds_completed != expected_round:
-            problems.append(
-                f"- rounds_completed is {dossier.rounds_completed}; this dispatch "
-                f"is round {expected_round}, so it must be {expected_round}"
-            )
-        rubric_ids = sorted(c.id for c in rubric.criteria)
-        section_ids = sorted(dossier.criterion_sections)
-        if section_ids != rubric_ids:
-            problems.append(
-                f"- criterion_sections must be keyed by exactly the rubric's "
-                f"criterion ids; expected {rubric_ids}, got {section_ids}"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    "the dossier validates in isolation but does not cohere with "
-                    "its assignment:\n" + "\n".join(problems)
-                ),
-                raw_output=raw_text,
-            )
 
     async def _rescore(
         self,
@@ -566,43 +582,38 @@ class DeepDiveStage(StageBase):
             ),
             context=context,
         )
-        result = await ctx.dispatcher.run_agent(contract)
+        card_set = OptionCardSet(angle_id=angle_id, cards=[finalist.card])
+
+        def check_rescore(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5):
+            # a coherence miss gets corrective feedback, not a paused run.
+            screening = artifacts["screening-result"]
+            assert isinstance(screening, ScreeningResult)
+            candidate, _dropped, _strays = normalize_rescore(screening, option_id, angle_id)
+            if candidate is None:
+                return (
+                    f"the re-score must contain exactly option '{option_id}'; it scored none of it"
+                )
+            problems = verify_screening(candidate, rubric, [card_set])
+            if problems:
+                return (
+                    "the re-score validates in isolation but does not cohere with "
+                    "the rubric and the option:\n" + "\n".join(problems)
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_rescore)
         screening = result.artifacts["screening-result"]
         assert isinstance(screening, ScreeningResult)
-        own = [o for o in screening.options if o.option_id == option_id]
-        if len(screening.options) > len(own):
-            # The mock full-scenario fixture fallback (and an over-eager live
-            # screener) may score other options; their own re-scores own them.
-            ctx.emit(
-                f"S6: {option_id} re-score included {len(screening.options) - len(own)} "
-                "other option(s) — dropped"
-            )
-        if not own:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    f"the re-score must contain exactly option '{option_id}'; it scored none of it"
-                ),
-                raw_output=result.raw_text,
-            )
-        strays = sorted({o.angle_id for o in own if o.angle_id != angle_id})
+        batch, dropped, strays = normalize_rescore(screening, option_id, angle_id)
+        assert batch is not None  # check_rescore accepted this reply
+        # Emitted post-success only: per-attempt evidence lives in logs/retries/.
+        if dropped:
+            ctx.emit(f"S6: {option_id} re-score included {dropped} other option(s) — dropped")
         if strays:
             ctx.emit(
                 f"S6: {option_id} re-score carried angle_id '{strays[0]}' — "
                 f"corrected to '{angle_id}' in code"
-            )
-            own = [o.model_copy(update={"angle_id": angle_id}) for o in own]
-        batch = ScreeningResult(options=own, notes=screening.notes)
-        card_set = OptionCardSet(angle_id=angle_id, cards=[finalist.card])
-        problems = verify_screening(batch, rubric, [card_set])
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    "the re-score validates in isolation but does not cohere with "
-                    "the rubric and the option:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
             )
         batch, drift = recompute_aggregates(batch, rubric, label="S6")
         for message in drift:
