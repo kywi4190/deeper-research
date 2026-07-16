@@ -131,5 +131,36 @@ spent), to be restarted.
    `validate` too — deliberately not done in the same change, to keep the
    mid-flight run's blast radius to the stage it is actually in.
 
+6. **OPEN (Prompt 14) — Review the verifier report itself: the analyst
+   mis-cited a load-bearing source and built on it.** Same verification as
+   finding 5 (`dossiers/implicit-bias-max-margin-verification.md` in the
+   run workspace once the resume settles it; the last attempted report is
+   in `logs/attention-20260716T165724Z-S6-verifier.md`). The verifier's
+   content is exactly what P5 pays for and worth reading end to end:
+   - Two load-bearing claims (`c-ji-telgarsky-proof`,
+     `c-tight-rate-ji-telgarsky`) cite arxiv.org/abs/1806.01796 as "Ji &
+     Telgarsky" — it is actually a Nacson/Srebro/Soudry SGD paper. The
+     verifier's notes say the error propagates through every dossier
+     section resting on those claims (instrumentation-preregistrability,
+     completion-confidence, failure_modes, self-directed-initiative,
+     comparable_cases). Only `contradicted` triggers the one targeted
+     revision (`s6_deepdive.py` filters on `Verdict.CONTRADICTED`), and S8
+     hands the synthesist only the aggregate `pass_rate_table` — so an
+     `unsupported` verdict on a LOAD-BEARING claim reaches the report as
+     nothing but a lowered percentage. The wrong citation survives into
+     S7/S8 unless a human intervenes at Gate C.
+   - One `contradicted` (`c-cold-email-evidence-norm`) and one
+     half-`unsupported` (`c-theory-checklist-sanity-check`: the source
+     never says what the claim's second half asserts).
+   For Prompt 14: (a) the analyst prompt should demand citation-identity
+   checks when a claim names authors — title/author match against the
+   fetched source, not just a live URL; (b) consider whether `unsupported`
+   verdicts on LOAD-BEARING claims deserve more than silent survival —
+   e.g. the revision leg, a Gate-C surfacing, or at minimum a forced note
+   in the S8 residual-uncertainty register; (c) the verifier also worked
+   around a 403 (CACM) via a corroborating lookup and an unreadable PDF
+   via Read on the cached binary — prompt guidance that already works,
+   worth keeping verbatim.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)
