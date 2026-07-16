@@ -26,12 +26,11 @@ input — is written last and marks the stage settled.
 
 from __future__ import annotations
 
-import asyncio
-
 import yaml
 from pydantic import ValidationError
 
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.contradictions import append_contradictions
 from deeper.schemas import (
@@ -197,7 +196,7 @@ class DeepDiveStage(StageBase):
             f"(per-option cap {cap} round(s), stability threshold "
             f"{ctx.config.caps.deep_dive_delta_score_stop:g})…"
         )
-        finals = await asyncio.gather(
+        finals = await gather_strict(
             *(self._deep_dive(ctx, f, rubric, base_inputs) for f in finalists)
         )
         merged = ScreeningResult(options=list(finals))

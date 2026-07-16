@@ -1,7 +1,7 @@
 """S1 — Angle cartography (design §5/S1).
 
 The profile's initial cartographer ensemble is dispatched in parallel (one
-asyncio.gather through the dispatcher's semaphore), then the merger folds the
+gather_strict fan-out through the dispatcher's semaphore), then the merger folds the
 raw reports into angles/map.yaml + map-report.md. The orchestrator — never an
 LLM — then applies the saturation rule (see `saturation.py`): while the mean
 marginal novelty of the trailing window stays at or above the threshold, it
@@ -22,13 +22,13 @@ so a crash mid-expansion resumes mid-plan.
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 
 import yaml
 from pydantic import ValidationError
 
 from deeper.agents_runtime import AgentContract
+from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.schemas import (
     AngleMap,
@@ -202,7 +202,7 @@ class CartographyStage(StageBase):
 
         plan = self.initial_plan(ctx)
         ctx.emit(f"S1: dispatching {len(plan)} cartographers in parallel…")
-        await asyncio.gather(
+        await gather_strict(
             *(self._run_cartographer(ctx, p, base_inputs, hint, None) for p in plan)
         )
         reported = 0
@@ -242,7 +242,7 @@ class CartographyStage(StageBase):
                 + ", ".join(p.context for p in new_runs)
             )
             mapped_names = [a.name for a in angle_map.angles]
-            await asyncio.gather(
+            await gather_strict(
                 *(self._run_cartographer(ctx, p, base_inputs, hint, mapped_names) for p in new_runs)
             )
         if hint is not None:

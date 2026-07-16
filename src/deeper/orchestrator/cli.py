@@ -169,7 +169,19 @@ def _run_engine(
         engine = Engine(workspace, emit=_emit, ask_user=ask_user)
     except BillingAuthError as err:  # billing: api without a key — before any work
         raise _fail(str(err)) from err
-    return asyncio.run(engine.resume() if resume else engine.run())
+
+    async def _main() -> Node:
+        try:
+            return await (engine.resume() if resume else engine.run())
+        finally:
+            if sys.platform == "win32":
+                # CPython's Proactor loop needs a few iterations after
+                # subprocess transports close before the loop itself closes,
+                # or their GC spews "Event loop is closed" (removable belt;
+                # gather_strict + generator aclose do the real teardown).
+                await asyncio.sleep(0.2)
+
+    return asyncio.run(_main())
 
 
 RunArg = Annotated[str, typer.Argument(help="Run directory or name under runs/.")]

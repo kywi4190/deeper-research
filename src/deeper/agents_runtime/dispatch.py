@@ -15,9 +15,9 @@ import os
 import random
 import re
 import time
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
-from typing import NamedTuple, Protocol
+from typing import NamedTuple, Protocol, cast
 
 from deeper.config import RunConfig
 from deeper.schemas import ArtifactModel, SpendEntry
@@ -604,8 +604,11 @@ class LiveDispatcher(_BaseDispatcher):
         result_text: str | None = None
         result_is_error = False
         started = time.monotonic()
+        # The SDK types query() as AsyncIterator, but it is an async generator
+        # at runtime — the cast makes its aclose() visible to the typechecker.
+        agen = cast("AsyncGenerator[object, None]", query(prompt=prompt, options=options))
         try:
-            async for message in query(prompt=prompt, options=options):
+            async for message in agen:
                 self._check_auth_source(message)
                 for block in getattr(message, "content", None) or []:
                     text = getattr(block, "text", None)
@@ -629,6 +632,13 @@ class LiveDispatcher(_BaseDispatcher):
             raise LiveDispatchError(
                 f"{type(err).__name__}: {err}" + (f" [{detail}]" if detail else "")
             ) from err
+        finally:
+            # PEP 533: async-for does not close its iterator when the body
+            # raises or the task is cancelled — without this, the SDK's
+            # subprocess teardown (Query.close → transport close, graceful
+            # 5s terminate/kill) waits on GC luck. Plain finally on purpose:
+            # an aclose failure is a genuine teardown bug, not noise to hide.
+            await agen.aclose()
         if result_is_error or (result_subtype not in (None, "success")):
             # An error result the SDK did NOT raise for: surfacing it here (with
             # the CLI's own words) beats letting an empty/garbled reply burn the

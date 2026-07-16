@@ -381,6 +381,37 @@ async def test_live_invoke_enriches_sdk_failures_with_cli_result_detail(
     assert "32000 output token" in message  # ...and the CLI's real diagnosis
 
 
+async def test_live_invoke_closes_the_generator_when_the_loop_body_raises(
+    ws: Workspace, monkeypatch
+) -> None:
+    """PEP 533 gap: when the async-for BODY raises (here the billing guard),
+    the abandoned query() generator's cleanup — the SDK's transport close and
+    graceful subprocess shutdown — only runs at GC, on loop-shutdown luck.
+    _invoke must aclose() it deterministically before the exception leaves."""
+    import claude_agent_sdk
+
+    from deeper.agents_runtime import BillingAuthError
+
+    closed = asyncio.Event()
+
+    class SystemMessage:  # the billing belt trips on a real apiKeySource
+        subtype = "init"
+        data = {"apiKeySource": "apiKey"}
+
+    async def fake_query(*, prompt, options):
+        try:
+            yield SystemMessage()
+            await asyncio.sleep(60)  # pragma: no cover — the guard raises first
+        finally:
+            closed.set()
+
+    monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
+    config = ws.load_config().model_copy(update={"mode": "live"})
+    with pytest.raises(BillingAuthError):
+        await LiveDispatcher(ws, config)._invoke("p", scout_contract(), 0)
+    assert closed.is_set()  # deterministic teardown, not GC luck
+
+
 async def test_live_invoke_surfaces_unraised_error_results(ws: Workspace, monkeypatch) -> None:
     """An is_error ResultMessage the SDK does NOT raise for must fail the
     dispatch (transient class) instead of burning schema retries on garbage."""

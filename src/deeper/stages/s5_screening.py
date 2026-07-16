@@ -29,10 +29,10 @@ crash between the two resumes into pure code, never a re-spend.
 
 from __future__ import annotations
 
-import asyncio
 import math
 
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.schemas import (
     AllocationTable,
@@ -161,7 +161,7 @@ class ScreeningStage(StageBase):
         # of those is over-scoping (or the mock full-scenario fixture fallback)
         # and is dropped; an id matching nothing at all is incoherence.
         all_ids = {c.id: s.angle_id for s in card_sets for c in s.cards}
-        batches = await asyncio.gather(
+        batches = await gather_strict(
             *(self._screen_angle(ctx, rubric, cs, base_inputs, all_ids) for cs in card_sets)
         )
         merged_options = [o for batch in batches for o in batch.options]
@@ -255,7 +255,7 @@ class ScreeningStage(StageBase):
                 f"{max_cards} per screener call — splitting into {len(chunks)} "
                 "sub-batches"
             )
-            parts = await asyncio.gather(
+            parts = await gather_strict(
                 *(
                     self._screen_chunk(
                         ctx,

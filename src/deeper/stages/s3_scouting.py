@@ -23,13 +23,13 @@ options/reflow.yaml last (its presence attests the top-ups are merged).
 
 from __future__ import annotations
 
-import asyncio
 import math
 
 import yaml
 from pydantic import ValidationError
 
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.aio import gather_strict
 from deeper.allocation import reflow
 from deeper.config import SizeClass
 from deeper.schemas import (
@@ -201,7 +201,7 @@ class ScoutingStage(StageBase):
         }
         rows = [r for r in table.rows if r.units > 0]
         ctx.emit(f"S3: scouting {len(rows)} angles in parallel…")
-        fresh = await asyncio.gather(
+        fresh = await gather_strict(
             *(self._scout_angle(ctx, row, angles[row.angle_id], base_inputs) for row in rows)
         )
         rescouted = {row.angle_id for row, was_fresh in zip(rows, fresh, strict=True) if was_fresh}
@@ -389,7 +389,7 @@ class ScoutingStage(StageBase):
                 "S3: reflow settled — replaying top-up(s) for re-scouted angle(s): "
                 + ", ".join(f"{r.angle_id} +{r.units}" for r in replay)
             )
-            await asyncio.gather(
+            await gather_strict(
                 *(self._top_up(ctx, row, angles[row.angle_id], base_inputs) for row in replay)
             )
             return
@@ -407,7 +407,7 @@ class ScoutingStage(StageBase):
             + ", ".join(f"{r.angle_id} +{r.units}" for r in targets)
         )
         angles = {a.id: a for a in angle_map.angles}
-        await asyncio.gather(
+        await gather_strict(
             *(self._top_up(ctx, row, angles[row.angle_id], base_inputs) for row in targets)
         )
         ctx.workspace.write_artifact(REFLOW_PATH, reflow_table)

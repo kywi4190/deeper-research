@@ -31,12 +31,11 @@ settled.
 
 from __future__ import annotations
 
-import asyncio
-
 import yaml
 from pydantic import ValidationError
 
 from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.schemas import (
     AngleMap,
@@ -242,7 +241,7 @@ class TournamentStage(StageBase):
         if self._try_read(ctx, FRAME_CHECK_PATH, FrameCheck) is None:
             jobs.append(self._frame_check(ctx, base_inputs, boards_text, sensitivity_text))
         if jobs:
-            await asyncio.gather(*jobs)
+            await gather_strict(*jobs)
 
         frame_check = ctx.workspace.read_artifact(FRAME_CHECK_PATH, FrameCheck)
         self._surface_frame_check(ctx, frame_check)
