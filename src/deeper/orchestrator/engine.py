@@ -261,8 +261,8 @@ class Engine:
                 role=err.contract.role,
                 reason=f"agent '{err.contract.role}' output invalid after retries",
                 detail=(
-                    f"agent '{err.contract.role}' failed schema validation "
-                    f"{self.config.caps.max_schema_retries + 1} times.\n"
+                    f"agent '{err.contract.role}' output failed validation "
+                    f"{err.attempts} time(s).\n"
                     f"Last validation errors:\n{err.errors}\n"
                     "Fix the cause (prompt, fixture, or schema), then resume."
                 ),

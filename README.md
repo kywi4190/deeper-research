@@ -260,13 +260,22 @@ AgentContract
      │ SpendEntry → state.json          (EVERY attempt, success or not)
      ▼
 parse `### artifact: <name>` markers → validate via ARTIFACT_REGISTRY
-     │ valid                                  │ invalid
-     ▼                                        ▼
-AgentResult                    re-invoke with format_validation_error()
-(validated models,             feedback appended, up to caps.max_schema_retries
- cost, retries_used)           times → then raise AgentOutputInvalid
-                               (orchestrator pauses run: human-attention flag)
+     │ valid → stage's validate= callback,     │ invalid (schema OR callback)
+     │ if any (coherence checks: sampling      ▼
+     ▼ assignments, cross-artifact linkage)   re-invoke with the errors AND the
+AgentResult                                   previous output as feedback, up to
+(validated models,                            caps.max_schema_retries times →
+ cost, retries_used)                          then raise AgentOutputInvalid
+                                              (orchestrator pauses run, message
+                                              carries the true attempt count)
 ```
+
+A stage passes its coherence check as `run_agent(contract, validate=...)` so a
+schema-valid but semantically wrong reply (the M2 live run's verifier dropped
+one of its 14 sampled claims) gets corrective feedback naming exactly what is
+wrong instead of pausing the run on the first miss. The S6 verifier's
+sampling-assignment check is wired this way; the remaining stage-level checks
+still raise single-shot and are candidates for the same wiring.
 
 **The quarantine guarantee** (design §6): a `PreToolUse` hook denies any
 Read/Grep/Glob whose target *or search root* covers `preferences.yaml` unless the

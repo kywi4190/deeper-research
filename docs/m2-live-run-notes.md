@@ -77,15 +77,17 @@ spent), to be restarted.
 4. **ADDRESSED — The S6 re-score demands an `angle_id` its inputs never
    state.** Restarted run, S6 round 1 (2026-07-16): the
    'attention-backprop-hand-derivation' re-score failed the coherence check
-   3× with `carries angle_id 'theory-derivation' but its card belongs to
+   with `carries angle_id 'theory-derivation' but its card belongs to
    angle 'from-scratch-build'` and paused the run. Root cause is a contract
    gap, not a flaky agent: the re-score inputs are brief + destination +
    rubric + dossier + preferences, and NONE of them carry the option's
    angle — the dossier schema has no angle field — while the screener
    prompt's own rule said "every angle_id must match the cards" in a mode
-   with no cards. The model had to guess, guessed the semantically obvious
-   angle for a hand-derivation option, and was deterministic about it, so
-   retries were pure spend (~3 wasted M-class dispatches). The other six
+   with no cards. The model had to guess, and guessed the semantically
+   obvious angle for a hand-derivation option. (Correction while triaging
+   finding 5: the pause message's "failed 3 times" was the retry cap, not a
+   count — a stage-level coherence check paused after ONE dispatch, so one
+   wasted M-class dispatch, not three.) The other six
    finalists passed by luck: their names telegraph their angles.
    **Landed (2026-07-16):** the angle is S3 bookkeeping code already knows
    (`finalist.baseline.angle_id`), so per P8 it is never the agent's to
@@ -97,6 +99,37 @@ spent), to be restarted.
    returns a plausible-wrong angle; the re-score survives, corrected).
    Both the round-loop and the post-revision final re-score share the
    `_rescore` path, so one fix covers both.
+
+5. **ADDRESSED — Coherence checks pause the run on the first miss; the
+   feedback retry loop never sees them.** Restarted run, S6 verification
+   (2026-07-16): the 'implicit-bias-max-margin' verifier adjudicated 13 of
+   its 14 sampled claims — high-quality work, two `unsupported` verdicts
+   catching a real mis-citation, one `contradicted` — but silently dropped
+   'c-fanpu-sketch-scope' (its own counts said 12+2=14, so it believed it
+   was done) and the run paused. The structural gap: the dispatcher's
+   retry-with-feedback loop (`_RETRY_TEMPLATE`) covered only
+   `parse_artifacts` schema failures, while every stage-level coherence
+   check raised `AgentOutputInvalid` straight to the engine after a single
+   dispatch — the one kind of failure where feedback ("you missed exactly
+   this claim") is most likely to fix the reply on the next attempt was the
+   one kind that never got a retry. The pause message ("failed schema
+   validation 3 times") printed the cap, not the truth.
+   **Landed (2026-07-16):** `run_agent` takes an optional `validate`
+   callback — a stage-owned coherence check returning an LLM-facing error
+   report or None — run INSIDE the retry loop, so semantic misses get the
+   same corrective feedback (previous output + errors) as schema failures,
+   every attempt ledgered and logged to `logs/retries/` as before. The S6
+   verifier's sampling-assignment check is wired through it.
+   `AgentOutputInvalid` now carries `attempts` and the engine's pause
+   message reports the true count. Covered by the dispatch-level
+   validate-callback tests and
+   `test_verifier_missing_sampled_claim_is_retried_with_feedback` (first
+   reply missing one sampled claim, exactly the live shape; second attempt
+   sees the feedback and completes). *Candidate follow-up:* wire the other
+   single-shot coherence checks (S5 screener batches, S6 dossier checks,
+   S7 prosecution/steelman, S8 report, Gate-C/redivergence) through
+   `validate` too — deliberately not done in the same change, to keep the
+   mid-flight run's blast radius to the stage it is actually in.
 
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

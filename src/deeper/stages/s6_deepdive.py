@@ -646,36 +646,41 @@ class DeepDiveStage(StageBase):
             ),
             context=option_id,
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        report = result.artifacts["verification-report"]
-        assert isinstance(report, VerificationReport)
-        problems: list[str] = []
-        if report.option_id != option_id:
-            problems.append(
-                f"- verification-report.option_id is '{report.option_id}' but this "
-                f"verifier was assigned option '{option_id}'"
-            )
-        adjudicated = sorted(res.claim_id for res in report.results)
-        if adjudicated != sorted(sampled):
-            problems.append(
-                f"- adjudicate exactly the sampled claims; expected "
-                f"{sorted(sampled)}, got {adjudicated}"
-            )
-        if (report.sampled_load_bearing_count, report.sampled_other_count) != (n_lb, n_other):
-            problems.append(
-                f"- sampled counts must be load-bearing {n_lb} / other {n_other}; "
-                f"the report says {report.sampled_load_bearing_count} / "
-                f"{report.sampled_other_count}"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+
+        def check_assignment(artifacts: dict) -> str | None:
+            # Runs inside the dispatcher's retry loop: a schema-valid report
+            # that misses its sampling assignment gets feedback naming exactly
+            # what is wrong, instead of pausing the run (M2 finding 5).
+            report = artifacts["verification-report"]
+            assert isinstance(report, VerificationReport)
+            problems: list[str] = []
+            if report.option_id != option_id:
+                problems.append(
+                    f"- verification-report.option_id is '{report.option_id}' but this "
+                    f"verifier was assigned option '{option_id}'"
+                )
+            adjudicated = sorted(res.claim_id for res in report.results)
+            if adjudicated != sorted(sampled):
+                problems.append(
+                    f"- adjudicate exactly the sampled claims; expected "
+                    f"{sorted(sampled)}, got {adjudicated}"
+                )
+            if (report.sampled_load_bearing_count, report.sampled_other_count) != (n_lb, n_other):
+                problems.append(
+                    f"- sampled counts must be load-bearing {n_lb} / other {n_other}; "
+                    f"the report says {report.sampled_load_bearing_count} / "
+                    f"{report.sampled_other_count}"
+                )
+            if problems:
+                return (
                     "the verification report validates in isolation but does not "
                     "match its sampling assignment:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_assignment)
+        report = result.artifacts["verification-report"]
+        assert isinstance(report, VerificationReport)
         return report
 
     # -- the contradiction ledger -----------------------------------------------------

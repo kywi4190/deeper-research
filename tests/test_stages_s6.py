@@ -24,7 +24,9 @@ from deeper.schemas import (
     ScreeningResult,
     SourceRef,
     SourceTier,
+    Verdict,
     VerificationReport,
+    VerificationResult,
 )
 from deeper.stages.depth import (
     derive_open_questions,
@@ -212,6 +214,57 @@ async def test_rescore_corrects_an_agent_guessed_angle_id(tmp_path):
     )
     assert result.angle_id == finalist.baseline.angle_id
     assert any("corrected" in m and "a-plausible-wrong-angle" in m for m in emitted)
+
+
+# -- a verifier that misses a sampled claim is retried with feedback -----------------
+
+
+async def test_verifier_missing_sampled_claim_is_retried_with_feedback(tmp_path):
+    """The M2 live run's verifier adjudicated 13 of 14 sampled claims and the
+    run paused on the first miss — the sampling-assignment check ran OUTSIDE
+    the dispatcher's feedback retry loop. Wired through run_agent's validate
+    callback, the second attempt sees exactly what was missing."""
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    ctx0 = make_ctx(ws)
+    await ScoutingStage().execute(ctx0)
+    await RubricStage().execute(ctx0)
+    await ScreeningStage().execute(ctx0)
+    stage = DeepDiveStage()
+    finalist = stage._finalists(ctx0)[0]
+
+    sampled, n_lb, n_other = ["c-alpha", "c-beta", "c-gamma"], 2, 1
+    claims = [_claim("c-alpha", lb=True), _claim("c-beta", lb=True), _claim("c-gamma", lb=False)]
+    dossier = _dossier(claims, {"crit-a": sampled}).model_copy(
+        update={"option_id": finalist.option_id}
+    )
+    full = VerificationReport(
+        option_id=finalist.option_id,
+        results=[
+            VerificationResult(claim_id=cid, verdict=Verdict.VERIFIED, evidence_quote="quoted")
+            for cid in sampled
+        ],
+        sampled_load_bearing_count=n_lb,
+        sampled_other_count=n_other,
+    )
+    # First reply: one sampled claim silently dropped, counts still asserted —
+    # the exact shape of the live failure.
+    missing = full.model_copy(update={"results": full.results[:-1]})
+
+    def reply(report: VerificationReport) -> str:
+        return f"### artifact: verification-report\n```yaml\n{report.dump_yaml()}```\n"
+
+    dispatcher = RecordingMockDispatcher(
+        ws, ws.load_config(), scripted_responses={"verifier": [reply(missing), reply(full)]}
+    )
+    ctx = make_ctx(ws, dispatcher=dispatcher)
+    report = await stage._dispatch_verifier(ctx, finalist, dossier, sampled, n_lb, n_other)
+    assert sorted(r.claim_id for r in report.results) == sorted(sampled)
+    prompts = [p for role, _, p in dispatcher.invocations if role == "verifier"]
+    assert len(prompts) == 2
+    assert "adjudicate exactly the sampled claims" in prompts[1]
+    assert "PREVIOUS ATTEMPT" in prompts[1]
 
 
 # -- the mock scenario: three termination paths end to end ---------------------------

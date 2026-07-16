@@ -104,6 +104,44 @@ async def test_retry_exhaustion_raises_and_persists(ws: Workspace) -> None:
     assert state.retry_counts["S3:scout:interpretability-research"] == attempts - 1
 
 
+async def test_validate_callback_feeds_coherence_errors_into_the_retry_loop(ws: Workspace) -> None:
+    """Stage-owned coherence checks (sampling assignments, cross-artifact
+    linkage) run INSIDE the retry loop via run_agent's validate callback, so a
+    semantically wrong reply gets corrective feedback like a schema failure
+    does — the M2 live run's verifier dropped one sampled claim and the run
+    paused on its FIRST miss, feedback never sent (M2 finding 5)."""
+    dispatcher = CapturingMock(
+        ws, ws.load_config(), scripted_responses={"scout": [VALID_TEXT, VALID_TEXT]}
+    )
+    calls: list[int] = []
+
+    def check(artifacts) -> str | None:
+        calls.append(1)
+        if len(calls) == 1:
+            return "- the card set is missing option 'x' from its assignment"
+        return None
+
+    result = await dispatcher.run_agent(scout_contract(), validate=check)
+    assert result.retries_used == 1
+    assert "PREVIOUS ATTEMPT" in dispatcher.prompts[1]
+    assert "missing option 'x'" in dispatcher.prompts[1]
+    # Both attempts were paid for, so both are ledgered.
+    state = ws.load_state()
+    assert len(state.spend) == 2
+    assert state.retry_counts == {"S3:scout:interpretability-research": 1}
+
+
+async def test_validate_callback_exhaustion_raises_with_true_attempt_count(ws: Workspace) -> None:
+    config = ws.load_config()
+    attempts = config.caps.max_schema_retries + 1
+    dispatcher = MockDispatcher(ws, config, scripted_responses={"scout": [VALID_TEXT] * attempts})
+    with pytest.raises(AgentOutputInvalid) as err:
+        await dispatcher.run_agent(scout_contract(), validate=lambda artifacts: "- never coherent")
+    assert "never coherent" in err.value.errors
+    assert err.value.attempts == attempts
+    assert len(ws.load_state().spend) == attempts
+
+
 async def test_semaphore_limits_concurrency(ws: Workspace) -> None:
     config = ws.load_config().model_copy(update={"concurrency": 2})
 

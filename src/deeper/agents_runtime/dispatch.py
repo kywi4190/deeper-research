@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from typing import NamedTuple, Protocol
 
 from deeper.config import RunConfig
-from deeper.schemas import SpendEntry
+from deeper.schemas import ArtifactModel, SpendEntry
 from deeper.workspace import Workspace
 
 from .contracts import (
@@ -175,7 +175,11 @@ class BillingAuthError(Exception):
 class Dispatcher(Protocol):
     """The interface every stage codes against."""
 
-    async def run_agent(self, contract: AgentContract) -> AgentResult: ...
+    async def run_agent(
+        self,
+        contract: AgentContract,
+        validate: Callable[[dict[str, ArtifactModel]], str | None] | None = None,
+    ) -> AgentResult: ...
 
     async def run_interview(
         self,
@@ -268,7 +272,18 @@ class _BaseDispatcher:
             )
         )
 
-    async def run_agent(self, contract: AgentContract) -> AgentResult:
+    async def run_agent(
+        self,
+        contract: AgentContract,
+        validate: Callable[[dict[str, ArtifactModel]], str | None] | None = None,
+    ) -> AgentResult:
+        """One agent invocation with the schema-retry discipline. `validate` is
+        a stage-owned coherence check (sampling assignments, cross-artifact
+        linkage) returning an LLM-facing error report or None: it runs INSIDE
+        the retry loop, so a schema-valid but semantically wrong reply gets the
+        same corrective feedback as a parse failure instead of pausing the run
+        on its first miss (M2 finding 5: the verifier dropped one sampled claim
+        and never saw the error naming it)."""
         prompt = assemble_prompt(contract)  # raises on drift before any spend
         retry_key = f"{contract.stage.value}:{contract.role}:{contract.context or '-'}"
         max_attempts = self.config.caps.max_schema_retries + 1
@@ -301,6 +316,12 @@ class _BaseDispatcher:
                 raw, feedback = inv.text, err.report
                 self._log_failed_attempt(contract, attempt, feedback, raw)
                 continue
+            if validate is not None:
+                problem = validate(artifacts)
+                if problem:
+                    raw, feedback = inv.text, problem
+                    self._log_failed_attempt(contract, attempt, feedback, raw)
+                    continue
             return AgentResult(
                 role=contract.role,
                 artifacts=artifacts,
@@ -313,7 +334,7 @@ class _BaseDispatcher:
                 session_id=inv.session_id,
                 retries_used=attempt,
             )
-        raise AgentOutputInvalid(contract, errors=feedback, raw_output=raw)
+        raise AgentOutputInvalid(contract, errors=feedback, raw_output=raw, attempts=max_attempts)
 
     def _log_failed_attempt(
         self, contract: AgentContract, attempt: int, feedback: str, raw: str
@@ -390,7 +411,7 @@ class _BaseDispatcher:
                     self._log_failed_attempt(contract, retries, err.report, inv.text)
                     if retries > self.config.caps.max_schema_retries:
                         raise AgentOutputInvalid(
-                            contract, errors=err.report, raw_output=inv.text
+                            contract, errors=err.report, raw_output=inv.text, attempts=retries
                         ) from err
                     self.ledger.bump_retry(retry_key)
                     raw, feedback = inv.text, err.report
@@ -421,7 +442,9 @@ class _BaseDispatcher:
                 retries += 1
                 self._log_failed_attempt(contract, retries, problem, inv.text)
                 if retries > self.config.caps.max_schema_retries:
-                    raise AgentOutputInvalid(contract, errors=problem, raw_output=inv.text)
+                    raise AgentOutputInvalid(
+                        contract, errors=problem, raw_output=inv.text, attempts=retries
+                    )
                 self.ledger.bump_retry(retry_key)
                 raw, feedback = inv.text, problem
                 continue

@@ -49,13 +49,19 @@ class ArtifactParseError(Exception):
 
 class AgentOutputInvalid(Exception):
     """Schema retries exhausted — the orchestrator pauses the run with a
-    human-attention flag (design §6)."""
+    human-attention flag (design §6). `attempts` is how many dispatches were
+    actually paid for: the dispatcher's retry loop passes its full count; a
+    stage-level check raising outside the loop leaves the single-attempt
+    default, and the pause message reports whichever is true."""
 
-    def __init__(self, contract: AgentContract, errors: str, raw_output: str) -> None:
+    def __init__(
+        self, contract: AgentContract, errors: str, raw_output: str, attempts: int = 1
+    ) -> None:
         super().__init__(f"agent '{contract.role}' output still invalid after retries:\n{errors}")
         self.contract = contract
         self.errors = errors
         self.raw_output = raw_output
+        self.attempts = attempts
 
 
 class AgentContract(BaseModel):
