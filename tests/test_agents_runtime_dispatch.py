@@ -318,9 +318,9 @@ def test_subscription_billing_refuses_a_foreign_auth_source(ws: Workspace, monke
 
 
 def test_usage_limit_notice_recognizes_known_shapes() -> None:
-    """Finding 11's detector, over both families the CLI is known to emit; the
-    exact live shape is unconfirmed (the triage's planned probe), so the
-    matcher is deliberately broad — but not so broad ordinary prose trips it."""
+    """M1 finding 11's detector, over the three families the CLI is known to
+    emit (the third — "hit your session limit" — confirmed live, M2 finding 8);
+    deliberately broad — but not so broad ordinary prose trips it."""
     from deeper.agents_runtime import usage_limit_notice
 
     hit, resets = usage_limit_notice("Claude AI usage limit reached|1751986800")
@@ -332,6 +332,15 @@ def test_usage_limit_notice_recognizes_known_shapes() -> None:
 
     hit, resets = usage_limit_notice("You've reached your usage limit for this session.")
     assert hit and resets is None  # detected, no reset time to echo
+
+    # The third confirmed live shape (M2 finding 8): "hit your ... limit",
+    # embedded in the enriched LiveDispatchError text, reset time in prose.
+    hit, resets = usage_limit_notice(
+        "Claude Code returned an error result: success [CLI result "
+        "subtype='success'; is_error=true; result: You've hit your session "
+        "limit · resets 2pm (America/Denver)]"
+    )
+    assert hit and resets == "2pm (America/Denver)"
 
     for benign in (
         "the vendor imposes rate limits on bulk exports",

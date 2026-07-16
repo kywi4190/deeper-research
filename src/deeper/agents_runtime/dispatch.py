@@ -150,10 +150,14 @@ _LIMIT_EPOCH_RE = re.compile(r"usage limit reached\|(\d{9,13})", re.IGNORECASE)
 _LIMIT_TEXT_RE = re.compile(
     r"usage limit (?:reached|hit|exceeded)"
     r"|(?:\d+\s*-?\s*hour|session|weekly|daily) limit reached"
-    r"|reached your (?:usage|session|plan) limit",
+    # "You've hit your session limit · resets 2pm" — the third live-confirmed
+    # family (M2 finding 8) slipped the first two: "hit", not "reached".
+    r"|(?:reached|hit) your (?:usage|session|plan|weekly|daily) limit",
     re.IGNORECASE,
 )
-_LIMIT_RESET_RE = re.compile(r"resets?(?:\s+at)?[:\s]+([^\n|]+)", re.IGNORECASE)
+# `]` excluded: the notice often arrives embedded in the enriched
+# LiveDispatchError's bracketed CLI detail, and the reset time is its tail.
+_LIMIT_RESET_RE = re.compile(r"resets?(?:\s+at)?[:\s]+([^\n|\]]+)", re.IGNORECASE)
 
 
 def usage_limit_notice(text: str) -> tuple[bool, str | None]:

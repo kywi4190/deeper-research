@@ -187,5 +187,30 @@ spent), to be restarted.
    remember failed markers at the same context minutes apart are usually
    ONE cause retried, not independent flakes.
 
+8. **ADDRESSED — A live session-limit notice slipped the detector and wore
+   the wrong pause.** Restarted run, S6 (2026-07-16T18:07Z, attempt 3 of
+   the finding-7 verifier): the CLI said `You've hit your session limit ·
+   resets 2pm (America/Denver)` — a plan-limit pause — but the run paused
+   as a generic `dispatch failed — inspect the saved transcript, fix the
+   cause`, because `_LIMIT_TEXT_RE` knew "usage limit hit", "session limit
+   reached", and "reached your session limit", and this third live shape
+   says "HIT your session limit". Consequences were mild but real: no
+   reset-time instruction in the pause message, and had the notice arrived
+   one attempt earlier it would have burned backoff retries rediscovering
+   the limit. This is exactly the drift M1 finding 11 predicted when it
+   made detection "deliberately broad over the known families" — the
+   families keep growing. **Landed (2026-07-16):** the third family
+   (`(?:reached|hit) your (?:usage|session|plan|weekly|daily) limit`) added
+   to `_LIMIT_TEXT_RE`; `_LIMIT_RESET_RE` stops at `]` so a reset time
+   embedded in the enriched LiveDispatchError's bracketed CLI detail comes
+   out clean (`2pm (America/Denver)`, not `2pm (America/Denver)]`).
+   Live-confirmed shape pinned in
+   `test_usage_limit_notice_recognizes_known_shapes`. Also observed in the
+   same window, NOT actionable: a burst of `Event loop is closed` /
+   `unclosed transport` tracebacks after the pause message — CPython's
+   Windows Proactor teardown racing subprocess-transport GC at interpreter
+   exit, cosmetic, prefixed "Exception ignored in:" (Python is saying it
+   ignored them).
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)
