@@ -10,6 +10,7 @@ exit 1.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import sys
 import time
@@ -50,6 +51,32 @@ def _force_utf8_output() -> None:
 
 
 _force_utf8_output()
+
+
+def _configure_logging(workspace: Workspace) -> None:
+    """Route SDK loggers to the run workspace (M2 finding 9): with no handlers
+    configured, python logging's lastResort prints records like the SDK's
+    "Fatal error in message reader" straight to the operator's stderr — but
+    the terminal is a viewer of pipeline emits only. Configures by logger NAME
+    so nothing here imports claude_agent_sdk (mock mode stays SDK-free).
+    Idempotent per workspace; a different workspace re-points the handler
+    (and closes the old one — Windows holds file locks)."""
+    logger = logging.getLogger("claude_agent_sdk")
+    logger.setLevel(logging.WARNING)
+    logger.propagate = False
+    target = str(workspace.path("logs/sdk.log"))
+    for handler in list(logger.handlers):
+        if getattr(handler, "_deeper_sdk_log", False):
+            if getattr(handler, "baseFilename", None) == target:
+                return
+            logger.removeHandler(handler)
+            handler.close()
+    workspace.path("logs").mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(target, encoding="utf-8", delay=True)
+    handler._deeper_sdk_log = True  # type: ignore[attr-defined]  # idempotency tag
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(handler)
+
 
 app = typer.Typer(
     name="deeper",
@@ -164,6 +191,7 @@ def _terminal_ask_user() -> Callable[[str], str] | None:
 def _run_engine(
     workspace: Workspace, *, resume: bool = False, non_interactive: bool = False
 ) -> Node:
+    _configure_logging(workspace)
     ask_user = None if non_interactive else _terminal_ask_user()
     try:
         engine = Engine(workspace, emit=_emit, ask_user=ask_user)
