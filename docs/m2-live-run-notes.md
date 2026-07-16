@@ -74,5 +74,29 @@ spent), to be restarted.
    Existing runs keep their own `config.yaml` — a mid-flight run wanting the
    new ceiling needs the one-line hand-edit.
 
+4. **ADDRESSED — The S6 re-score demands an `angle_id` its inputs never
+   state.** Restarted run, S6 round 1 (2026-07-16): the
+   'attention-backprop-hand-derivation' re-score failed the coherence check
+   3× with `carries angle_id 'theory-derivation' but its card belongs to
+   angle 'from-scratch-build'` and paused the run. Root cause is a contract
+   gap, not a flaky agent: the re-score inputs are brief + destination +
+   rubric + dossier + preferences, and NONE of them carry the option's
+   angle — the dossier schema has no angle field — while the screener
+   prompt's own rule said "every angle_id must match the cards" in a mode
+   with no cards. The model had to guess, guessed the semantically obvious
+   angle for a hand-derivation option, and was deterministic about it, so
+   retries were pure spend (~3 wasted M-class dispatches). The other six
+   finalists passed by luck: their names telegraph their angles.
+   **Landed (2026-07-16):** the angle is S3 bookkeeping code already knows
+   (`finalist.baseline.angle_id`), so per P8 it is never the agent's to
+   decide — `_rescore` now states it in the task objective, and a
+   mismatched echo is corrected in code with an emitted notice instead of
+   pausing the run; `agents/screener.md` re-score mode says to echo the
+   objective's angle, not infer one. Covered by
+   `test_rescore_corrects_an_agent_guessed_angle_id` (stub dispatcher
+   returns a plausible-wrong angle; the re-score survives, corrected).
+   Both the round-loop and the post-revision final re-score share the
+   `_rescore` path, so one fix covers both.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

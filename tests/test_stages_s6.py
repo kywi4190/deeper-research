@@ -6,6 +6,8 @@ mid-stage resume."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from deeper.agents_runtime import AgentOutputInvalid
@@ -18,6 +20,7 @@ from deeper.schemas import (
     DeepDiveStatus,
     Dossier,
     DossierSection,
+    Rubric,
     ScreeningResult,
     SourceRef,
     SourceTier,
@@ -168,6 +171,47 @@ def test_derive_open_questions_names_the_blocking_claims():
     assert len(questions) == 1 and "c-low-lb" in questions[0] and "claim c-low-lb" in questions[0]
     fallback = derive_open_questions(dossier, [])
     assert len(fallback) == 1 and "budget cap" in fallback[0]
+
+
+# -- the re-score owns its angle_id -------------------------------------------------
+
+
+async def test_rescore_corrects_an_agent_guessed_angle_id(tmp_path):
+    """The re-score inputs (brief/destination/rubric/dossier/preferences) carry
+    no angle information — the M2 live run's screener guessed a plausible-but-
+    wrong angle_id three times and paused the run. The angle is S3 bookkeeping
+    code already knows (finalist.baseline.angle_id): a mismatched angle_id is
+    corrected in code with an emitted notice, never a paused run."""
+    ws = make_workspace(tmp_path)
+    write_s0_artifacts(ws)
+    write_s1_s2_artifacts(ws)
+    ctx = make_ctx(ws)
+    await ScoutingStage().execute(ctx)
+    await RubricStage().execute(ctx)
+    await ScreeningStage().execute(ctx)
+    stage = DeepDiveStage()
+    finalist = stage._finalists(ctx)[0]
+    rubric = ws.read_artifact("rubric.yaml", Rubric)
+
+    wrong = finalist.baseline.model_copy(update={"angle_id": "a-plausible-wrong-angle"})
+
+    class OneShotDispatcher:
+        async def run_agent(self, contract):
+            return SimpleNamespace(
+                artifacts={"screening-result": ScreeningResult(options=[wrong])},
+                raw_text="stub",
+            )
+
+    emitted: list[str] = []
+    rescore_ctx = make_ctx(ws, dispatcher=OneShotDispatcher(), emitted=emitted)
+    dossier = _dossier([_claim("c-x", lb=False)], {"crit-a": ["c-x"]}).model_copy(
+        update={"option_id": finalist.option_id}
+    )
+    result = await stage._rescore(
+        rescore_ctx, finalist, rubric, {}, dossier, context="angle-fix-test"
+    )
+    assert result.angle_id == finalist.baseline.angle_id
+    assert any("corrected" in m and "a-plausible-wrong-angle" in m for m in emitted)
 
 
 # -- the mock scenario: three termination paths end to end ---------------------------

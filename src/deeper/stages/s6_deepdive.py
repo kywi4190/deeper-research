@@ -536,16 +536,21 @@ class DeepDiveStage(StageBase):
         context: str,
     ) -> OptionScreening:
         """The S5 scoring machinery pointed at the dossier: screener dispatch,
-        per-batch integrity check, code-recomputed aggregates."""
+        per-batch integrity check, code-recomputed aggregates. The option's
+        angle is S3 bookkeeping the dossier does not carry: the objective
+        states it, and a mismatched echo is corrected in code, never a paused
+        run (M2 live run: the screener guessed a plausible wrong angle 3×)."""
         option_id = finalist.option_id
+        angle_id = finalist.baseline.angle_id
         contract = AgentContract(
             role="screener",
             stage=StageEnum.S6,
             task_objective=(
                 "# DEEP-DIVE RE-SCORE\nRe-score exactly one finalist, option "
-                f"'{option_id}', from its deep-dive dossier (in your inputs, in "
-                "place of cards) — see your 'Deep-dive re-score mode' section. "
-                "Emit a screening-result containing exactly this one option."
+                f"'{option_id}' (angle '{angle_id}'), from its deep-dive dossier "
+                "(in your inputs, in place of cards) — see your 'Deep-dive "
+                "re-score mode' section. Emit a screening-result containing "
+                "exactly this one option."
             ),
             input_artifacts={
                 **base_inputs,
@@ -581,8 +586,15 @@ class DeepDiveStage(StageBase):
                 ),
                 raw_output=result.raw_text,
             )
+        strays = sorted({o.angle_id for o in own if o.angle_id != angle_id})
+        if strays:
+            ctx.emit(
+                f"S6: {option_id} re-score carried angle_id '{strays[0]}' — "
+                f"corrected to '{angle_id}' in code"
+            )
+            own = [o.model_copy(update={"angle_id": angle_id}) for o in own]
         batch = ScreeningResult(options=own, notes=screening.notes)
-        card_set = OptionCardSet(angle_id=finalist.baseline.angle_id, cards=[finalist.card])
+        card_set = OptionCardSet(angle_id=angle_id, cards=[finalist.card])
         problems = verify_screening(batch, rubric, [card_set])
         if problems:
             raise AgentOutputInvalid(

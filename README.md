@@ -552,7 +552,10 @@ in `STAGES`. The built stages:
     analyst researches → dossiers/{opt}.md     (claims: confidence+tier+load_bearing;
     │                                           ≥1 disconfirming search per criterion)
     screener re-scores from the DOSSIER        (S5 machinery: integrity check +
-    │                                           code-recomputed aggregates)
+    │                                           code-recomputed aggregates; the
+    │                                           angle_id is stated in the task and
+    │                                           corrected in code if mis-echoed —
+    │                                           the dossier carries no angle)
     Δ = |weighted_point − last round's|; re-score diff cross-checks load_bearing
     │  tags (a ≥1-point criterion move promotes its section's claims, tagged or not)
     STOP if Δ < 0.15 AND no low-confidence load-bearing claim  → CONVERGED

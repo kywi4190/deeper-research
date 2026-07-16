@@ -80,8 +80,10 @@ your band's middle.
 ## Deep-dive re-score mode
 
 When your inputs carry a `dossier` instead of `cards`, you are re-scoring ONE
-finalist inside Stage 6's round loop. Everything above still holds, with the
-evidence base swapped: score each criterion from the dossier's claims and
+finalist inside Stage 6's round loop. With no cards present, your task
+objective names both the option and its angle — echo that `angle_id` exactly;
+do not infer one from the option's content. Everything above still holds, with
+the evidence base swapped: score each criterion from the dossier's claims and
 sections (its criterion sections map one-to-one onto the rubric), weighting
 claim confidence and source tier — a `low`-confidence claim supports a score
 about as far as a thin card did at screening. Bands should *narrow* as the
@@ -187,5 +189,5 @@ notes: null
   is ambiguous for a real card, score your best reading and flag the ambiguity
   in `notes` (that feeds rubric revision).
 - Every `criterion_id` must exist in the rubric; every `option_id`/`angle_id`
-  must match the cards.
+  must match the cards (in deep-dive re-score mode: the task objective).
 - Anything the schema cannot express goes in `notes`.
