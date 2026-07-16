@@ -93,7 +93,13 @@ logged to `logs/retries/`; option ids are globally unique by construction;
 S5 batches persist per angle and are never re-paid; `--non-interactive`
 makes the stdin shape explicit; the CLI forces UTF-8 output (the cp1252 'Δ'
 crash); and plan usage-limit exhaustion is its own pause cause with the
-reset time in the message and no auto-resume.
+reset time in the message and no auto-resume. The terminal is emit-only:
+subagent stderr is captured per attempt (failures persist it to
+`logs/stderr/` and carry the tail), SDK loggers write to `logs/sdk.log`,
+and stage fan-outs use `gather_strict` (deeper/aio.py) — on first failure
+siblings are cancelled and drained so subprocess teardown happens on a
+live loop, and one deterministic exception (usage limit and spend cap
+outrank per-dispatch deaths) names the pause.
 
 ## Architecture map
 
@@ -273,9 +279,20 @@ AgentResult                                   previous output as feedback, up to
 A stage passes its coherence check as `run_agent(contract, validate=...)` so a
 schema-valid but semantically wrong reply (the M2 live run's verifier dropped
 one of its 14 sampled claims) gets corrective feedback naming exactly what is
-wrong instead of pausing the run on the first miss. The S6 verifier's
-sampling-assignment check is wired this way; the remaining stage-level checks
-still raise single-shot and are candidates for the same wiring.
+wrong instead of pausing the run on the first miss. Every per-dispatch
+coherence check rides this loop — scout/critic angle assignments (S3,
+redivergence), screener chunk and re-score coherence (S5, S6, gate-C
+mini-loop and preference feedback), analyst dossier round/sections (S6),
+verifier sampling assignments and challenges (S6, gate-C),
+prosecutor/steelman/frame-check/judge (S7), and the synthesist's board
+coherence + mechanical citation pass (S8). The taxonomy: a check over ONE
+agent's reply vs its assignment retries with feedback; a merge-level or
+cross-dispatch check (S5's cross-angle id collisions, the merged sub-batch
+belt) still raises straight to a pause — firing means a code bug or a
+hand-edited workspace, not retryable agent output. Sites that normalize a
+reply before checking (dropping foreign options, correcting a stray
+angle_id) use pure `normalize_*` functions shared by the callback and the
+post-success path, and their notices emit once, for the accepted attempt.
 
 **The quarantine guarantee** (design §6): a `PreToolUse` hook denies any
 Read/Grep/Glob whose target *or search root* covers `preferences.yaml` unless the
@@ -638,8 +655,9 @@ in `STAGES`. The built stages:
   pass** (`src/deeper/report.py`, code not LLM): every inline `[[claim-id]]`
   (or `[[option-id:claim-id]]` where a bare id is ambiguous across dossiers)
   must resolve to a dossier claim, and the recommendation must carry at least
-  one; unresolvable annotations fail the stage with the exact list and buy
-  ONE synthesist retry — a second failure pauses the run. On success code
+  one. Both checks ride the dispatcher's feedback retry loop
+  (`caps.max_schema_retries`); exhaustion pauses the run with the exact
+  unresolvable-annotation list. On success code
   renders `report/decision-report.md`: seven numbered sections, the
   code-computed tables embedded verbatim, every annotation linked to an
   appendix claims index carrying each claim's text, source, and tier, plus
@@ -980,6 +998,12 @@ canonical `Makefile` is used wherever GNU make is available.
   `HardCaps.max_schema_retries` already defaults to 2. The design doc wins: the retry
   loop runs up to `caps.max_schema_retries` re-invocations before raising
   `AgentOutputInvalid`.
+- **S8's citation pass uses the shared retry budget, not its own "one retry".**
+  The build guide gave the mechanical citation pass a bespoke single retry;
+  it now rides the same `validate=` feedback loop as every other
+  per-dispatch coherence check (strictly more forgiving — up to
+  `caps.max_schema_retries` — same pause on exhaustion, one retry
+  discipline instead of two).
 - **Per-dispatcher semaphore, not module-level.** An `asyncio.Semaphore` binds to the
   running event loop, so a literal module-level semaphore breaks across loops (pytest
   creates one per test). The semaphore lives on the dispatcher instance, created

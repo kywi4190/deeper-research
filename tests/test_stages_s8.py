@@ -1,14 +1,16 @@
 """S8 synthesis tests: the report carries all seven design components
 (structural assertion), the code-computed tables are embedded verbatim,
 annotations render as links into the claims index, the mechanical citation
-pass buys exactly one synthesist retry, and incoherent reports (wrong winner)
-pause instead of persisting."""
+pass and board coherence ride the dispatcher's feedback retry loop, and a
+synthesist that exhausts the shared retry budget pauses instead of
+persisting."""
 
 from __future__ import annotations
 
 import pytest
 
 from deeper.agents_runtime import AgentOutputInvalid
+from deeper.config import profile_config
 from deeper.report import decision_matrix_table
 from deeper.schemas import DecisionReport, Rubric, ScreeningResult
 from deeper.sensitivity import dual_scoreboards, render_scoreboards
@@ -107,41 +109,49 @@ async def test_stage_is_complete_and_reentry_dispatches_nothing(run):
     assert not stage.is_complete(ctx)
 
 
-async def test_citation_failure_buys_exactly_one_retry_then_succeeds(tmp_path):
+async def test_citation_failure_is_retried_with_feedback_then_succeeds(tmp_path):
+    """The citation pass rides run_agent's validate loop (M2 finding 5): the
+    retry prompt carries the previous artifact and the exact unresolvable
+    annotations. (Design deviation, recorded in README: the bespoke
+    one-citation-retry loop is replaced by the shared schema-retry budget.)"""
     bad = fixture_response(lambda t: t.replace("[[c-sae-reuse]]", "[[c-invented]]"))
     good = fixture_response()
-    ws, ctx, dispatcher, emitted = await walk_to_s8(
+    ws, ctx, dispatcher, _ = await walk_to_s8(
         tmp_path, scripted_responses={"synthesist": [bad, good]}
     )
     await SynthesisStage().execute(ctx)
-    assert synthesist_dispatches(dispatcher) == 2  # one retry, then clean
-    assert any("citation pass failed" in m for m in emitted)
+    assert synthesist_dispatches(dispatcher) == 2  # one feedback retry, then clean
     assert ws.path(REPORT_MD_PATH).is_file()
     # The retry prompt named the exact unresolvable annotation.
     retry_prompt = [p for r, _, p in dispatcher.invocations if r == "synthesist"][1]
-    assert "c-invented" in retry_prompt and "CITATION-PASS RETRY" in retry_prompt
+    assert "c-invented" in retry_prompt and "PREVIOUS ATTEMPT" in retry_prompt
+    assert ws.load_state().retry_counts["S8:synthesist:-"] == 1
 
 
-async def test_citation_failure_twice_pauses_instead_of_persisting(tmp_path):
+async def test_citation_failure_exhausts_the_retry_budget_then_pauses(tmp_path):
     bad = fixture_response(lambda t: t.replace("[[c-sae-reuse]]", "[[c-invented]]"))
+    attempts = profile_config("quick").caps.max_schema_retries + 1
     ws, ctx, dispatcher, _ = await walk_to_s8(
-        tmp_path, scripted_responses={"synthesist": [bad, bad]}
+        tmp_path, scripted_responses={"synthesist": [bad] * attempts}
     )
     with pytest.raises(AgentOutputInvalid, match="c-invented"):
         await SynthesisStage().execute(ctx)
-    assert synthesist_dispatches(dispatcher) == 2  # ONE retry, no more
+    assert synthesist_dispatches(dispatcher) == attempts  # the shared budget, no more
     assert not ws.path(REPORT_MD_PATH).exists()
     assert not ws.path(REPORT_YAML_PATH).exists()
 
 
-async def test_wrong_winner_is_rejected_as_incoherent(tmp_path):
+async def test_wrong_winner_exhausts_retries_as_incoherent(tmp_path):
     wrong = fixture_response(
         lambda t: t.replace(
             "winner_option_id: sae-feature-atlas",
             "winner_option_id: contamination-robust-benchmark",
         )
     )
-    ws, ctx, _, _ = await walk_to_s8(tmp_path, scripted_responses={"synthesist": [wrong] * 2})
+    attempts = profile_config("quick").caps.max_schema_retries + 1
+    ws, ctx, _, _ = await walk_to_s8(
+        tmp_path, scripted_responses={"synthesist": [wrong] * attempts}
+    )
     with pytest.raises(AgentOutputInvalid, match="preference-adjusted scoreboard"):
         await SynthesisStage().execute(ctx)
     assert not ws.path(REPORT_YAML_PATH).exists()

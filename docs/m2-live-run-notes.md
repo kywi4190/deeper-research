@@ -212,5 +212,36 @@ spent), to be restarted.
    exit, cosmetic, prefixed "Exception ignored in:" (Python is saying it
    ignored them).
 
+9. **ADDRESSED — Bucket 3: subprocess lifecycle & observability (the
+   terminal-noise class).** Holistic triage of the run's error history
+   sorted everything into three buckets: (1) content contracts (findings
+   2/4/5 — closed, `validate=` is the mechanism), (2) infrastructure
+   ceilings & error taxonomy (findings on 16k, 7, 8 — closed), and (3) the
+   one still open: everything alarming the terminal showed that was NOT a
+   pipeline failure. Three structural causes, all violating
+   pipeline-as-kernel/UI-as-viewer: the CLI subprocess *inherited the
+   operator's stderr* (the minified-JS "Error in hook callback … Stream
+   closed" dumps — the CLI complaining its pending hook control-requests
+   died when an abandoned sibling's stream was yanked); the project
+   configured no logging, so SDK records ("Fatal error in message reader")
+   fell to logging's lastResort handler = the terminal; and all 9 stage
+   fan-outs were bare `asyncio.gather`, which abandons siblings when one
+   child raises a pause — their transports then closed by GC luck at loop
+   shutdown ("Event loop is closed" Proactor spew). **Landed (2026-07-17,
+   commits e4cf77d/b054e49/5f8d832 + the finding-5 follow-up in
+   ab96db7/this):** `gather_strict` (deeper/aio.py) cancels-and-drains
+   siblings and re-raises ONE deterministic exception (UsageLimitReached,
+   then SpendCapExceeded, outrank per-dispatch deaths — the actionable
+   pause wins the race); `_invoke` acloses the query() generator in a
+   finally (PEP 533); subagent stderr is piped per attempt, persisted to
+   `logs/stderr/` on failure with the tail in the enriched error;
+   SDK loggers route to `logs/sdk.log` (WARNING+); win32 gets a 0.2s
+   Proactor teardown grace; and every per-dispatch coherence check now
+   rides `validate=` (S3, S5, S6, S7, S8, gate-C, redivergence — S8's
+   bespoke one-citation-retry replaced by the shared budget, recorded as a
+   README design deviation), with merge-level checks staying pause-on-fire
+   by stated taxonomy. Operator's view from here on: emits only; every
+   diagnostic lands in the run's `logs/`.
+
 (Next findings from the restarted run go here — keep the M1 file's format:
 what worked / findings by pain / final cost by stage from `deeper status`.)

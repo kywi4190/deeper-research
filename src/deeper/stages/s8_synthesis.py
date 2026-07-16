@@ -18,7 +18,7 @@ from __future__ import annotations
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid, AgentResult
+from deeper.agents_runtime import AgentContract
 from deeper.config import SizeClass
 from deeper.contradictions import load_ledger
 from deeper.report import (
@@ -76,6 +76,27 @@ from .s7_tournament import (
 
 REPORT_MD_PATH = "report/decision-report.md"
 REPORT_YAML_PATH = "report/decision-report.yaml"
+
+
+def coherence_problems(report: DecisionReport, winner_id: str) -> list[str]:
+    """Pure: the report must agree with the code-computed boards — the winner
+    is the adjusted board's rank 1, and the dissent comes from the winner's
+    prosecution file."""
+    problems: list[str] = []
+    if report.winner_option_id != winner_id:
+        problems.append(
+            f"- winner_option_id is '{report.winner_option_id}' but the "
+            f"preference-adjusted scoreboard ranks '{winner_id}' first — the "
+            "report narrates the boards, it does not re-decide them"
+        )
+    expected_source = prosecution_path(winner_id)
+    if report.dissent_source != expected_source:
+        problems.append(
+            f"- dissent_source is '{report.dissent_source}'; the dissent is the "
+            f"best surviving argument against the winner, so it must be "
+            f"'{expected_source}'"
+        )
+    return problems
 
 
 class SynthesisStage(StageBase):
@@ -255,58 +276,22 @@ class SynthesisStage(StageBase):
     async def _synthesize(
         self, ctx: StageContext, inputs: dict[str, str], claims, winner_id: str
     ) -> DecisionReport:
-        """Dispatch the synthesist; the mechanical citation pass buys exactly
-        ONE retry carrying the unresolvable-annotation list."""
+        """Dispatch the synthesist; board coherence and the mechanical citation
+        pass ride the dispatcher's retry loop (M2 finding 5) under the shared
+        caps.max_schema_retries budget — the bespoke one-citation-retry loop
+        this replaces is recorded as a design deviation in the README."""
         ctx.emit(
             f"S8: synthesist drafting the decision report — adjusted-board winner '{winner_id}'"
         )
-        contract, result, report = await self._dispatch(ctx, inputs, retry_feedback=None)
-        self._check_coherence(contract, report, result, winner_id)
-        problems = citation_pass(report_sections(report), claims)
-        if problems:
-            ctx.emit(
-                f"S8: mechanical citation pass failed — {len(problems)} unresolvable "
-                "annotation(s); one synthesist retry"
-            )
-            feedback = (
-                "Your previous decision-report artifact (below) failed the mechanical "
-                "citation pass. Fix EXACTLY these annotations, keep everything else, "
-                "and re-emit the complete artifact:\n"
-                + "\n".join(problems)
-                + f"\n\nYour previous artifact:\n```yaml\n{report.dump_yaml()}```"
-            )
-            contract, result, report = await self._dispatch(ctx, inputs, retry_feedback=feedback)
-            self._check_coherence(contract, report, result, winner_id)
-            problems = citation_pass(report_sections(report), claims)
-            if problems:
-                raise AgentOutputInvalid(
-                    contract,
-                    errors=(
-                        "the mechanical citation pass still fails after the one "
-                        "retry (design §5 — every factual claim must link to a "
-                        "dossier claim):\n" + "\n".join(problems)
-                    ),
-                    raw_output=result.raw_text,
-                )
-        return report
-
-    # -- dispatch --------------------------------------------------------------------
-
-    async def _dispatch(
-        self, ctx: StageContext, inputs: dict[str, str], *, retry_feedback: str | None
-    ) -> tuple[AgentContract, AgentResult, DecisionReport]:
-        task = (
-            "Synthesize this run into the decision report: all seven components, "
-            "every factual sentence annotated with the dossier claim id it rests "
-            "on ([[claim-id]], or [[option-id:claim-id]] when the bare id is "
-            "ambiguous)."
-        )
-        if retry_feedback is not None:
-            task += f"\n\n# CITATION-PASS RETRY\n{retry_feedback}"
         contract = AgentContract(
             role="synthesist",
             stage=StageEnum.S8,
-            task_objective=task,
+            task_objective=(
+                "Synthesize this run into the decision report: all seven components, "
+                "every factual sentence annotated with the dossier claim id it rests "
+                "on ([[claim-id]], or [[option-id:claim-id]] when the bare id is "
+                "ambiguous)."
+            ),
             input_artifacts=inputs,
             output_schemas=("decision-report",),
             size_class=SizeClass.L,
@@ -315,41 +300,28 @@ class SynthesisStage(StageBase):
                 "a fact you cannot annotate does not belong in the report."
             ),
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        report = result.artifacts["decision-report"]
-        assert isinstance(report, DecisionReport)
-        return contract, result, report
 
-    def _check_coherence(
-        self,
-        contract: AgentContract,
-        report: DecisionReport,
-        result: AgentResult,
-        winner_id: str,
-    ) -> None:
-        """The report must agree with the code-computed boards: the winner is
-        the adjusted board's rank 1, and the dissent comes from the winner's
-        prosecution file."""
-        problems = []
-        if report.winner_option_id != winner_id:
-            problems.append(
-                f"- winner_option_id is '{report.winner_option_id}' but the "
-                f"preference-adjusted scoreboard ranks '{winner_id}' first — the "
-                "report narrates the boards, it does not re-decide them"
-            )
-        expected_source = prosecution_path(winner_id)
-        if report.dissent_source != expected_source:
-            problems.append(
-                f"- dissent_source is '{report.dissent_source}'; the dissent is the "
-                f"best surviving argument against the winner, so it must be "
-                f"'{expected_source}'"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+        def check_report(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            report = artifacts["decision-report"]
+            assert isinstance(report, DecisionReport)
+            parts: list[str] = []
+            problems = coherence_problems(report, winner_id)
+            if problems:
+                parts.append(
                     "the decision report validates in isolation but does not cohere "
                     "with the tournament's boards:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            citation = citation_pass(report_sections(report), claims)
+            if citation:
+                parts.append(
+                    "the mechanical citation pass failed (design §5 — every factual "
+                    "claim must link to a dossier claim); fix EXACTLY these "
+                    "annotations, keep everything else:\n" + "\n".join(citation)
+                )
+            return "\n".join(parts) or None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_report)
+        report = result.artifacts["decision-report"]
+        assert isinstance(report, DecisionReport)
+        return report

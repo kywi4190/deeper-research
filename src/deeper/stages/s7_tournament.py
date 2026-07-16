@@ -31,10 +31,12 @@ settled.
 
 from __future__ import annotations
 
+from typing import cast
+
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.agents_runtime import AgentContract
 from deeper.aio import gather_strict
 from deeper.config import SizeClass
 from deeper.schemas import (
@@ -94,6 +96,52 @@ def prosecution_path(option_id: str) -> str:
 
 def steelman_path(option_id: str) -> str:
     return f"tournament/{option_id}-steelman.md"
+
+
+def update_problems(log: ScoreUpdateLog, scores: ScreeningResult, rubric: Rubric) -> str | None:
+    """Pure cross-artifact integrity: every update names a real option and
+    rubric criterion, amends the score as it currently stands, and stays off
+    the preference slot. Run inside the dispatcher's retry loop (M2 finding
+    5): a miss gets corrective feedback, not a paused run."""
+    records = {o.option_id: o for o in scores.options}
+    criterion_ids = {c.id for c in rubric.criteria}
+    problems: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for update in log.updates:
+        key = (update.option_id, update.criterion_id)
+        if key in seen:
+            problems.append(
+                f"- ({update.option_id}, {update.criterion_id}) is updated twice; "
+                "one update round means one change per score (design §12)"
+            )
+        seen.add(key)
+        record = records.get(update.option_id)
+        if record is None:
+            problems.append(
+                f"- option '{update.option_id}' is not on the post-deep-dive scoreboard"
+            )
+            continue
+        if update.criterion_id not in criterion_ids:
+            problems.append(
+                f"- criterion '{update.criterion_id}' is not in the rubric "
+                "(the preference slot is never the judge's to touch)"
+            )
+            continue
+        current = next(
+            cs.score for cs in record.criterion_scores if cs.criterion_id == update.criterion_id
+        )
+        if abs(current - update.old_score) > 1e-6:
+            problems.append(
+                f"- old_score for ({update.option_id}, {update.criterion_id}) is "
+                f"{update.old_score:g}, but the current score is {current:g} — "
+                "amend the ledger as it stands"
+            )
+    if problems:
+        return (
+            "the score-update log validates in isolation but does not "
+            "cohere with the scoreboard:\n" + "\n".join(problems)
+        )
+    return None
 
 
 def apply_score_updates(
@@ -283,31 +331,34 @@ class TournamentStage(StageBase):
             ),
             context=option_id,
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        prosecution = result.artifacts["prosecution"]
-        assert isinstance(prosecution, Prosecution)
-        problems = []
-        if prosecution.option_id != option_id:
-            problems.append(
-                f"- prosecution.option_id is '{prosecution.option_id}' but this "
-                f"prosecutor was assigned option '{option_id}'"
-            )
-        known = {c.id for c in dossier.claims}
-        unknown = sorted(set(prosecution.supporting_claim_ids) - known)
-        if unknown:
-            problems.append(
-                f"- supporting_claim_ids must reference the dossier's claims; "
-                f"unknown ids: {unknown}"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+
+        def check_prosecution(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            prosecution = artifacts["prosecution"]
+            assert isinstance(prosecution, Prosecution)
+            problems = []
+            if prosecution.option_id != option_id:
+                problems.append(
+                    f"- prosecution.option_id is '{prosecution.option_id}' but this "
+                    f"prosecutor was assigned option '{option_id}'"
+                )
+            known = {c.id for c in dossier.claims}
+            unknown = sorted(set(prosecution.supporting_claim_ids) - known)
+            if unknown:
+                problems.append(
+                    f"- supporting_claim_ids must reference the dossier's claims; "
+                    f"unknown ids: {unknown}"
+                )
+            if problems:
+                return (
                     "the prosecution validates in isolation but does not cohere "
                     "with its assignment:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_prosecution)
+        prosecution = result.artifacts["prosecution"]
+        assert isinstance(prosecution, Prosecution)
         ctx.workspace.write_artifact(prosecution_path(option_id), prosecution)
         ctx.emit(
             f"S7: {option_id} prosecution written "
@@ -356,36 +407,39 @@ class TournamentStage(StageBase):
             ),
             context=option_id,
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        steelman = result.artifacts["steelman"]
-        assert isinstance(steelman, Steelman)
-        problems = []
-        if steelman.option_id != option_id:
-            problems.append(
-                f"- steelman.option_id is '{steelman.option_id}' but this steelman "
-                f"was assigned option '{option_id}'"
-            )
-        if steelman.trigger.value != trigger:
-            problems.append(
-                f"- trigger must be '{trigger}' (the docket's reason for this "
-                f"steelman), not '{steelman.trigger.value}'"
-            )
-        known = {c.id for c in dossier.claims}
-        unknown = sorted(set(steelman.supporting_claim_ids) - known)
-        if unknown:
-            problems.append(
-                f"- supporting_claim_ids must reference the option's own dossier "
-                f"claims; unknown ids: {unknown}"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+
+        def check_steelman(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            steelman = artifacts["steelman"]
+            assert isinstance(steelman, Steelman)
+            problems = []
+            if steelman.option_id != option_id:
+                problems.append(
+                    f"- steelman.option_id is '{steelman.option_id}' but this steelman "
+                    f"was assigned option '{option_id}'"
+                )
+            if steelman.trigger.value != trigger:
+                problems.append(
+                    f"- trigger must be '{trigger}' (the docket's reason for this "
+                    f"steelman), not '{steelman.trigger.value}'"
+                )
+            known = {c.id for c in dossier.claims}
+            unknown = sorted(set(steelman.supporting_claim_ids) - known)
+            if unknown:
+                problems.append(
+                    f"- supporting_claim_ids must reference the option's own dossier "
+                    f"claims; unknown ids: {unknown}"
+                )
+            if problems:
+                return (
                     "the steelman validates in isolation but does not cohere with "
                     "its assignment:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_steelman)
+        steelman = result.artifacts["steelman"]
+        assert isinstance(steelman, Steelman)
         ctx.workspace.write_artifact(steelman_path(option_id), steelman)
         ctx.emit(f"S7: {option_id} steelman written (trigger: {trigger})")
 
@@ -453,23 +507,26 @@ class TournamentStage(StageBase):
                 "test whether a suspected gap is real."
             ),
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        frame_check = result.artifacts["frame-check"]
-        assert isinstance(frame_check, FrameCheck)
-        proposal = frame_check.proposal
-        if proposal is not None and proposal.kind is RedivergenceKind.SCOUT_TASK:
-            known = {a.id for a in angle_map.angles}
-            if proposal.target_angle_id not in known:
-                raise AgentOutputInvalid(
-                    contract,
-                    errors=(
+
+        def check_frame_proposal(artifacts: dict) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            frame_check = artifacts["frame-check"]
+            assert isinstance(frame_check, FrameCheck)
+            proposal = frame_check.proposal
+            if proposal is not None and proposal.kind is RedivergenceKind.SCOUT_TASK:
+                known = {a.id for a in angle_map.angles}
+                if proposal.target_angle_id not in known:
+                    return (
                         f"- a scout-task proposal must target an existing angle; "
                         f"'{proposal.target_angle_id}' is not in the map "
                         f"(known: {sorted(known)}). Use kind: new-angle for a "
                         "region the map lacks."
-                    ),
-                    raw_output=result.raw_text,
-                )
+                    )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_frame_proposal)
+        frame_check = result.artifacts["frame-check"]
+        assert isinstance(frame_check, FrameCheck)
         ctx.workspace.write_artifact(FRAME_CHECK_PATH, frame_check)
 
     def _surface_frame_check(self, ctx: StageContext, frame_check: FrameCheck) -> None:
@@ -553,62 +610,12 @@ class TournamentStage(StageBase):
                 "one update round (design §12)."
             ),
         )
-        result = await ctx.dispatcher.run_agent(contract)
+        result = await ctx.dispatcher.run_agent(
+            contract,
+            validate=lambda artifacts: update_problems(
+                cast(ScoreUpdateLog, artifacts["score-update-log"]), scores, rubric
+            ),
+        )
         log = result.artifacts["score-update-log"]
         assert isinstance(log, ScoreUpdateLog)
-        self._check_updates(contract, log, scores, rubric, result.raw_text)
         return log
-
-    def _check_updates(
-        self,
-        contract: AgentContract,
-        log: ScoreUpdateLog,
-        scores: ScreeningResult,
-        rubric: Rubric,
-        raw_text: str,
-    ) -> None:
-        """Cross-artifact integrity: every update names a real option and rubric
-        criterion, amends the score as it currently stands, and stays off the
-        preference slot."""
-        records = {o.option_id: o for o in scores.options}
-        criterion_ids = {c.id for c in rubric.criteria}
-        problems: list[str] = []
-        seen: set[tuple[str, str]] = set()
-        for update in log.updates:
-            key = (update.option_id, update.criterion_id)
-            if key in seen:
-                problems.append(
-                    f"- ({update.option_id}, {update.criterion_id}) is updated twice; "
-                    "one update round means one change per score (design §12)"
-                )
-            seen.add(key)
-            record = records.get(update.option_id)
-            if record is None:
-                problems.append(
-                    f"- option '{update.option_id}' is not on the post-deep-dive scoreboard"
-                )
-                continue
-            if update.criterion_id not in criterion_ids:
-                problems.append(
-                    f"- criterion '{update.criterion_id}' is not in the rubric "
-                    "(the preference slot is never the judge's to touch)"
-                )
-                continue
-            current = next(
-                cs.score for cs in record.criterion_scores if cs.criterion_id == update.criterion_id
-            )
-            if abs(current - update.old_score) > 1e-6:
-                problems.append(
-                    f"- old_score for ({update.option_id}, {update.criterion_id}) is "
-                    f"{update.old_score:g}, but the current score is {current:g} — "
-                    "amend the ledger as it stands"
-                )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
-                    "the score-update log validates in isolation but does not "
-                    "cohere with the scoreboard:\n" + "\n".join(problems)
-                ),
-                raw_output=raw_text,
-            )

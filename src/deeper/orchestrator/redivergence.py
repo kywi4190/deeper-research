@@ -24,7 +24,7 @@ import re
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.agents_runtime import AgentContract
 from deeper.config import SizeClass
 from deeper.schemas import (
     Angle,
@@ -187,18 +187,21 @@ async def _scout(
         budget_line="1 budget unit: target ~2 option cards, for the proposed region only.",
         context=f"redivergence-{angle_id}",
     )
-    result = await ctx.dispatcher.run_agent(contract)
-    card_set = result.artifacts["option-card-set"]
-    assert isinstance(card_set, OptionCardSet)
-    if card_set.angle_id != angle_id:
-        raise AgentOutputInvalid(
-            contract,
-            errors=(
+
+    def check_scout_assignment(artifacts: dict) -> str | None:
+        # Per-dispatch check, run inside the retry loop (M2 finding 5).
+        card_set = artifacts["option-card-set"]
+        assert isinstance(card_set, OptionCardSet)
+        if card_set.angle_id != angle_id:
+            return (
                 f"- option-card-set.angle_id is '{card_set.angle_id}' but this scout "
                 f"was assigned angle '{angle_id}'"
-            ),
-            raw_output=result.raw_text,
-        )
+            )
+        return None
+
+    result = await ctx.dispatcher.run_agent(contract, validate=check_scout_assignment)
+    card_set = result.artifacts["option-card-set"]
+    assert isinstance(card_set, OptionCardSet)
     new_cards = [c for c in card_set.cards if c.id not in existing_ids]
     skipped = len(card_set.cards) - len(new_cards)
     if skipped:
@@ -244,36 +247,39 @@ async def _screen(
         ),
         context="redivergence",
     )
-    result = await ctx.dispatcher.run_agent(contract)
+    own_ids = {c.id for c in new_cards}
+
+    def check_miniloop(artifacts: dict) -> str | None:
+        # Per-dispatch check, run inside the retry loop (M2 finding 5).
+        screening = artifacts["screening-result"]
+        assert isinstance(screening, ScreeningResult)
+        kept = [o for o in screening.options if o.option_id in own_ids]
+        if not kept:
+            return (
+                "the mini-loop screening scored none of the new cards; score "
+                f"exactly these: {sorted(own_ids)}"
+            )
+        problems = verify_screening(
+            ScreeningResult(options=kept, notes=screening.notes), rubric, [new_set]
+        )
+        if problems:
+            return (
+                "the screening result validates in isolation but does not cohere "
+                "with the rubric and the new cards:\n" + "\n".join(problems)
+            )
+        return None
+
+    result = await ctx.dispatcher.run_agent(contract, validate=check_miniloop)
     screening = result.artifacts["screening-result"]
     assert isinstance(screening, ScreeningResult)
-    own_ids = {c.id for c in new_cards}
     kept = [o for o in screening.options if o.option_id in own_ids]
     if len(kept) < len(screening.options):
+        # Emitted post-success only: per-attempt evidence lives in logs/retries/.
         ctx.emit(
             f"gate-c: mini-loop screening included "
             f"{len(screening.options) - len(kept)} already-screened option(s) — dropped"
         )
-    if not kept:
-        raise AgentOutputInvalid(
-            contract,
-            errors=(
-                "the mini-loop screening scored none of the new cards; score "
-                f"exactly these: {sorted(own_ids)}"
-            ),
-            raw_output=result.raw_text,
-        )
     batch = ScreeningResult(options=kept, notes=screening.notes)
-    problems = verify_screening(batch, rubric, [new_set])
-    if problems:
-        raise AgentOutputInvalid(
-            contract,
-            errors=(
-                "the screening result validates in isolation but does not cohere "
-                "with the rubric and the new cards:\n" + "\n".join(problems)
-            ),
-            raw_output=result.raw_text,
-        )
     batch, drift = recompute_aggregates(batch, rubric, label="gate-c")
     for message in drift:
         ctx.emit(message)

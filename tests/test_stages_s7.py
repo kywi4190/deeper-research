@@ -197,6 +197,27 @@ async def test_partial_reentry_dispatches_only_whats_missing(run):
 # -- integrity checks: incoherent adversarial output pauses, never persists -----------
 
 
+async def test_judge_incoherence_is_retried_with_feedback(tmp_path):
+    """One incoherent score-update log costs a feedback retry, not a paused
+    run — the judge's coherence check rides run_agent's validate loop and the
+    retry (fixture fallback) completes the stage."""
+    bad_log = (
+        "### artifact: score-update-log\n```yaml\n"
+        "updates:\n"
+        "  - option_id: sae-feature-atlas\n"
+        "    criterion_id: momentum-by-deadline\n"
+        "    old_score: 5.0\n"
+        "    new_score: 4.0\n"
+        "    cause: mismatched ledger amendment\n"
+        "    source_artifact: tournament/sae-feature-atlas-prosecution.md\n"
+        "notes: null\n```\n"
+    )
+    ws, ctx, _, _ = await walk_to_s7(tmp_path, scripted_responses={"judge": [bad_log]})
+    await TournamentStage().execute(ctx)
+    assert ws.path(UPDATE_LOG_PATH).exists()
+    assert ws.load_state().retry_counts["S7:judge:-"] == 1
+
+
 async def test_judge_old_score_mismatch_is_rejected(tmp_path):
     bad_log = (
         "### artifact: score-update-log\n```yaml\n"

@@ -23,7 +23,7 @@ from __future__ import annotations
 import yaml
 from pydantic import ValidationError
 
-from deeper.agents_runtime import AgentContract, AgentOutputInvalid
+from deeper.agents_runtime import AgentContract
 from deeper.config import RunConfig, SizeClass
 from deeper.contradictions import append_contradictions
 from deeper.schemas import (
@@ -150,31 +150,35 @@ async def apply_preference_feedback(ctx: StageContext, reactions: list[Contender
         budget_line="No new research — a free re-score of the preference slot only.",
         context="gate-c-feedback",
     )
-    result = await ctx.dispatcher.run_agent(contract)
+    current = {o.option_id: o for o in scores.options}
+
+    def check_feedback_coverage(artifacts: dict) -> str | None:
+        # Per-dispatch check, run inside the retry loop (M2 finding 5).
+        proposed = artifacts["screening-result"]
+        assert isinstance(proposed, ScreeningResult)
+        by_id = {o.option_id: o for o in proposed.options}
+        problems = []
+        for reaction in reactions:
+            record = by_id.get(reaction.option_id)
+            if record is None or record.preference_score is None:
+                problems.append(
+                    f"- the reaction on '{reaction.option_id}' requires a re-emitted "
+                    "record with a preference_score; none came back"
+                )
+        unknown = sorted(set(by_id) - set(current))
+        if unknown:
+            problems.append(f"- these records match no contender on the scoreboard: {unknown}")
+        if problems:
+            return (
+                "the re-score validates in isolation but does not cover the "
+                "human's reactions:\n" + "\n".join(problems)
+            )
+        return None
+
+    result = await ctx.dispatcher.run_agent(contract, validate=check_feedback_coverage)
     proposed = result.artifacts["screening-result"]
     assert isinstance(proposed, ScreeningResult)
     by_id = {o.option_id: o for o in proposed.options}
-    current = {o.option_id: o for o in scores.options}
-    problems = []
-    for reaction in reactions:
-        record = by_id.get(reaction.option_id)
-        if record is None or record.preference_score is None:
-            problems.append(
-                f"- the reaction on '{reaction.option_id}' requires a re-emitted "
-                "record with a preference_score; none came back"
-            )
-    unknown = sorted(set(by_id) - set(current))
-    if unknown:
-        problems.append(f"- these records match no contender on the scoreboard: {unknown}")
-    if problems:
-        raise AgentOutputInvalid(
-            contract,
-            errors=(
-                "the re-score validates in isolation but does not cover the "
-                "human's reactions:\n" + "\n".join(problems)
-            ),
-            raw_output=result.raw_text,
-        )
     for option_id, record in by_id.items():
         old = current[option_id]
         if [(cs.criterion_id, cs.score) for cs in record.criterion_scores] != [
@@ -250,29 +254,33 @@ async def run_evidence_challenges(
             ),
             context=f"challenge-{challenge.option_id}-{challenge.claim_id}",
         )
-        result = await ctx.dispatcher.run_agent(contract)
-        report = result.artifacts["verification-report"]
-        assert isinstance(report, VerificationReport)
-        problems = []
-        if report.option_id != challenge.option_id:
-            problems.append(
-                f"- verification-report.option_id is '{report.option_id}' but the "
-                f"challenge names option '{challenge.option_id}'"
-            )
-        adjudicated = [r.claim_id for r in report.results]
-        if adjudicated != [challenge.claim_id]:
-            problems.append(
-                f"- adjudicate exactly ['{challenge.claim_id}']; the report covers {adjudicated}"
-            )
-        if problems:
-            raise AgentOutputInvalid(
-                contract,
-                errors=(
+
+        def check_challenge(artifacts: dict, challenge=challenge) -> str | None:
+            # Per-dispatch check, run inside the retry loop (M2 finding 5).
+            report = artifacts["verification-report"]
+            assert isinstance(report, VerificationReport)
+            problems = []
+            if report.option_id != challenge.option_id:
+                problems.append(
+                    f"- verification-report.option_id is '{report.option_id}' but the "
+                    f"challenge names option '{challenge.option_id}'"
+                )
+            adjudicated = [r.claim_id for r in report.results]
+            if adjudicated != [challenge.claim_id]:
+                problems.append(
+                    f"- adjudicate exactly ['{challenge.claim_id}']; the report "
+                    f"covers {adjudicated}"
+                )
+            if problems:
+                return (
                     "the verification report validates in isolation but does not "
                     "match the challenge:\n" + "\n".join(problems)
-                ),
-                raw_output=result.raw_text,
-            )
+                )
+            return None
+
+        result = await ctx.dispatcher.run_agent(contract, validate=check_challenge)
+        report = result.artifacts["verification-report"]
+        assert isinstance(report, VerificationReport)
         target = challenge_path(iteration, challenge.option_id, challenge.claim_id)
         ws.write_artifact(target, report)
         verdict = report.results[0].verdict
