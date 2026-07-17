@@ -243,5 +243,43 @@ spent), to be restarted.
    by stated taxonomy. Operator's view from here on: emits only; every
    diagnostic lands in the run's `logs/`.
 
-(Next findings from the restarted run go here — keep the M1 file's format:
-what worked / findings by pain / final cost by stage from `deeper status`.)
+## Run complete (2026-07-17) — the M2 exit test
+
+Winner `relu-depth-width-expressivity`, rank 1 on BOTH boards, no
+inversions, stable across the full preference sweep 0-40%; dissent
+UNREBUTTED (carried faithfully from the winner's prosecution); citation
+pass clean over 105 indexed claim ids; frame-check PASS with no proposal;
+judge applied zero updates with per-thread reasoning. Gate C approved
+after review — rationale recorded in the run's `gates/gate-c.yaml`
+(notable: the winner's prosecution was the strongest artifact in the pack,
+built entirely from the verifier's own findings; the finding-6 mis-cited
+claims sat at rank 5 and were noted, not re-challenged).
+
+**What worked end-to-end:** every failure across the run paused resumably
+and no paid work was re-paid (persisted batches, part files, round logs
+all honored on resume); the adversarial layer produced genuinely decisive
+material (a verifier contradiction forced a dossier walk-back that moved
+the winner's initiative score; rademacher dropped 3.98 → 3.86 after its
+3-claim revision); the final resume after the finding-9 hardening showed
+an emit-only terminal.
+
+**Final cost by stage** (`deeper status`; subscription plan-usage
+API-equivalents, cap was raised 100 → 125 mid-run):
+
+| stage | usd |
+|---|---|
+| S0 | $1.71 |
+| S1 | $5.32 |
+| S3 | $24.05 |
+| S4 | $3.18 |
+| S5 | $35.46 |
+| S6 | $35.11 |
+| S7 | $3.90 |
+| S8 | $1.69 |
+| **total** | **$110.43** |
+
+Schema-retry hotspots for Prompt 14: S3 scouts (12 retries across
+initial/revision/top-up passes) and S5 screeners (8) dominate;
+S6/S7 nearly clean (3 combined); S8 zero. The remaining human leg of the
+M2 exit test: read `report/decision-report.md` end-to-end against ground
+truth.
