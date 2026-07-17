@@ -13,9 +13,22 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**M2 complete.** The full pipeline S0–S8 runs end-to-end in mock (live-smoke
-through S5), from `deeper new` to a citation-linked decision report, and the
-Prompt 13 pre-live hardening pass has landed: every M1 triage finding is
+**M2 complete, including its exit test**: one full standard-profile live run
+(`2026-07-13-map-the-space-of-first-hands-on-ai-ml-re`, $110.43) worked all
+three gates for real and produced a citation-linked decision report with a
+clean pass over 105 claims. The complete triage for that run — findings 1–9
+(infrastructure, all addressed), the user's through-Gate-B findings F1–F12
+with post-run verdicts, the ground-truth divergence (the expected fork-test
+winner was never carded: an option-level scouting miss, not a scoring
+error), the S6 depth stats, the still-unexercised paths, and the **benchmark
+seed** — lives in
+[`docs/m2-live-run-notes.md`](docs/m2-live-run-notes.md). **Prompt 14 must
+read that file** (with [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md))
+— it is the prompt-iteration evidence and the seed for `benchmarks/`.
+
+The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
+the run above), from `deeper new` to a citation-linked decision report, and
+the Prompt 13 pre-live hardening pass has landed: every M1 triage finding is
 addressed, and every live failure path — agent timeout, network error, SDK
 exception, schema double-failure, spend cap, plan usage-limit exhaustion —
 lands in a resumable `PAUSED_ATTENTION` with a transcript, never a crash. The

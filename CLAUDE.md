@@ -9,6 +9,9 @@ complete state of a run — inspectable, diffable, resumable.
 ## File map
 - `docs/deeper-research-design.md` — authoritative design (numbered §sections).
 - `docs/deeper-research-build-guide.md` — the ordered prompt/build plan (phases A–E).
+- `docs/m1-live-run-notes.md`, `docs/m2-live-run-notes.md` — live-run triage
+  findings and the benchmark seed; required reading for Prompt 14 (eval) and
+  ongoing prompt iteration.
 - `src/deeper/schemas/` — Pydantic artifact models (stage contracts).
 - `src/deeper/agents_runtime/` — SDK dispatch, mock mode, enforcement hooks, cost accounting.
 - `src/deeper/stages/` — per-stage logic S0–S8.

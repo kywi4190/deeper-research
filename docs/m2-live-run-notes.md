@@ -283,3 +283,118 @@ initial/revision/top-up passes) and S5 screeners (8) dominate;
 S6/S7 nearly clean (3 combined); S8 zero. The remaining human leg of the
 M2 exit test: read `report/decision-report.md` end-to-end against ground
 truth.
+
+## User triage through Gate B (F1–F12), merged and closed out post-run
+
+The user kept independent triage notes through Gate B with **withheld
+ground truth** (4 known probe candidates; expected winner: a from-scratch
+nanoGPT *fork test* with compression framing, engineered to measure the
+build/understand axis by revealed choice). Deduped against findings 1–9
+above; post-run verdicts filled in from the completed workspace.
+
+**Prompt-iteration targets (the heart of Prompt 14's loop):**
+
+- **F3 — Cartography ground-truth miss: agent/LLM-systems region.** 3 of 4
+  withheld probes had map homes; the scratchpad+memory agent build
+  (build×empirics) did not — all five personas shared the frame "probe =
+  study/train/adapt a model"; none produced systems-composed-around-a-model.
+  The human added `llm-agent-systems-build` at Gate A; it was scouted and
+  produced finalist #6. Cartographer-persona iteration target; add the
+  region to the benchmark's reference angle union as the
+  "practitioner-obvious miss" test case. (Horizon-scanner absent at
+  standard — expected; note in the reference union.)
+- **F9 — Rubric-builder defect: purity ≠ discrimination.** The S4 rubric
+  was destination-faithful and quarantine-clean, but the build/understand
+  criterion credited only pole purity and would have scored a *designed
+  fork* as ambiguity (~2 on the axis it was engineered to measure). Fixed
+  live at Gate B via `edited_criteria` (that gate path is now exercised).
+  Iteration target: the rubric-builder must recognize
+  revealed-choice-at-a-designed-fork as a measurement mechanism.
+- **F6 — Critic revision rate 100% (16/16 angles).** Baseline for the
+  quality metric; either scouts under-deliver on pass 1 or the critic
+  over-triggers. Post-run texture: S5 kill-risk checks did real work (the
+  two sampler options died on summed-hours math), so the critic is not
+  uniformly noise — validate a sample of critiques against cards before
+  choosing which prompt to iterate.
+- **F7 — Allocation floor dominance.** 16 angles × floor 2 = 32 of 40
+  units; only 8 proportional, so γ was inert (priors 0.85 and 0.65 both →
+  3 units). Expect weak informedness rank-correlation in the eval;
+  knob-tuning candidate: floor/γ/budget vs angle count at standard.
+
+**Trap 2 verdict — the ground-truth divergence (the eval headline).** The
+expected winner never existed as an option card: no scout produced the
+compression-framed fork test ("compression" appears in zero cards; the
+nearest neighbors are plain nanoGPT builds). Those neighbors screened
+mid-field and were cut honestly by the finalist cap — every seated
+finalist's S5-time UCB (≥ 4.3705) beat the best nanoGPT cut
+(scaling-law-fit, 4.165); cut-reason texts verified against the S5
+scoreboard. The actual winner is the theory-side
+relu-depth-width-expressivity, robust across the full sensitivity sweep.
+So the divergence is a *scouting/cartography breadth miss at the option
+level*, not a scoring error — the F9 rubric fix made the fork axis
+measurable, but no card embodied the fork mechanism. For Prompt 14: the
+breadth metric should check option-level ground truth, not only
+angle-level; adjudicating whether the fork-test prior or the run's answer
+is right is the human's ground-truth reading.
+
+**Closed post-run:**
+
+- **F10 — preference slot 0.2 → 0.15 propagated.** Verified: the decision
+  matrix scores the slot at 0.15 and the S8 sweep pivots on slot weight
+  0.15.
+- **F11 — hard-floors-as-weights did not bite.** No private-by-design
+  option survived screening: twin-track and diagonal-pair cut by the cap,
+  both samplers by confirmed kill-risks. The design question stays open
+  (constraint enforcement is screener prompt + kill-risk checks, not code),
+  but this run gives no evidence it needs code yet.
+- **F12 / Trap 3 — quarantine grep done.** One hit total across
+  angles/ + rubric artifacts: the practitioner cartographer's raw report
+  suggests "a structured AI-safety fellowship such as MATS or SPAR" —
+  plausibly generic advice for the field, but the one line worth the
+  user's eye; map priors and rubric justifications show no
+  compression/safety shaping.
+- **F5 — session-limit detection: since fixed.** The mid-S3 untyped
+  fall-through is the same class findings 3/8 above closed (enriched CLI
+  detail + the three limit-notice families); S3's batch persistence
+  correctly re-paid nothing on resume. Superseded, no further action.
+- **S6 depth stats** (for the depth metric's baseline): rounds to
+  convergence 1/1/2/2/2/2/3, all CONVERGED, zero BUDGET-CAPPED; verifier
+  pass rates 33%–91% (rademacher 3/9 and context-strategy 5/10 at the low
+  end); 5 of 7 finalists took the one targeted revision; 10 contradictions
+  ledgered, all revised or open-by-design in the report.
+- **S7**: zero rank inversions (so the inversion-docket path ran empty —
+  only the runner-up steelman exercised); frame-check PASS explicitly
+  re-examined the logged Gate-A removal and upheld it.
+
+**What worked, recorded as tested (F1/F2/F4):** S0 filed both floors as
+hard constraints and kept tastes out of the brief — but the
+preference-stated-as-constraint pushback never fired: record as
+*untested*, not passed. Over-decomposition fix confirmed (16 angles vs
+M1's 41; merger self-flagged with a full dedup trail; saturation novelty
+0.90/0.38/0.33/0.09/0.00 → trailing-2 mean 0.05 < 0.2, stop). All three
+Gate-A edit types (add/remove/prior-adjust) applied and logged, removal
+reason preserved for the frame-checker (which used it).
+
+**Still unexercised live (coverage gaps for eval/benchmarks):** the S3
+reflow path (redundancy 0–25%, no early stops → no-op); ALL Gate-C loop
+actions (the gate was approved directly — zero preference-feedback
+re-scores, zero evidence challenges, no re-divergence; mock-tested only);
+S8 citation-pass retries (zero — first dispatch clean); the S0 pushback
+trap (above).
+
+## Benchmark seed (for benchmarks/ in Prompt 14)
+
+- Type: personal decision, known ground truth. Question text = this run's
+  goal string; the run's brief/destination/preferences artifacts are
+  reusable as fixtures.
+- Reference angle union: this run's 16-angle map + `llm-agent-systems-build`
+  (the F3 miss; flag as the practitioner-obvious-miss test case) +
+  horizon-scanner-shaped frontier coverage (absent at standard).
+- Expected outcome (user's withheld prior): fork test (from-scratch
+  nanoGPT, compression framing) at/near the top of the destination-only
+  board; grokking/induction-heads interp as understand-side runner-up.
+  Actual outcome: the fork test was never carded (see Trap 2 verdict);
+  winner relu-depth-width-expressivity, interp probes #2/#3.
+- Cost calibration: S0–S1 ≈ $7.04, S0–S4 ≈ $34.27, final $110.43 at
+  standard (ledger above) — use as the README cost row and the eval's
+  spend baseline.
