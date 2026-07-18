@@ -384,6 +384,13 @@ trap (above).
 
 ## Benchmark seed (for benchmarks/ in Prompt 14)
 
+**Expanded into [`docs/benchmark-seeds.md`](benchmark-seeds.md)** — four
+complete, pre-authored specs (this run as the known-ground-truth spec, the
+M1 vector-store run as the technical selection, plus two fresh questions
+derived from this run's own artifacts). Prompt 14's step 1 transcribes that
+file verbatim; no TODO-USER placeholders remain. The summary below stands
+as the short form.
+
 - Type: personal decision, known ground truth. Question text = this run's
   goal string; the run's brief/destination/preferences artifacts are
   reusable as fixtures.

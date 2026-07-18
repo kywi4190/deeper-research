@@ -432,14 +432,14 @@ Read CLAUDE.md, README.md. The full pipeline S0→S8 exists in mock. This sessio
 ```text
 ultrathink
 
-Read CLAUDE.md, README.md, docs/deeper-research-design.md §10 (evaluation plan — implement its five property metrics as specified) and §12. Skim the workspace/ledger structures.
+Read CLAUDE.md, README.md, docs/deeper-research-design.md §10 (evaluation plan — implement its five property metrics as specified) and §12. Read docs/m1-live-run-notes.md and docs/m2-live-run-notes.md (the live-run triage: prompt-iteration targets F3/F6/F7/F9, the Trap-2 option-level ground-truth divergence, S6 depth baselines, retry hotspots) and docs/benchmark-seeds.md (pre-authored benchmark content). Skim the workspace/ledger structures.
 
 Task: the measurement layer that makes knob-tuning evidence-based (design P10).
 
-1. benchmarks/: a spec format for benchmark questions (question, type tag, optional reference-angle-union file, notes on known ground truth). Seed 4 specs per design §10's shapes: a personal decision, a technical selection, an open advice question, one where I know ground truth (leave content placeholders marked TODO-USER for me to fill — do not invent my personal questions).
+1. benchmarks/: a spec format for benchmark questions (question, type tag, optional reference-angle-union file, notes on known ground truth). Seed 4 specs per design §10's shapes by transcribing docs/benchmark-seeds.md into the spec format verbatim — the content is pre-authored from the two live runs and the user's own artifacts, so leave NO TODO-USER placeholders. Preserve the organic vs human-added distinction in the probe-space-mapping reference union (it drives the practitioner-obvious-miss check) and record ground truth exactly as the seeds state it (including what remains the user's adjudication — do not settle it).
 
 2. src/deeper/eval/ implementing the five metrics over a completed run's workspace:
-   - breadth: distinct-angle count vs reference union (LLM-judge matches run angles to reference angles; report hits/misses; flag "practitioner-obvious" misses).
+   - breadth: distinct-angle count vs reference union (LLM-judge matches run angles to reference angles; report hits/misses; flag "practitioner-obvious" misses). Where a spec carries option-level ground truth (probe-space-mapping's fork test), also check whether that option was carded at all — the M2 Trap-2 divergence was an option-level scouting miss that the angle-level metric alone cannot catch.
    - informedness: rank correlation (Spearman) between allocation and post-hoc angle value = share of finalists sourced from that angle; report alongside floor-compliance.
    - quality: critic revision rate + schema-failure rate per angle, from logs.
    - depth: verifier pass rate; % load-bearing claims at high confidence; BUDGET-CAPPED count.

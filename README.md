@@ -24,7 +24,11 @@ error), the S6 depth stats, the still-unexercised paths, and the **benchmark
 seed** — lives in
 [`docs/m2-live-run-notes.md`](docs/m2-live-run-notes.md). **Prompt 14 must
 read that file** (with [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md))
-— it is the prompt-iteration evidence and the seed for `benchmarks/`.
+— it is the prompt-iteration evidence — and
+[`docs/benchmark-seeds.md`](docs/benchmark-seeds.md), which pre-authors all
+four benchmark specs from the two live runs so Prompt 14 leaves no
+TODO-USER placeholders (its step 1 has been updated accordingly in the
+build guide).
 
 The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
 the run above), from `deeper new` to a citation-linked decision report, and

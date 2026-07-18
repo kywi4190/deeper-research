@@ -12,6 +12,8 @@ complete state of a run — inspectable, diffable, resumable.
 - `docs/m1-live-run-notes.md`, `docs/m2-live-run-notes.md` — live-run triage
   findings and the benchmark seed; required reading for Prompt 14 (eval) and
   ongoing prompt iteration.
+- `docs/benchmark-seeds.md` — pre-authored content for the four Prompt-14
+  benchmark specs (transcribed verbatim; no TODO-USER placeholders).
 - `src/deeper/schemas/` — Pydantic artifact models (stage contracts).
 - `src/deeper/agents_runtime/` — SDK dispatch, mock mode, enforcement hooks, cost accounting.
 - `src/deeper/stages/` — per-stage logic S0–S8.
