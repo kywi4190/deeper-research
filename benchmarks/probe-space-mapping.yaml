@@ -1,0 +1,77 @@
+# Benchmark: the M2 live run's question — the design's "one where I know
+# ground truth" shape; doubles as the personal decision already run end-to-end.
+# Content transcribed from docs/benchmark-seeds.md (seed 1); the organic vs
+# human-added distinction on reference angles is load-bearing for the breadth
+# metric's practitioner-obvious-miss check (M2 notes F3).
+id: probe-space-mapping
+question: >-
+  Map the space of first hands-on AI/ML research 'probe' projects runnable
+  over the next few weeks (evenings/weekends, ~3-4 weekends each), and
+  recommend which to run first — where the chosen first probe must do double
+  duty: serve as an instrumented diagnostic on the user's own
+  research-direction uncertainty, and produce a linkable artifact that
+  seeds/aligns with the undergraduate research project he will propose to CU
+  Boulder faculty this fall.
+type: personal-decision-known-ground-truth
+profile: standard
+fixtures: >-
+  The completed run runs/2026-07-13-map-the-space-of-first-hands-on-ai-ml-re
+  (kept locally, gitignored) — its brief.md / destination.md /
+  preferences.yaml are reusable as S0 fixtures; the full workspace is the
+  comparison artifact.
+reference_angles:
+  - id: mechanistic-interpretability
+  - id: from-scratch-build
+  - id: paper-reproduction
+  - id: empirical-phenomenon-study
+  - id: theory-proof-note
+  - id: theory-empirics-verification
+  - id: fine-tuning-adaptation
+  - id: rl-probe
+  - id: eval-artifact-construction
+  - id: explainer-exposition
+  - id: open-source-contribution
+  - id: competition-leaderboard
+  - id: curriculum-anchored-extension
+  - id: repurpose-existing-work
+  - id: diagnostic-sampler
+  - id: llm-agent-systems-build
+    provenance: human-added
+    practitioner_obvious: true
+    note: >-
+      Added by the human at Gate A of the M2 run (notes F3): all five personas
+      shared the frame "probe = study/train/adapt a model"; none produced
+      systems-composed-around-a-model. A fresh run's map is scored on
+      producing this region WITHOUT human help — the practitioner-obvious-miss
+      test case.
+ground_truth: >-
+  User's withheld prior: expected winner = a from-scratch nanoGPT fork test
+  with compression framing (engineered to measure the build/understand axis
+  by revealed choice at a designed fork); grokking/induction-heads
+  interpretability as understand-side runner-up. Actual M2 outcome: the fork
+  test was never carded (option-level scouting miss — "compression" appears
+  in zero cards; M2 notes Trap 2 verdict); winner
+  relu-depth-width-expressivity (theory proof note), interp probes #2/#3,
+  robust across the full sensitivity sweep. Whether the fork-test prior or
+  the theory-side answer is right is the USER'S adjudication, not a settled
+  fact — the eval records both, it never settles them.
+option_checks:
+  - id: compression-framed-fork-test
+    description: >-
+      A from-scratch nanoGPT fork test with compression framing — the
+      withheld expected winner. The M2 Trap-2 verdict: no scout carded it;
+      the nearest neighbors are plain nanoGPT builds, which screened
+      mid-field and were cut honestly by the finalist cap.
+    evidence_terms:
+      - compression
+    expectation: >-
+      A maximally broad scouting pass should card a compression-framed
+      fork-test option; plain nanoGPT builds without the fork/compression
+      mechanism do not count.
+cost_calibration: >-
+  Standard profile: S0-S1 ~ $7.04, S0-S4 ~ $34.27, complete ~ $110.43.
+baseline_file: baselines/probe-space-mapping.md
+notes: >-
+  Frontier/speculative framings are expected to be under-covered at standard
+  (no horizon-scanner in the 5-persona ensemble) — a horizon-shaped miss is
+  expected, not a regression.

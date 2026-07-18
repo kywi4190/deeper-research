@@ -109,7 +109,8 @@
         "S5",
         "S6",
         "S7",
-        "S8"
+        "S8",
+        "EVAL"
       ],
       "title": "Stage",
       "type": "string"

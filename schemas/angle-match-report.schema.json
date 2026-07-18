@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "AngleMatch": {
+      "additionalProperties": false,
+      "description": "The judge's verdict on one reference angle: which candidate angle (if\nany) covers substantially the same solution region.",
+      "properties": {
+        "reference_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Reference Id",
+          "type": "string"
+        },
+        "matched_candidate_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The candidate angle covering this reference region, or null when no candidate does (a breadth miss).",
+          "title": "Matched Candidate Id"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id",
+        "rationale"
+      ],
+      "title": "AngleMatch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The eval-judge's output: every reference angle adjudicated exactly once,\nplus the candidate angles that matched no reference (novel coverage \u2014\ncandidate additions to the union, not errors).",
+  "properties": {
+    "matches": {
+      "items": {
+        "$ref": "#/$defs/AngleMatch"
+      },
+      "minItems": 1,
+      "title": "Matches",
+      "type": "array"
+    },
+    "novel_candidate_ids": {
+      "description": "Candidate angles that match no reference angle.",
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "title": "Novel Candidate Ids",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "matches"
+  ],
+  "title": "AngleMatchReport",
+  "type": "object"
+}

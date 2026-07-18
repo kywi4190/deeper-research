@@ -1,0 +1,26 @@
+# Benchmark: a real, live decision derived from the M2 run's own
+# second-order-effects finding — probe #1 naturally narrows faculty targeting,
+# and the brief says targeting must NOT narrow at the input stage. Not yet
+# run. Content transcribed from docs/benchmark-seeds.md (seed 3).
+id: faculty-targeting-decision
+question: >-
+  Given a completed first research probe (a scoped theory/proof-note
+  artifact) and an early-August outreach deadline: decide the
+  faculty-targeting strategy for the CU Boulder undergraduate research
+  proposal — target theory/learning-theory labs aligned with probe #1's
+  artifact, target interpretability/empirics labs to counterweight it, or
+  stay subfield-open and filter on rigor + undergrad track record only — and
+  recommend how many faculty to approach in the first wave.
+type: personal-decision
+profile: quick
+fixtures: null
+reference_angles: []
+ground_truth: null
+option_checks: []
+cost_calibration: null
+baseline_file: baselines/faculty-targeting-decision.md
+notes: >-
+  Quick profile deliberately (it is a bounded decision, not a mapping
+  question). No reference angle union yet — the first run of this question
+  seeds it. No ground truth — score on the property metrics only (breadth,
+  informedness, quality, depth, anti-overfit).

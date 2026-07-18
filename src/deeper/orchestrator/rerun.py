@@ -34,6 +34,9 @@ STAGE_ARTIFACTS: dict[Stage, tuple[str, ...]] = {
     Stage.S6: ("dossiers",),
     Stage.S7: ("tournament",),
     Stage.S8: ("report",),
+    # Not a pipeline stage — listed so any invalidation also deletes the run's
+    # eval reports, which are stale the moment upstream artifacts change.
+    Stage.EVAL: ("eval",),
 }
 
 # Directory skeleton to restore after deleting a directory-owned subtree, so the
@@ -77,6 +80,11 @@ def _delete(workspace: Workspace, relpath: str) -> bool:
 def invalidate(workspace: Workspace, stage: Stage, angle: str | None = None) -> list[str]:
     """Invalidate `stage`'s outputs (angle-scoped for S3) and everything
     downstream; point the run back at `stage`; commit. Returns what was removed."""
+    if stage is Stage.EVAL:
+        raise RerunError(
+            "EVAL is not a pipeline stage — re-run `deeper eval <run>` to refresh "
+            "the eval report instead"
+        )
     if angle is not None and stage is not Stage.S3:
         raise RerunError("--angle only applies to --stage S3 (per-angle scout outputs)")
     angle_id = _resolve_angle(workspace, angle) if angle is not None else None

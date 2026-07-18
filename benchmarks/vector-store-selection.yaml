@@ -1,0 +1,38 @@
+# Benchmark: the M1 live run's question — the technical-selection shape.
+# Content transcribed from docs/benchmark-seeds.md (seed 2). The reference
+# union is the M1 run's post-Gate-A map (the 41 -> 12 prune).
+id: vector-store-selection
+question: >-
+  Which vector store should a solo developer adopt for a local-first personal
+  RAG assistant on Windows (~1M chunks, Python, no cloud, low-maintenance
+  hobby project)?
+type: technical-selection
+profile: quick
+fixtures: >-
+  The M1 run runs/2026-07-07-which-vector-store-should-a-solo-develop (kept
+  locally; PRE-M2 artifact formats — use for the angle union and qualitative
+  comparison, do not expect current schemas to load every artifact).
+reference_angles:
+  - id: embedded-purpose-built-vector-db
+  - id: embedded-general-db-vector-extension
+  - id: server-dbms-vector-extension
+  - id: local-server-vector-db
+  - id: bare-ann-index-library
+  - id: exact-brute-force-search
+  - id: hybrid-lexical-vector-search
+  - id: pure-python-no-build-toolchain
+  - id: ephemeral-rebuild-from-source
+  - id: turnkey-personal-ai-appliance
+  - id: hand-rolled-minimal-dependency-index
+  - id: lexical-only-retrieval
+ground_truth: >-
+  Partial. M1 ran S0-S5 only (kernel milestone): there is an audited
+  shortlist with kill receipts but no tournament winner. The M1 strategic
+  notes are quality anchors a good run should rediscover: Windows-wheel
+  availability as a rubric weight, export-format as abandonment insurance,
+  and the "~1M vectors is a few GB — scale reward over-weights scale-solving
+  engineering" reframe.
+option_checks: []
+cost_calibration: null
+baseline_file: baselines/vector-store-selection.md
+notes: null

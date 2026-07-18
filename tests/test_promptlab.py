@@ -46,6 +46,7 @@ EXPECTED_ROLES = {
     "frame-checker",
     "judge",
     "synthesist",
+    "eval-judge",  # design §10 — the eval harness's breadth matcher, not a pipeline stage
 }
 REQUIRED_META_KEYS = {"role", "stage", "model_class", "output_schemas", "inputs", "research"}
 CONTRACT_SECTIONS = ["# OBJECTIVE", "# OUTPUT FORMAT", "# TOOL & SOURCE GUIDANCE", "# BOUNDARIES"]

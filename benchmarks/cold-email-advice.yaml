@@ -1,0 +1,26 @@
+# Benchmark: the open-advice shape, grounded in the M2 run's own evidence
+# trail (the cold-email evidence-norm claims in the implicit-bias-max-margin
+# dossier, one of which the verifier contradicted — the pipeline has already
+# touched this question's evidence base once, badly). Not yet run. Content
+# transcribed from docs/benchmark-seeds.md (seed 4).
+id: cold-email-advice
+question: >-
+  How should a CS + applied-math undergraduate approach cold-emailing faculty
+  about joining undergraduate research — timing relative to the semester,
+  what evidence/artifacts to attach or link, how to frame prior self-directed
+  work, and how many emails to send — when the goal is a research position
+  with a rigor-focused advisor?
+type: open-advice
+profile: quick
+fixtures: null
+reference_angles: []
+ground_truth: null
+option_checks: []
+cost_calibration: null
+baseline_file: baselines/cold-email-advice.md
+notes: >-
+  No reference union yet (first run seeds it); no ground truth — property
+  metrics only. Note for the judge of any future run: the M2 run's
+  contradicted claim (cold-email evidence norms — "attach vs. don't attach"
+  sources disagree) is a known live disagreement in the evidence base. A good
+  run should surface it as residual uncertainty, not resolve it by fiat.

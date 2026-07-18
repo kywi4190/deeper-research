@@ -46,6 +46,26 @@ from .dossier import (
     VerificationReport,
     VerificationResult,
 )
+from .evaluation import (
+    AngleMatch,
+    AngleMatchReport,
+    AntiOverfitEval,
+    BaselineEval,
+    BenchmarkSpec,
+    BreadthEval,
+    DepthEval,
+    DepthRow,
+    EvalReport,
+    InformednessEval,
+    InformednessRow,
+    InversionPair,
+    OptionCheck,
+    OptionCheckResult,
+    QualityEval,
+    QualityRow,
+    ReferenceAngle,
+    ReferenceProvenance,
+)
 from .export import ARTIFACT_REGISTRY, export_all
 from .gates import (
     AngleAddition,
@@ -183,6 +203,25 @@ __all__ = [
     "VerificationResult",
     # S8 report
     "DecisionReport",
+    # evaluation (design §10)
+    "AngleMatch",
+    "AngleMatchReport",
+    "AntiOverfitEval",
+    "BaselineEval",
+    "BenchmarkSpec",
+    "BreadthEval",
+    "DepthEval",
+    "DepthRow",
+    "EvalReport",
+    "InformednessEval",
+    "InformednessRow",
+    "InversionPair",
+    "OptionCheck",
+    "OptionCheckResult",
+    "QualityEval",
+    "QualityRow",
+    "ReferenceAngle",
+    "ReferenceProvenance",
     # S7 tournament
     "CheckFinding",
     "FrameCheck",

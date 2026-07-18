@@ -506,6 +506,147 @@ def doctor() -> None:
         raise typer.Exit(code=1)
 
 
+@app.command("eval")
+def eval_cmd(
+    run: Annotated[
+        str | None, typer.Argument(help="Run to evaluate (omit when using --compare).")
+    ] = None,
+    against: Annotated[
+        str | None,
+        typer.Option(
+            "--against",
+            help="Benchmark spec (an id under benchmarks/, or a path) whose reference "
+            "union the breadth metric scores against.",
+        ),
+    ] = None,
+    compare: Annotated[
+        tuple[str, str] | None,
+        typer.Option(
+            "--compare",
+            help="Two runs whose persisted eval reports to diff (before/after a "
+            "knob or prompt change). Run `deeper eval <run>` on each first.",
+        ),
+    ] = None,
+    compare_baseline: Annotated[
+        bool,
+        typer.Option(
+            "--compare-baseline",
+            help="Also judge the benchmark's pasted plain-Deep-Research answer "
+            "against the same reference union (requires --against and a pasted "
+            "baseline file).",
+        ),
+    ] = False,
+) -> None:
+    """Score a completed run on the design-§10 property metrics (breadth,
+    informedness, quality, depth, anti-overfit) and write eval/eval-report.md
+    — or, with --compare, diff two runs' persisted reports."""
+    from deeper.eval import (
+        EVAL_MD_PATH,
+        EVAL_YAML_PATH,
+        EvalError,
+        compare_path,
+        load_benchmark,
+        render_compare,
+    )
+    from deeper.schemas import EvalReport
+
+    if compare is not None:
+        if run is not None or against is not None or compare_baseline:
+            raise _fail("--compare takes exactly two runs and no other arguments")
+        ws_a, ws_b = _open_run(compare[0]), _open_run(compare[1])
+        reports = []
+        for ws in (ws_a, ws_b):
+            try:
+                reports.append(ws.read_artifact(EVAL_YAML_PATH, EvalReport))
+            except WorkspaceError as err:
+                raise _fail(
+                    f"{ws.run_id} has no persisted eval report ({err}); "
+                    f"run `deeper eval {ws.root}` first"
+                ) from err
+        markdown = render_compare(reports[0], reports[1])
+        target = ws_b.path(compare_path(reports[0].run_id))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(markdown, encoding="utf-8", newline="\n")
+        ws_b.commit(f"deeper eval: compared against {reports[0].run_id}")
+        console.print(markdown, markup=False, soft_wrap=True)
+        console.print(f"\ncompare report written to {target}", markup=False, soft_wrap=True)
+        return
+
+    if run is None:
+        raise _fail("give a run to evaluate, or --compare <runA> <runB>")
+    if compare_baseline and against is None:
+        raise _fail("--compare-baseline needs --against <benchmark> for the reference union")
+    workspace = _open_run(run)
+    _configure_logging(workspace)
+    spec = spec_path = None
+    if against is not None:
+        try:
+            spec, spec_path = load_benchmark(against)
+        except EvalError as err:
+            raise _fail(str(err)) from err
+
+    async def _main():
+        from deeper.eval import evaluate_run
+
+        return await evaluate_run(
+            workspace,
+            spec,
+            spec_path,
+            include_baseline=compare_baseline,
+            emit=_emit,
+        )
+
+    from deeper.agents_runtime import (
+        AgentDispatchFailed,
+        AgentOutputInvalid,
+        SpendCapExceeded,
+        UsageLimitReached,
+    )
+
+    try:
+        eval_report = asyncio.run(_main())
+    except EvalError as err:
+        raise _fail(str(err)) from err
+    except (
+        AgentDispatchFailed,
+        AgentOutputInvalid,
+        SpendCapExceeded,
+        UsageLimitReached,
+        BillingAuthError,
+    ) as err:
+        # Judge dispatch failures never touch the run's pipeline state — the
+        # eval writes nothing partial; report the cause and stop. A spend-cap
+        # refusal means the completed run sits at its cap: raise max_spend_usd
+        # in the run's config.yaml to fund the judge.
+        raise _fail(f"eval judge dispatch failed: {err}") from err
+
+    console.print(f"eval report written to {workspace.path(EVAL_MD_PATH)}", soft_wrap=True)
+    console.print(f"structured report at   {workspace.path(EVAL_YAML_PATH)}", soft_wrap=True)
+    headline = []
+    if eval_report.breadth is not None and eval_report.breadth.reference_total:
+        b = eval_report.breadth
+        headline.append(f"breadth {len(b.hits)}/{b.reference_total}")
+        if b.practitioner_obvious_misses:
+            headline.append(f"OBVIOUS MISSES {len(b.practitioner_obvious_misses)}")
+    if eval_report.informedness is not None:
+        sp = eval_report.informedness.spearman
+        headline.append(f"informedness {'n/a' if sp is None else f'{sp:.2f}'}")
+    if eval_report.quality is not None:
+        headline.append(f"revision rate {eval_report.quality.revision_rate:.0%}")
+    if eval_report.depth is not None:
+        headline.append(f"pass rate {eval_report.depth.overall_pass_rate:.0%}")
+    if eval_report.anti_overfit is not None:
+        headline.append(
+            f"{len(eval_report.anti_overfit.inversions)} inversion(s)"
+            + ("" if eval_report.anti_overfit.inversions_steelmanned else " UNSTEELMANNED")
+        )
+    if headline:
+        console.print("headline: " + " · ".join(headline), markup=False, soft_wrap=True)
+    if eval_report.skipped:
+        console.print("skipped: " + "; ".join(eval_report.skipped), markup=False, soft_wrap=True)
+    console.print(f"eval judge spend: ${eval_report.eval_usd:.4f}")
+
+
 @app.command()
 def report(run: RunArg) -> None:
     """The decision report's path plus a terminal summary: winner, both

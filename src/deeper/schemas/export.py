@@ -17,6 +17,7 @@ from .angles import AngleMap, CartographerReport, CoverageReport
 from .base import ArtifactModel
 from .common import ContradictionLedger, SourceRecord
 from .dossier import DeepDiveRoundLog, Dossier, VerificationReport
+from .evaluation import AngleMatchReport, BenchmarkSpec, EvalReport
 from .gates import GateADecision, GateBDecision, GateCDecision
 from .intake import Brief, DestinationModel, Preferences
 from .options import CardCritique, OptionCardSet
@@ -54,6 +55,9 @@ ARTIFACT_REGISTRY: dict[str, type[ArtifactModel]] = {
     "source-record": SourceRecord,
     "contradiction-ledger": ContradictionLedger,
     "run-state": RunState,
+    "benchmark-spec": BenchmarkSpec,
+    "angle-match-report": AngleMatchReport,
+    "eval-report": EvalReport,
 }
 
 # src/deeper/schemas/export.py -> repo root / schemas

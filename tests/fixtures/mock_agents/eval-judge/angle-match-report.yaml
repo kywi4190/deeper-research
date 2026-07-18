@@ -1,0 +1,29 @@
+# Mock eval-judge report, coherent with the senior-project scenario's 8-angle
+# merged map and the tests' `mock-bench` benchmark spec: two reference angles
+# hit, one practitioner-obvious reference missed (mirroring the M2 F3 shape),
+# and every unmatched run angle listed as novel coverage.
+matches:
+  - reference_id: interpretability-research
+    matched_candidate_id: interpretability-research
+    rationale: >-
+      Same region under the same name: mechanistic interpretability of trained
+      models, including the safety-auditing sub-angle.
+  - reference_id: evaluation-science
+    matched_candidate_id: evaluation-science
+    rationale: >-
+      The candidate's definition names benchmarks, metrics, and eval
+      methodology — the reference region exactly.
+  - reference_id: llm-agent-systems-build
+    matched_candidate_id: null
+    rationale: >-
+      No candidate covers systems composed AROUND a model (agent scaffolds,
+      memory, tool use); every candidate frames a probe as studying, training,
+      or adapting a model itself.
+novel_candidate_ids:
+  - training-efficiency
+  - small-model-science
+  - applied-domain-collaboration
+  - research-tooling
+  - negative-results-science
+  - supervisor-pipeline
+notes: null

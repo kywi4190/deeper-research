@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "OptionCheck": {
+      "additionalProperties": false,
+      "description": "Option-level ground truth: a specific option the run should have carded.\nThe M2 Trap-2 divergence was an option-level scouting miss the angle-level\nmetric alone cannot catch ('compression' appeared in zero cards), so specs\nthat know a ground-truth option carry a mechanical carded-at-all check.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence_terms": {
+          "description": "Case-insensitive substrings searched over every option card's text; any match marks the option as plausibly carded (candidates are listed for the human to confirm).",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Terms",
+          "type": "array"
+        },
+        "expectation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What the withheld prior says should happen \u2014 recorded, never settled by the eval (adjudication stays the user's).",
+          "title": "Expectation"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "evidence_terms"
+      ],
+      "title": "OptionCheck",
+      "type": "object"
+    },
+    "ReferenceAngle": {
+      "additionalProperties": false,
+      "description": "One angle of a benchmark's reference union (design \u00a710 breadth: 'built\nonce per benchmark question by an exhaustive manual + multi-tool pass').",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ReferenceProvenance",
+          "default": "organic"
+        },
+        "practitioner_obvious": {
+          "default": false,
+          "description": "Missing this angle draws the design's explicit penalty flag: 'penalty for missing any angle a domain practitioner would consider obvious'.",
+          "title": "Practitioner Obvious",
+          "type": "boolean"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ReferenceAngle",
+      "type": "object"
+    },
+    "ReferenceProvenance": {
+      "description": "How a reference angle entered the benchmark's union. The distinction is\nload-bearing: a HUMAN_ADDED angle was missed by the original run's ensemble\nand added at Gate A \u2014 a fresh run is scored on producing it WITHOUT help\n(the 'practitioner-obvious miss' test case, M2 notes F3).",
+      "enum": [
+        "organic",
+        "human-added"
+      ],
+      "title": "ReferenceProvenance",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One benchmarks/<id>.yaml question spec (design \u00a710's 4-6 question set).",
+  "properties": {
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "question": {
+      "description": "The goal string, verbatim.",
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "type": {
+      "description": "Question shape tag (design \u00a710): personal-decision, technical-selection, open-advice \u2014 suffixed '-known-ground-truth' where the user holds a withheld prior.",
+      "minLength": 1,
+      "title": "Type",
+      "type": "string"
+    },
+    "profile": {
+      "description": "Run profile the benchmark is calibrated for.",
+      "minLength": 1,
+      "title": "Profile",
+      "type": "string"
+    },
+    "fixtures": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Where reusable run artifacts live (kept locally, gitignored) and any caveats about their formats.",
+      "title": "Fixtures"
+    },
+    "reference_angles": {
+      "description": "The reference angle union; empty until a first run seeds it.",
+      "items": {
+        "$ref": "#/$defs/ReferenceAngle"
+      },
+      "title": "Reference Angles",
+      "type": "array"
+    },
+    "ground_truth": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "What is actually known vs what remains the user's adjudication \u2014 recorded exactly, never settled by the eval.",
+      "title": "Ground Truth"
+    },
+    "option_checks": {
+      "items": {
+        "$ref": "#/$defs/OptionCheck"
+      },
+      "title": "Option Checks",
+      "type": "array"
+    },
+    "cost_calibration": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Observed spend checkpoints for this question/profile.",
+      "title": "Cost Calibration"
+    },
+    "baseline_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Path (relative to this spec) where a plain Deep Research answer to the same question can be pasted for `deeper eval --compare-baseline`.",
+      "title": "Baseline File"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "id",
+    "question",
+    "type",
+    "profile"
+  ],
+  "title": "BenchmarkSpec",
+  "type": "object"
+}

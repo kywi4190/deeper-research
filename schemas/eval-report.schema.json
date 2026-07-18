@@ -1,0 +1,646 @@
+{
+  "$defs": {
+    "AntiOverfitEval": {
+      "additionalProperties": false,
+      "description": "Design \u00a710 anti-overfit: do the scoreboards differ, and did the\ntournament examine every inversion? Asserted from tournament artifacts.",
+      "properties": {
+        "preference_slot_weight": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Preference Slot Weight",
+          "type": "number"
+        },
+        "boards_differ": {
+          "description": "Any option ranks differently on the two boards.",
+          "title": "Boards Differ",
+          "type": "boolean"
+        },
+        "inversions": {
+          "items": {
+            "$ref": "#/$defs/InversionPair"
+          },
+          "title": "Inversions",
+          "type": "array"
+        },
+        "inversions_steelmanned": {
+          "description": "Every inversion-demoted option has a rank-inversion steelman in tournament/ \u2014 vacuously true when there are no inversions.",
+          "title": "Inversions Steelmanned",
+          "type": "boolean"
+        },
+        "missing_steelmen": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Missing Steelmen",
+          "type": "array"
+        }
+      },
+      "required": [
+        "preference_slot_weight",
+        "boards_differ",
+        "inversions_steelmanned"
+      ],
+      "title": "AntiOverfitEval",
+      "type": "object"
+    },
+    "BaselineEval": {
+      "additionalProperties": false,
+      "description": "The A/B scaffold: a plain Deep Research answer's angle coverage against\nthe same reference union, scored by the same judge (design \u00a710: the system\nmust visibly beat it \u2014 if it doesn't, the eval names the stage to fix).",
+      "properties": {
+        "source_file": {
+          "minLength": 1,
+          "title": "Source File",
+          "type": "string"
+        },
+        "hits": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Hits",
+          "type": "array"
+        },
+        "misses": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Misses",
+          "type": "array"
+        },
+        "practitioner_obvious_misses": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Practitioner Obvious Misses",
+          "type": "array"
+        },
+        "novel_angles": {
+          "description": "Angles the baseline answer covers that are outside the union.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Novel Angles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_file"
+      ],
+      "title": "BaselineEval",
+      "type": "object"
+    },
+    "BreadthEval": {
+      "additionalProperties": false,
+      "description": "Design \u00a710 breadth: distinct-angle count vs the reference union.",
+      "properties": {
+        "run_angle_count": {
+          "minimum": 0,
+          "title": "Run Angle Count",
+          "type": "integer"
+        },
+        "reference_total": {
+          "minimum": 0,
+          "title": "Reference Total",
+          "type": "integer"
+        },
+        "hits": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Hits",
+          "type": "array"
+        },
+        "misses": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Misses",
+          "type": "array"
+        },
+        "practitioner_obvious_misses": {
+          "description": "The design's explicit penalty flag.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Practitioner Obvious Misses",
+          "type": "array"
+        },
+        "matched": {
+          "description": "Reference angle id -> matching run angle id.",
+          "patternProperties": {
+            "^[a-z0-9][a-z0-9-]*$": {
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            }
+          },
+          "title": "Matched",
+          "type": "object"
+        },
+        "novel_angles": {
+          "description": "Run angles matching no reference \u2014 candidate union additions.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Novel Angles",
+          "type": "array"
+        },
+        "option_checks": {
+          "items": {
+            "$ref": "#/$defs/OptionCheckResult"
+          },
+          "title": "Option Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_angle_count",
+        "reference_total"
+      ],
+      "title": "BreadthEval",
+      "type": "object"
+    },
+    "DepthEval": {
+      "additionalProperties": false,
+      "description": "Design \u00a710 depth: verifier pass rate, load-bearing confidence, capped count.",
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DepthRow"
+          },
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        },
+        "overall_pass_rate": {
+          "description": "Verified / sampled across every verification report.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Overall Pass Rate",
+          "type": "number"
+        },
+        "load_bearing_high_pct": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Share of load-bearing claims at high confidence; null when no dossier carries a load-bearing claim.",
+          "title": "Load Bearing High Pct"
+        },
+        "budget_capped_count": {
+          "minimum": 0,
+          "title": "Budget Capped Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rows",
+        "overall_pass_rate",
+        "budget_capped_count"
+      ],
+      "title": "DepthEval",
+      "type": "object"
+    },
+    "DepthRow": {
+      "additionalProperties": false,
+      "properties": {
+        "option_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "pass_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Pass Rate",
+          "type": "number"
+        },
+        "load_bearing_total": {
+          "minimum": 0,
+          "title": "Load Bearing Total",
+          "type": "integer"
+        },
+        "load_bearing_high": {
+          "minimum": 0,
+          "title": "Load Bearing High",
+          "type": "integer"
+        },
+        "budget_capped": {
+          "title": "Budget Capped",
+          "type": "boolean"
+        },
+        "rounds": {
+          "minimum": 1,
+          "title": "Rounds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "option_id",
+        "pass_rate",
+        "load_bearing_total",
+        "load_bearing_high",
+        "budget_capped",
+        "rounds"
+      ],
+      "title": "DepthRow",
+      "type": "object"
+    },
+    "InformednessEval": {
+      "additionalProperties": false,
+      "description": "Design \u00a710 informedness: did budget go where the finalists came from \u2014\nwithout collapsing the floor?",
+      "properties": {
+        "spearman": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Rank correlation between allocation units and post-hoc angle value; null when either side has no variance (e.g. floor-dominated allocations \u2014 see floor_share_pct).",
+          "title": "Spearman"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InformednessRow"
+          },
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        },
+        "floor": {
+          "minimum": 0,
+          "title": "Floor",
+          "type": "integer"
+        },
+        "floor_compliant": {
+          "description": "Every allocated angle received at least the floor.",
+          "title": "Floor Compliant",
+          "type": "boolean"
+        },
+        "floor_share_pct": {
+          "description": "Share of the budget consumed by the exploration floor (n*floor/B). Near 100 means gamma was inert (M2 notes F7).",
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Floor Share Pct",
+          "type": "number"
+        }
+      },
+      "required": [
+        "rows",
+        "floor",
+        "floor_compliant",
+        "floor_share_pct"
+      ],
+      "title": "InformednessEval",
+      "type": "object"
+    },
+    "InformednessRow": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "relevance_prior": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Relevance Prior",
+          "type": "number"
+        },
+        "units": {
+          "minimum": 0,
+          "title": "Units",
+          "type": "integer"
+        },
+        "finalist_count": {
+          "minimum": 0,
+          "title": "Finalist Count",
+          "type": "integer"
+        },
+        "value_share": {
+          "description": "Share of finalists sourced from this angle.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Share",
+          "type": "number"
+        }
+      },
+      "required": [
+        "angle_id",
+        "relevance_prior",
+        "units",
+        "finalist_count",
+        "value_share"
+      ],
+      "title": "InformednessRow",
+      "type": "object"
+    },
+    "InversionPair": {
+      "additionalProperties": false,
+      "properties": {
+        "demoted": {
+          "description": "Wins on the destination-only board.",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Demoted",
+          "type": "string"
+        },
+        "promoted": {
+          "description": "Wins on the preference-adjusted board.",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Promoted",
+          "type": "string"
+        }
+      },
+      "required": [
+        "demoted",
+        "promoted"
+      ],
+      "title": "InversionPair",
+      "type": "object"
+    },
+    "OptionCheckResult": {
+      "additionalProperties": false,
+      "description": "One option-level ground-truth check's outcome.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "carded": {
+          "description": "Any card's text matched an evidence term.",
+          "title": "Carded",
+          "type": "boolean"
+        },
+        "matching_card_ids": {
+          "description": "Candidate cards for the human to confirm \u2014 a term match is evidence, not proof, that the ground-truth option was carded.",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Matching Card Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "carded"
+      ],
+      "title": "OptionCheckResult",
+      "type": "object"
+    },
+    "QualityEval": {
+      "additionalProperties": false,
+      "description": "Design \u00a710 quality: critic revision rate + schema-failure rate \u2014 falling\nover time = prompts improving.",
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/QualityRow"
+          },
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        },
+        "revision_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Revision Rate",
+          "type": "number"
+        },
+        "schema_retry_total": {
+          "minimum": 0,
+          "title": "Schema Retry Total",
+          "type": "integer"
+        },
+        "schema_retries_by_stage": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Schema Retries By Stage",
+          "type": "object"
+        }
+      },
+      "required": [
+        "rows",
+        "revision_rate",
+        "schema_retry_total"
+      ],
+      "title": "QualityEval",
+      "type": "object"
+    },
+    "QualityRow": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_id": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Angle Id",
+          "type": "string"
+        },
+        "revised": {
+          "description": "The critique reported fixable issues (S3's rule).",
+          "title": "Revised",
+          "type": "boolean"
+        },
+        "redundancy_pct": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Redundancy Pct",
+          "type": "number"
+        },
+        "missed_options": {
+          "minimum": 0,
+          "title": "Missed Options",
+          "type": "integer"
+        },
+        "schema_retries": {
+          "description": "Schema/coherence retries in this angle's context.",
+          "minimum": 0,
+          "title": "Schema Retries",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "angle_id",
+        "revised",
+        "redundancy_pct",
+        "missed_options",
+        "schema_retries"
+      ],
+      "title": "QualityRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "eval/eval-report.yaml \u2014 the machine-readable eval; the .md render is the\nhuman view. A metric section is null when the run has not produced its\ninput artifacts yet (a partial run evaluates partially, with the gaps\nnamed in `skipped`).",
+  "properties": {
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "profile": {
+      "minLength": 1,
+      "title": "Profile",
+      "type": "string"
+    },
+    "benchmark_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark Id"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "breadth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BreadthEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "informedness": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InformednessEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "quality": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QualityEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "depth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DepthEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "anti_overfit": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AntiOverfitEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "baseline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BaselineEval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "spend_by_stage": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Spend By Stage",
+      "type": "object"
+    },
+    "total_usd": {
+      "minimum": 0,
+      "title": "Total Usd",
+      "type": "number"
+    },
+    "eval_usd": {
+      "description": "What this eval's own judge dispatches cost (stage EVAL).",
+      "minimum": 0,
+      "title": "Eval Usd",
+      "type": "number"
+    },
+    "skipped": {
+      "description": "Why any null metric could not be computed.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Skipped",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "run_id",
+    "profile",
+    "generated_at",
+    "total_usd",
+    "eval_usd"
+  ],
+  "title": "EvalReport",
+  "type": "object"
+}

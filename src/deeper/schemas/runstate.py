@@ -25,6 +25,10 @@ class Stage(StrEnum):
     S6 = "S6"
     S7 = "S7"
     S8 = "S8"
+    # Not a pipeline node: the §10 eval harness's ledger/contract stage, so
+    # judge invocations are cost-tracked honestly (never as a pipeline stage).
+    # RunState.stage never takes this value; rerun refuses it as a target.
+    EVAL = "EVAL"
 
 
 class RunStatus(StrEnum):

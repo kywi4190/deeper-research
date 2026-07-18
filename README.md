@@ -13,22 +13,28 @@ Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-g
 
 ## Current status
 
-**M2 complete, including its exit test**: one full standard-profile live run
+**M2 complete (including its exit test), and the M3 eval harness is built.**
+One full standard-profile live run
 (`2026-07-13-map-the-space-of-first-hands-on-ai-ml-re`, $110.43) worked all
 three gates for real and produced a citation-linked decision report with a
 clean pass over 105 claims. The complete triage for that run — findings 1–9
 (infrastructure, all addressed), the user's through-Gate-B findings F1–F12
 with post-run verdicts, the ground-truth divergence (the expected fork-test
 winner was never carded: an option-level scouting miss, not a scoring
-error), the S6 depth stats, the still-unexercised paths, and the **benchmark
-seed** — lives in
-[`docs/m2-live-run-notes.md`](docs/m2-live-run-notes.md). **Prompt 14 must
-read that file** (with [`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md))
-— it is the prompt-iteration evidence — and
-[`docs/benchmark-seeds.md`](docs/benchmark-seeds.md), which pre-authors all
-four benchmark specs from the two live runs so Prompt 14 leaves no
-TODO-USER placeholders (its step 1 has been updated accordingly in the
-build guide).
+error), the S6 depth stats, and the still-unexercised paths — lives in
+[`docs/m2-live-run-notes.md`](docs/m2-live-run-notes.md) (with
+[`docs/m1-live-run-notes.md`](docs/m1-live-run-notes.md)); it is the
+prompt-iteration evidence the eval loop consumes.
+
+**Prompt 14 has landed the measurement layer** (design §10, P10): four
+seeded benchmark specs in `benchmarks/` (transcribed from
+[`docs/benchmark-seeds.md`](docs/benchmark-seeds.md), no placeholders),
+`src/deeper/eval/` computing the five property metrics over any run's
+workspace, a Haiku-class `eval-judge` dispatched through the same agent
+runtime as the pipeline (mockable, cost-tracked under ledger stage `EVAL`),
+and `deeper eval` / `eval --compare` / `eval --compare-baseline` — see
+"Evaluation" below. The first real use is scoring the M2 run against
+`probe-space-mapping` and checking the numbers against the triage.
 
 The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
 the run above), from `deeper new` to a citation-linked decision report, and
@@ -137,10 +143,11 @@ state of a run.
 | `src/deeper/agents_runtime/` | SDK dispatch, mock mode, enforcement hooks, cost accounting | **built** |
 | `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S8 built** |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), Gate-C loop actions (`gate_c_loops.py`), the re-divergence mini-loop (`redivergence.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
+| `src/deeper/eval/` | Design-§10 measurement layer: pure metric math (`metrics.py`), benchmark loading (`benchmarks.py`), the eval-judge dispatch (`judge.py`), the per-run eval runner (`runner.py`), report/compare renders (`report.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–8 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor suites (943 tests) |
-| `benchmarks/` | Eval question specs | empty (Prompt 14) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor, eval suites (1019 tests) |
+| `benchmarks/` | Eval question specs + baseline-answer slots (`baselines/`) | **seeded — 4 specs** |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
 ## The schema layer
@@ -201,6 +208,9 @@ each model validates a single file.
 | `sources/` records | `SourceRecord` | any research agent | verifier, audit |
 | `ledger/contradictions.md` | `ContradictionLedger` | any detecting stage, via `contradictions.append_contradictions` | verifier, S8 |
 | `state.json` | `RunState` (`SpendEntry`) | orchestrator | orchestrator, CLI |
+| `benchmarks/<id>.yaml` (repo, not run) | `BenchmarkSpec` (`ReferenceAngle`, `OptionCheck`) | human (seeded from the live-run notes) | `deeper eval --against` |
+| (judge reply, not persisted) | `AngleMatchReport` | eval-judge | `eval.metrics.breadth` |
+| `eval/eval-report.yaml` (+ `.md` render) | `EvalReport` | `deeper eval` | the human; `eval --compare` |
 
 Notable schema-level invariants (each mirrors a design rule): allocation rows must sum
 exactly to the budget; anchored rubric levels must be exactly 1–5 and criterion
@@ -244,6 +254,7 @@ quarantine's exact allowlist) — both enforced by tests.
 | `frame-checker` | S7 | opus | `frame-check` |
 | `judge` | S7 | opus | `score-update-log` |
 | `synthesist` | S8 | opus | `decision-report` |
+| `eval-judge` | EVAL (the harness, not a pipeline stage) | haiku | `angle-match-report` |
 
 Design §6 names merger/rubric-builder/judge/frame-checker as Opus-class and
 cartographers/scouts/analysts/prosecutors as Sonnet-class; roles it leaves unlisted
@@ -348,7 +359,7 @@ violation, like a schema failure).
 **Mock mode** (`config.yaml mode: mock`, the default) substitutes only the network
 call: `MockDispatcher` renders canned fixtures from
 `tests/fixtures/mock_agents/<role>/<schema>[.<context>].yaml` (a coherent
-senior-project scenario covering all 18 roles, including per-round analyst
+senior-project scenario covering all 20 roles, including per-round analyst
 dossiers, deep-dive re-scores, verifier reports that exercise all three S6
 termination paths, and a tournament with an engineered rank inversion and
 frame-check gap) into the same marker+fenced-yaml
@@ -870,6 +881,7 @@ deeper resume <run>
 
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
+deeper eval <run> --against <benchmark>  # design-§10 property metrics (below)
 deeper report <run>
 #   the report's path + a terminal summary: winner (first decisive sentence,
 #   with a red DISSENT UNREBUTTED marker when it stands), both scoreboards
@@ -971,6 +983,89 @@ predates them; expect the quick estimate to shift after the first full live
 run and this table to be updated from its ledger. The caps are runaway
 guards, not targets: a spend-cap pause is cheap (resume with a higher cap
 continues exactly where it stopped).
+
+## Evaluation (design §10 — the measurement layer)
+
+You can't tune breadth/quality/depth knobs without measurement, so every
+prompt or knob change is judged by `deeper eval`, never by vibes (P10).
+
+**Running an eval:**
+
+```bash
+deeper eval <run>                                  # the four un-judged metrics
+deeper eval <run> --against probe-space-mapping    # + breadth vs the reference union
+deeper eval <run> --against probe-space-mapping --compare-baseline
+deeper eval --compare <runA> <runB>                # diff two persisted eval reports
+```
+
+`eval` writes `eval/eval-report.yaml` (machine-readable `EvalReport`) and
+`eval/eval-report.md` (the human view) into the run workspace, committed. A
+partial run evaluates partially — each metric a run hasn't earned yet is
+skipped with the reason named (an M1-shaped S0–S5 run still gets
+informedness and quality). The five metrics:
+
+- **Breadth** — the run's distinct-angle count vs the benchmark's reference
+  union. The semantic matching is the eval's only LLM call: the Haiku-class
+  `eval-judge` (`agents/eval-judge.md`) goes through the *same* dispatch
+  layer as every pipeline agent — schema-retried with a coherence callback,
+  every attempt ledgered under stage `EVAL`, fixture-answered in mock mode.
+  The report lists hits, misses, **practitioner-obvious misses** (the
+  design's penalty flag — e.g. `llm-agent-systems-build`, the angle the M2
+  ensemble missed and a human added at Gate A), and novel run angles
+  (candidate union additions). Where the spec carries option-level ground
+  truth (`option_checks`), a mechanical term scan over every option card
+  reports whether the option was carded at all — the M2 Trap-2 divergence
+  ("compression" in zero cards) is exactly the miss the angle-level metric
+  cannot see.
+- **Informedness** — Spearman rank correlation between allocation units and
+  post-hoc angle value (an angle's share of the finalists), with
+  floor-compliance and the **floor's budget share**: near 100% means γ was
+  inert (M2 F7: 16 angles × floor 2 consumed 32 of 40 units), and a
+  no-variance allocation reports `n/a`, not a fake 0.
+- **Quality** — critic revision rate per angle (computed with S3's own
+  `needs_revision` rule, so the metric cannot drift from the pipeline) plus
+  schema/coherence retry counts from the ledger, by stage and by angle —
+  falling over time = prompts improving. The raw causes stay in
+  `logs/retries/`. M2 baselines: revision rate 100% (F6), S3/S5 the retry
+  hotspots (12/8).
+- **Depth** — verifier pass rate (verified/sampled over all reports), the
+  share of load-bearing claims at high confidence, and the BUDGET-CAPPED
+  dossier count, per finalist and overall. M2 baseline: pass rates 33–91%,
+  zero capped.
+- **Anti-overfit** — asserted from the tournament artifacts: do the
+  destination-only and preference-adjusted boards differ, what are the rank
+  inversions (recomputed with the same `sensitivity.py` code S7 used), and
+  does every inversion-demoted option have a `rank-inversion` steelman on
+  file — missing steelmen are named.
+
+**Reading the report:** the markdown leads each section with the headline
+number, then the per-angle/per-finalist table. Bold uppercase markers
+(**PRACTITIONER-OBVIOUS MISSES**, **NOT CARDED**, **STEELMAN MISSING**,
+floor **VIOLATED**) are the things that demand action; everything else is
+trend data. The spend table and the eval's own judge cost close the report.
+
+**The A/B scaffold:** each benchmark has a slot under `benchmarks/baselines/`
+to paste a plain Deep Research answer to the same question.
+`--compare-baseline` has the same judge score that answer's angle coverage
+against the same reference union and prints the side-by-side — the system
+must visibly beat it to justify its cost, and when it doesn't, the miss
+lists name the stage to fix (angle misses → S1 cartography personas; carded
+misses → S3 scouts). A still-empty placeholder is refused loudly.
+
+**The tuning loop** (this is the ongoing M3 activity):
+
+1. `deeper eval <run> --against <benchmark>` — find the weak property.
+2. Edit the responsible `agents/*.md` prompt or config knob (γ, floor,
+   shortlist margin, stability Δ…) — one change at a time.
+3. Rerun the benchmark question on the **quick** profile.
+4. `deeper eval <new-run> --against <benchmark>`, then
+   `deeper eval --compare <old-run> <new-run>` — did the change move the
+   property it was aimed at, and did anything else regress? The compare
+   lands at `eval/compare-vs-<old>.md` in the new run.
+
+`deeper rerun` invalidates a run's `eval/` reports along with everything
+else — a stale eval can never masquerade as evidence. The four seeded specs
+and the spec format live in [`benchmarks/README.md`](benchmarks/README.md).
 
 ## How to test
 
@@ -1308,6 +1403,28 @@ canonical `Makefile` is used wherever GNU make is available.
   ledger their spend under S7 (the gate's preceding stage; `SpendEntry` has no
   gate stages) with `gate-c-feedback` / `challenge-*` / `redivergence*`
   contexts, so the audit trail still separates them.
+- **`Stage.EVAL` is a ledger/contract stage, not a pipeline node.** The §10
+  judge must be cost-tracked through the same `SpendEntry` machinery as every
+  agent, and `SpendEntry.stage`/`AgentContract.stage` are typed `Stage` — so
+  the enum gains an `EVAL` member that `RunState.stage` never takes, the
+  engine never dispatches on, and `deeper rerun` refuses as a target (with
+  the pointer to re-run `deeper eval` instead). Its one rerun-machinery role:
+  any invalidation also deletes the run's `eval/` subtree, because an eval
+  report is stale the moment upstream artifacts change.
+- **Option-level ground-truth checks extend §10's angle-level breadth.**
+  Design §10 measures breadth only against a reference *angle* union; the M2
+  ground-truth divergence was an option-level scouting miss inside a
+  correctly-mapped angle ("compression" appeared in zero cards), invisible
+  to that metric. Benchmark specs may therefore carry `option_checks` —
+  case-insensitive evidence terms scanned mechanically over every option
+  card, with matches listed as candidates for the human to confirm (a term
+  match is evidence, not proof). Adjudicating what the answer *should* have
+  been stays the user's; the check only answers "was it ever carded".
+- **The eval never settles ground truth.** Benchmark `ground_truth` fields
+  record the withheld prior, the actual outcome, and exactly what remains
+  the user's adjudication, verbatim from the live-run notes; the eval report
+  surfaces them but no metric scores "was the winner right" — per the M2
+  triage, that reading is the human's.
 
 ## Roadmap position
 
@@ -1330,11 +1447,16 @@ Following the phases in the build guide:
 - **Phase D — Evaluation & hardening (M3):** Prompt 13 (pre-live hardening:
   every M1 triage finding addressed, the failure-path audit — timeout,
   network, SDK, schema double-failure, usage limit — all pausing resumably,
-  ledger reconciliation asserted end-to-end) ✅ → Prompt 14 (benchmark evals)
-  next.
+  ledger reconciliation asserted end-to-end) ✅ → Prompt 14 (the eval
+  harness: 4 seeded benchmark specs, the five §10 property metrics, the
+  `eval-judge`, `deeper eval`/`--compare`/`--compare-baseline`) ✅ →
+  Prompt 15 (security/ops hardening) next.
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase D, Prompt 14 — the benchmark evals (`benchmarks/` question
-specs and the §10 metrics over them), plus a live probe at the plan-limit
-boundary to pin down exactly how the SDK surfaces the usage-limit condition
-(the detector is deliberately broad until then).**
+**Next: Phase D, Prompt 15 — hardening (the §11 mitigation audit: adversarial
+sanitizer fixtures, policy tests over agent tool scopes, contradiction-ledger
+surfacing in S8, structured JSONL logs, gate-fatigue config). Also worth
+doing soon: `deeper eval <the M2 run> --against probe-space-mapping` — the
+Prompt 14 verify step — and a live probe at the plan-limit boundary to pin
+down how the SDK surfaces the usage-limit condition (the detector is
+deliberately broad until then).**
