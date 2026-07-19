@@ -39,10 +39,26 @@ def render_eval_report(report: EvalReport, spec: BenchmarkSpec | None = None) ->
     else:
         parts.append(f"- distinct angles in the run's map: **{b.run_angle_count}**")
         if b.reference_total:
-            parts.append(f"- reference union coverage: **{len(b.hits)}/{b.reference_total}**")
+            ensemble_hits = len(b.hits) - len(b.human_assisted_hits)
+            coverage = (
+                f"- reference union coverage: **{len(b.hits)}/{b.reference_total}** in the map"
+            )
+            if b.human_assisted_hits:
+                coverage += (
+                    f" — **ensemble coverage {ensemble_hits}/{b.reference_total}** "
+                    f"({len(b.human_assisted_hits)} human-rescued at a gate)"
+                )
+            parts.append(coverage)
+            if b.human_assisted_hits:
+                parts.append(
+                    "- **HUMAN-RESCUED (the ensemble missed these; a gate edit added them): "
+                    + ", ".join(f"`{m}`" for m in b.human_assisted_hits)
+                    + "**"
+                )
             if b.practitioner_obvious_misses:
                 parts.append(
-                    "- **PRACTITIONER-OBVIOUS MISSES (penalty flag): "
+                    "- **PRACTITIONER-OBVIOUS MISSES (penalty flag; includes "
+                    "human-rescued angles the ensemble did not produce): "
                     + ", ".join(f"`{m}`" for m in b.practitioner_obvious_misses)
                     + "**"
                 )
@@ -68,8 +84,12 @@ def render_eval_report(report: EvalReport, spec: BenchmarkSpec | None = None) ->
                 "the map plus a manual pass, then future runs score against it)"
             )
         for check in b.option_checks:
+            # A term match is evidence, not proof (the M2 run's "compression"
+            # matched a context-compression card) — never render it as a pass.
             verdict = (
-                "CARDED (candidates: " + ", ".join(f"`{c}`" for c in check.matching_card_ids) + ")"
+                "TERM MATCH — confirm by hand: "
+                + ", ".join(f"`{c}`" for c in check.matching_card_ids)
+                + " (word overlap only; the card may not embody the option)"
                 if check.carded
                 else "**NOT CARDED** — an option-level scouting miss"
             )
@@ -255,7 +275,10 @@ def _headline_rows(a: EvalReport, b: EvalReport) -> list[list[str]]:
     def breadth_cov(r: EvalReport) -> str:
         if r.breadth is None or not r.breadth.reference_total:
             return "n/a"
-        return f"{len(r.breadth.hits)}/{r.breadth.reference_total}"
+        cov = f"{len(r.breadth.hits)}/{r.breadth.reference_total}"
+        if r.breadth.human_assisted_hits:
+            cov += f" ({len(r.breadth.human_assisted_hits)} human-rescued)"
+        return cov
 
     def obvious(r: EvalReport) -> str:
         return "n/a" if r.breadth is None else str(len(r.breadth.practitioner_obvious_misses))

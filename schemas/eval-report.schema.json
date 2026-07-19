@@ -123,8 +123,17 @@
           "title": "Misses",
           "type": "array"
         },
+        "human_assisted_hits": {
+          "description": "Reference angles whose only match is a human-provenance run angle (added at a gate): in the map, but the ensemble did not produce them \u2014 a Gate-A rescue must not hide an ensemble miss (M2 F3).",
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Human Assisted Hits",
+          "type": "array"
+        },
         "practitioner_obvious_misses": {
-          "description": "The design's explicit penalty flag.",
+          "description": "The design's explicit penalty flag. Includes practitioner-obvious references that are human-assisted hits: the benchmark scores the ensemble on producing them WITHOUT human help.",
           "items": {
             "pattern": "^[a-z0-9][a-z0-9-]*$",
             "type": "string"

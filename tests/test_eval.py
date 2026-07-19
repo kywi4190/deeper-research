@@ -370,6 +370,41 @@ def test_breadth_combines_judge_report_with_the_union() -> None:
     assert result.misses == ["region-two", "region-three"]
     assert result.practitioner_obvious_misses == ["region-three"]
     assert result.novel_angles == ["run-z"] and result.run_angle_count == 5
+    assert result.human_assisted_hits == []
+
+
+def test_breadth_sees_through_a_gate_a_rescue() -> None:
+    # The M2 F3 shape: the practitioner-obvious reference IS in the map, but
+    # only because the human added the matching angle at Gate A — the map hit
+    # must not read as ensemble coverage, and the penalty flag must still fire.
+    report = AngleMatchReport(
+        matches=[
+            AngleMatch(reference_id="region-one", matched_candidate_id="run-a", rationale="same"),
+            AngleMatch(reference_id="region-two", matched_candidate_id=None, rationale="absent"),
+            AngleMatch(
+                reference_id="region-three", matched_candidate_id="rescued-angle", rationale="same"
+            ),
+        ],
+    )
+    result = metrics.breadth(_spec(), report, run_angle_count=5, human_angle_ids={"rescued-angle"})
+    assert "region-three" in result.hits  # the map does contain it
+    assert result.human_assisted_hits == ["region-three"]
+    assert result.practitioner_obvious_misses == ["region-three"]  # the ensemble missed it
+    assert result.misses == ["region-two"]  # 'missed' stays a map-level fact
+
+    markdown = render_eval_report(
+        EvalReport(
+            run_id="r",
+            profile="quick",
+            benchmark_id="test-bench",
+            generated_at=datetime.now(UTC),
+            breadth=result,
+            total_usd=0.0,
+            eval_usd=0.0,
+        )
+    )
+    assert "ensemble coverage 1/3" in markdown and "1 human-rescued" in markdown
+    assert "HUMAN-RESCUED" in markdown and "PRACTITIONER-OBVIOUS MISSES" in markdown
 
 
 def test_option_checks_scan_card_text_case_insensitively() -> None:
@@ -607,6 +642,8 @@ async def test_evaluate_run_over_a_completed_mock_run(tmp_path: Path) -> None:
     assert persisted.run_id == report.run_id
     md = ws.path(EVAL_MD_PATH).read_text(encoding="utf-8")
     assert "PRACTITIONER-OBVIOUS MISSES" in md and "llm-agent-systems-build" in md
+    # A term match renders as a confirm-by-hand candidate, never as a pass.
+    assert "TERM MATCH — confirm by hand" in md and "CARDED (candidates" not in md
     assert any(s.startswith("deeper eval: report written") for s in ws.history())
 
 

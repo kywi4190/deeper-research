@@ -182,8 +182,17 @@ class BreadthEval(ArtifactModel):
     reference_total: int = Field(ge=0)
     hits: list[Slug] = Field(default_factory=list)
     misses: list[Slug] = Field(default_factory=list)
+    human_assisted_hits: list[Slug] = Field(
+        default_factory=list,
+        description="Reference angles whose only match is a human-provenance run "
+        "angle (added at a gate): in the map, but the ensemble did not produce "
+        "them — a Gate-A rescue must not hide an ensemble miss (M2 F3).",
+    )
     practitioner_obvious_misses: list[Slug] = Field(
-        default_factory=list, description="The design's explicit penalty flag."
+        default_factory=list,
+        description="The design's explicit penalty flag. Includes practitioner-"
+        "obvious references that are human-assisted hits: the benchmark scores "
+        "the ensemble on producing them WITHOUT human help.",
     )
     matched: dict[Slug, Slug] = Field(
         default_factory=dict, description="Reference angle id -> matching run angle id."

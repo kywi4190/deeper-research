@@ -29,6 +29,7 @@ from deeper.schemas import (
     DeepDiveRoundLog,
     Dossier,
     EvalReport,
+    Heuristic,
     OptionCardSet,
     Rubric,
     ScreeningResult,
@@ -130,7 +131,16 @@ async def evaluate_run(
                 f"{len(spec.reference_angles)} reference angles ({spec.id})"
             )
             match_report = await match_run_angles(dispatcher, spec, angle_map)
-            breadth = metrics.breadth(spec, match_report, len(angle_map.angles), option_checks)
+            # Gate-A-added angles carry provenance [human] — the breadth metric
+            # must see them, or a human rescue reads as ensemble coverage.
+            human_ids = {
+                a.id
+                for a in angle_map.angles
+                if set(a.contributing_heuristics) == {Heuristic.HUMAN}
+            }
+            breadth = metrics.breadth(
+                spec, match_report, len(angle_map.angles), option_checks, human_ids
+            )
             if include_baseline:
                 assert spec_path is not None  # the CLI resolves the spec from a path
                 text = read_baseline(spec, spec_path)

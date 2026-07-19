@@ -33,8 +33,17 @@ seeded benchmark specs in `benchmarks/` (transcribed from
 workspace, a Haiku-class `eval-judge` dispatched through the same agent
 runtime as the pipeline (mockable, cost-tracked under ledger stage `EVAL`),
 and `deeper eval` / `eval --compare` / `eval --compare-baseline` — see
-"Evaluation" below. The first real use is scoring the M2 run against
-`probe-space-mapping` and checking the numbers against the triage.
+"Evaluation" below. **The Prompt 14 verify step has been run**: scoring the
+M2 run against `probe-space-mapping` matched the triage on informedness
+(0.32, floor 80% — F7), quality (100% revision rate, S3/S5 retry hotspots —
+F6), depth (73%, rademacher 33%), and anti-overfit (no inversions), and
+exposed two eval-layer defects, both fixed: the breadth metric now reads
+angle provenance (a Gate-A rescue reports as **human-rescued**, so the
+F3 practitioner-obvious check fires on ensemble coverage — the M2 run
+honestly scores 15/16 ensemble, 16/16 map), and an option-check term match
+renders as **TERM MATCH — confirm by hand**, never as a pass (the run's
+"compression" match was a context-compression card, not the fork test —
+Trap 2's NOT CARDED verdict stands).
 
 The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
 the run above), from `deeper new` to a citation-linked decision report, and
@@ -1012,11 +1021,17 @@ informedness and quality). The five metrics:
   The report lists hits, misses, **practitioner-obvious misses** (the
   design's penalty flag — e.g. `llm-agent-systems-build`, the angle the M2
   ensemble missed and a human added at Gate A), and novel run angles
-  (candidate union additions). Where the spec carries option-level ground
-  truth (`option_checks`), a mechanical term scan over every option card
-  reports whether the option was carded at all — the M2 Trap-2 divergence
-  ("compression" in zero cards) is exactly the miss the angle-level metric
-  cannot see.
+  (candidate union additions). Matching is provenance-aware: a reference
+  angle whose only match carries `[human]` provenance (a Gate-A addition)
+  is a **human-rescued** hit — in the map, but not ensemble coverage, and
+  its practitioner-obvious flag still fires, so a gate rescue can never
+  hide an ensemble miss. Where the spec carries option-level ground truth
+  (`option_checks`), a mechanical term scan over every option card reports
+  whether the option was plausibly carded — a match renders as **TERM
+  MATCH — confirm by hand**, never as a pass (word overlap is evidence,
+  not proof: the M2 run's "compression" hit was a context-compression
+  card, not the fork test). The M2 Trap-2 divergence is exactly the miss
+  the angle-level metric cannot see.
 - **Informedness** — Spearman rank correlation between allocation units and
   post-hoc angle value (an angle's share of the finalists), with
   floor-compliance and the **floor's budget share**: near 100% means γ was
@@ -1455,8 +1470,7 @@ Following the phases in the build guide:
 
 **Next: Phase D, Prompt 15 — hardening (the §11 mitigation audit: adversarial
 sanitizer fixtures, policy tests over agent tool scopes, contradiction-ledger
-surfacing in S8, structured JSONL logs, gate-fatigue config). Also worth
-doing soon: `deeper eval <the M2 run> --against probe-space-mapping` — the
-Prompt 14 verify step — and a live probe at the plan-limit boundary to pin
-down how the SDK surfaces the usage-limit condition (the detector is
-deliberately broad until then).**
+surfacing in S8, structured JSONL logs, gate-fatigue config). The Prompt 14
+verify step is done (see Current status). Still worth doing sometime: a live
+probe at the plan-limit boundary to pin down how the SDK surfaces the
+usage-limit condition (the detector is deliberately broad until then).**

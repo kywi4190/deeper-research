@@ -9,7 +9,7 @@ with the spec is still just arithmetic.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from deeper.schemas import (
     AllocationTable,
@@ -88,22 +88,38 @@ def breadth(
     match_report: AngleMatchReport,
     run_angle_count: int,
     option_checks: Sequence[OptionCheckResult] = (),
+    human_angle_ids: Collection[str] = (),
 ) -> BreadthEval:
-    """Combine the judge's match report with the spec's reference union."""
+    """Combine the judge's match report with the spec's reference union.
+
+    `human_angle_ids` are the run angles the human added at a gate (provenance
+    `[human]` in the map). A reference angle matched only by one of those is a
+    hit for the *map* but not for the *ensemble* — it lands in
+    human_assisted_hits, and its practitioner_obvious flag still fires (the M2
+    F3 test case: the eval must see through a Gate-A rescue, or the check can
+    never fail on the very runs it was built to catch)."""
     by_ref = {a.id: a for a in spec.reference_angles}
-    hits, misses, matched = [], [], {}
+    hits, misses, matched, human_assisted = [], [], {}, []
     for match in match_report.matches:
         if match.matched_candidate_id is None:
             misses.append(match.reference_id)
         else:
             hits.append(match.reference_id)
             matched[match.reference_id] = match.matched_candidate_id
-    obvious = [m for m in misses if by_ref[m].practitioner_obvious]
+            if match.matched_candidate_id in human_angle_ids:
+                human_assisted.append(match.reference_id)
+    obvious = [
+        m.reference_id
+        for m in match_report.matches
+        if by_ref[m.reference_id].practitioner_obvious
+        and (m.reference_id in misses or m.reference_id in human_assisted)
+    ]
     return BreadthEval(
         run_angle_count=run_angle_count,
         reference_total=len(spec.reference_angles),
         hits=hits,
         misses=misses,
+        human_assisted_hits=human_assisted,
         practitioner_obvious_misses=obvious,
         matched=matched,
         novel_angles=list(match_report.novel_candidate_ids),
