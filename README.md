@@ -60,6 +60,17 @@ contract; and §11's gate-fatigue mitigation is a real config dial
 summary; all gates default to hard). "When things go wrong" below is the
 matching failure-mode runbook.
 
+**The M4 viewer is built** (design §8 v2: pipeline-as-kernel, UI-as-viewer):
+`deeper view <run>` serves a single-process FastAPI app over the plain-file
+workspace — run list with spend-vs-cap, the angle map with prior/allocation
+bars, the option-card grid with critique badges, a rubric editor whose Gate B
+form and a contender-comparison page whose Gate C form write the gate YAML
+through the *same* GateDecision schemas and `read_decision` machinery the CLI
+path validates (one code path; a form submission is indistinguishable from a
+hand-edited file), and the decision report rendered with its claim links
+resolving to dossier-claim anchors. No database, no viewer-side state — close
+the tab and nothing is lost. See "The viewer" below.
+
 The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
 the run above), from `deeper new` to a citation-linked decision report, and
 the Prompt 13 pre-live hardening pass has landed: every M1 triage finding is
@@ -168,9 +179,10 @@ state of a run.
 | `src/deeper/stages/` | Per-stage logic S0–S8 (`StageBase` protocol + registry); `saturation.py` (S1 rule), `shortlist.py` (S5 rule + screening arithmetic), and `depth.py` (S6 stopping rule + verifier sampling) are pure math | **S0–S8 built** |
 | `src/deeper/orchestrator/` | State machine (`engine.py`), gates (`gates.py`), Gate-C loop actions (`gate_c_loops.py`), the re-divergence mini-loop (`redivergence.py`), rerun invalidation (`rerun.py`), `deeper` CLI (`cli.py`) | **built** |
 | `src/deeper/eval/` | Design-§10 measurement layer: pure metric math (`metrics.py`), benchmark loading (`benchmarks.py`), the eval-judge dispatch (`judge.py`), the per-run eval runner (`runner.py`), report/compare renders (`report.py`) | **built** |
+| `src/deeper/viewer/` | The design-§8 v2 viewer: FastAPI + Jinja templates + HTMX over the workspace; writes ONLY gate YAML, through the CLI's own gate schemas | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–8 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime (incl. adversarial injection fixtures), §11 policy, gate modes, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor, eval suites (1056 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime (incl. adversarial injection fixtures), §11 policy, gate modes, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor, eval, viewer suites (1082 tests) |
 | `benchmarks/` | Eval question specs + baseline-answer slots (`baselines/`) | **seeded — 4 specs** |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -942,6 +954,7 @@ deeper resume <run>
 deeper rerun <run> --stage S1            # invalidate S1 + downstream, rewalk
 deeper rerun <run> --stage S3 --angle x  # scoped to one angle's scout outputs
 deeper eval <run> --against <benchmark>  # design-§10 property metrics (below)
+deeper view <run>                        # browser viewer on localhost (below)
 deeper report <run>
 #   the report's path + a terminal summary: winner (first decisive sentence,
 #   with a red DISSENT UNREBUTTED marker when it stands), both scoreboards
@@ -955,6 +968,55 @@ hint injected into every cartographer prompt. `<run>` is a path or a name under
 `runs/`. Every command is safe to repeat: pauses exit 0 with instructions,
 `status`/`report` are read-only, and re-entering a run never re-executes completed
 work.
+
+## The viewer (`deeper view`)
+
+The design-§8 v2 viewer: the pipeline is the kernel, the UI is a *viewer* of
+the plain-file workspace. One process, server-rendered Jinja templates plus
+HTMX's `hx-boost` (loaded from a CDN; every page degrades to plain links and
+forms without it), no build step, no database, and no state of its own — every
+request re-reads the files, so `deeper resume` in a terminal and a browser tab
+never disagree, and closing the tab loses nothing.
+
+```bash
+deeper view <run>              # serves http://127.0.0.1:8177/run/<run-dir-name>
+deeper view <run> --port 9000  # the run-list page at / covers every sibling run
+```
+
+The pages:
+
+- **Run list** (`/`) — every run under the runs directory with its node,
+  status, and a spend-vs-cap bar.
+- **Angle map** — the Gate-A-shaped tree: each angle with its contributing
+  heuristics, relevance-prior bar, allocated-units bar (post-S2), and
+  sub-angles.
+- **Option cards** — the card grid, filterable by angle, with the card-critic's
+  verdicts as badges: redundancy % (early-stop flagged), missed options,
+  distinctness issues, per-card completeness issues, kill-risk counts.
+- **Rubric · Gate B** — criterion table with weight bars plus the Gate B form:
+  the preference-slot weight up top, per-criterion weight overrides (blank =
+  keep; untouched criteria rescale, exactly the CLI-path semantics), approve.
+  Full criterion edits (definitions, levels) remain a YAML-file job.
+- **Contenders · Gate C** — side-by-side dossier summaries (rounds,
+  BUDGET-CAPPED badge, verification pass rate, strongest criticism, open
+  questions), BOTH scoreboards with every rank inversion highlighted, the
+  prosecution/steelman excerpts, the frame-check verdict + proposal, the
+  rubric-sensitivity chart (distance-to-flip per criterion — shorter bar =
+  more fragile — and the 0→0.4 preference-slot sweep with winner changes
+  marked), and the Gate C action form: preference feedback rows, evidence
+  challenges, accept-re-divergence (only offered when a proposal is on file),
+  approve — with the iteration counter, and approve-only once the §12 cap is
+  spent.
+- **Report** — `report/decision-report.md` rendered, with every inline claim
+  citation linking to its dossier-claim anchor in the appendix index.
+
+**Gate forms are the CLI path.** A submission is validated by the gate's own
+`GateDecision` schema (invalid combinations — e.g. approve + loop actions at
+Gate C — come back as the schema's own message and nothing is written), then
+dumped to `gates/gate-{b,c}.yaml`; `deeper resume` re-validates it with
+`read_decision` exactly as if you had edited the file by hand. The viewer
+writes gate YAML and *nothing else*, and only while that gate is pending.
+Screenshots live in [`docs/screenshots/`](docs/screenshots/).
 
 ## Running your first live run
 
@@ -1587,10 +1649,13 @@ Following the phases in the build guide:
   invocation logs + per-run rotation, `status --spend`, the doctor
   hook-denial probe, per-gate `gate_modes` notify) ✅. **M3's build items are
   done — what remains is the ongoing tuning loop.**
-- **Phase E — Viewer (M4, optional).**
+- **Phase E — Viewer (M4):** Prompt 16 (the §8 v2 viewer: FastAPI +
+  templates + HTMX, run list / angle map / option cards / rubric editor /
+  contender comparison / report view, gate forms through the CLI's own
+  GateDecision schemas, `deeper view`) ✅. **M4 done.**
 
 **Next: the ongoing M3 tuning loop (eval-driven prompt iteration against the
-seeded benchmarks), then optionally the Phase E viewer. Still worth doing
-sometime: a live probe at the plan-limit boundary to pin down how the SDK
-surfaces the usage-limit condition (the detector is deliberately broad until
-then).**
+seeded benchmarks). Still worth doing sometime: a live probe at the
+plan-limit boundary to pin down how the SDK surfaces the usage-limit
+condition (the detector is deliberately broad until then), and screenshots of
+the viewer pages for `docs/screenshots/`.**

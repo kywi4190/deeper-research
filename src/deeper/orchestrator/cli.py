@@ -780,6 +780,28 @@ def eval_cmd(
 
 
 @app.command()
+def view(
+    run: RunArg,
+    host: Annotated[str, typer.Option(help="Bind address (keep it local).")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to serve on.")] = 8177,
+) -> None:
+    """Launch the workspace viewer (design §8 v2) on localhost: read-only pages
+    over the run's files, plus gate forms that write ONLY gates/gate-*.yaml —
+    the same files, through the same schemas, `deeper resume` validates."""
+    import uvicorn
+
+    from deeper.viewer import create_app
+
+    workspace = _open_run(run)  # validates the run before anything binds a port
+    runs_root = workspace.root.parent
+    console.print(
+        f"viewer: http://{host}:{port}/run/{workspace.root.name} "
+        f"(all runs under {runs_root} at http://{host}:{port}/)"
+    )
+    uvicorn.run(create_app(runs_root), host=host, port=port, log_level="warning")
+
+
+@app.command()
 def report(run: RunArg) -> None:
     """The decision report's path plus a terminal summary: winner, both
     scoreboards, the top sensitivity flag, verification pass rates, spend."""

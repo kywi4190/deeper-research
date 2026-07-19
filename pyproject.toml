@@ -18,6 +18,12 @@ dependencies = [
     "rich",
     "pytest",
     "pytest-asyncio",
+    # Viewer (design §8 v2): server-rendered pages over the workspace.
+    "fastapi",
+    "jinja2",
+    "uvicorn",
+    "markdown",
+    "httpx",
 ]
 
 [project.scripts]

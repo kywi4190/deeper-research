@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} — contenders · gate C{% endblock %}
+{% block content %}
+<h1>Contenders &middot; Gate C</h1>
+{% if written %}<div class="written">gates/gate-c.yaml written — run
+  <code>deeper resume {{ run }}</code> to apply it. Loop actions consume one Gate-C
+  iteration; approval proceeds to S8 synthesis.</div>{% endif %}
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if decision_problem %}<div class="error">The gate file on disk does not validate:
+{{ decision_problem }}</div>{% endif %}
+
+{% if not finalists and not boards %}
+<p class="muted">Nothing to compare yet — the run has not reached the S6/S7 depth and
+  tournament stages.</p>
+{% endif %}
+
+{% if boards %}
+<h2>The two scoreboards</h2>
+<p class="muted small">Rows in <mark style="background:var(--warn-soft)">amber</mark> are part of a
+  rank inversion — the destination-only and preference-adjusted boards disagree on their order;
+  exactly where preference-overfitting would hide. Every inversion is steelmanned in S7.</p>
+<table>
+  <tr><th>option</th><th class="num">destination-only</th><th class="num">preference-adjusted
+    (slot weight {{ '%g'|format(slot_weight) }})</th><th>inversion</th></tr>
+  {% for row in boards.adjusted %}
+  {% set d = boards.dest[row.option_id] %}
+  <tr {% if row.option_id in inverted %}class="inverted"{% endif %}>
+    <td>{{ row.option_id }}</td>
+    <td class="num">{{ '%g'|format(d.score) }} (#{{ d.rank }})</td>
+    <td class="num">{{ '%g'|format(row.score) }} (#{{ row.rank }})</td>
+    <td>{% if row.option_id in inverted %}<span class="badge warn">&#8646; inverted</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% for x, y in inversions %}
+<p class="small muted">&#8646; destination-only ranks <b>{{ x }}</b> above <b>{{ y }}</b>;
+  the preference-adjusted board reverses them.</p>
+{% endfor %}
+{% endif %}
+
+{% if finalists %}
+<h2>Dossier summaries</h2>
+<div class="cols">
+  {% for f in finalists %}
+  <div class="card">
+    <h3>{{ f.id }}</h3>
+    <p style="margin:.2rem 0">
+      {% if f.screening %}<span class="badge">point {{ '%g'|format(f.screening.weighted_point) }}</span>
+      <span class="badge">UCB {{ '%g'|format(f.screening.weighted_ucb) }}</span>{% endif %}
+      {% if f.verification %}<span class="badge ok">verified {{ '%.0f'|format(f.verification.pass_rate * 100) }}%</span>{% endif %}
+      {% if f.dossier %}
+        <span class="badge">{{ f.dossier.rounds_completed }} round(s)</span>
+        <span class="badge">{{ f.dossier.claims|length }} claims</span>
+        {% if f.dossier.budget_capped %}<span class="badge bad">BUDGET-CAPPED</span>{% endif %}
+      {% endif %}
+    </p>
+    {% if f.dossier %}
+      <p class="small"><b>Strongest criticism.</b> {{ f.dossier.strongest_criticism.content|truncate(260) }}</p>
+      {% if f.dossier.open_questions %}
+        <p class="small muted"><b>Open questions:</b></p>
+        <ul class="tight small muted">
+          {% for q in f.dossier.open_questions %}<li>{{ q }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% else %}<p class="muted small">No dossier on file.</p>{% endif %}
+    {% if f.prosecution %}
+      <p class="small"><b>Prosecution.</b> {{ f.prosecution.case|truncate(240) }}</p>
+      <p class="small muted"><b>Regret path:</b> {{ f.prosecution.regret_path|truncate(180) }}</p>
+    {% endif %}
+    {% if f.steelman %}
+      <p class="small"><b>Steelman</b> <span class="badge">{{ f.steelman.trigger.value }}</span>
+        {{ f.steelman.case|truncate(240) }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if boards %}
+<h2>Rubric sensitivity</h2>
+<div class="panel">
+  <p class="small muted" style="margin-top:0">Distance to a rank-1&harr;2 flip per criterion:
+    bar length is the |weight change| that would tie the top two (criterion pinned, others
+    rescaled — Gate B's own semantics). <b>Shorter = more fragile.</b> Full muted bars have no
+    in-range flip at all.</p>
+  {% for f in flip_bars %}
+  <div class="barrow">
+    <span class="lbl">{{ f.id }} <span class="muted small">(w {{ '%g'|format(f.weight) }})</span></span>
+    <div class="bar {{ 'mutedbar' if f.delta is none }}"
+         title="{{ 'no in-range flip — robust' if f.delta is none else 'delta %+g ties ranks 1-2'|format(f.delta) }}">
+      <i style="width:{{ '%.0f'|format(f.pct) }}%"></i></div>
+    <span class="val">{% if f.delta is none %}robust{% else %}{{ '%+g'|format(f.delta) }}{% endif %}</span>
+  </div>
+  {% endfor %}
+  <p class="small muted">Preference-slot sweep 0 &rarr; 0.4 (amber rows: the winner changes):</p>
+  <table>
+    <tr><th class="num">slot weight</th><th>winner</th><th>ranking</th></tr>
+    {% for p in sweep %}
+    <tr {% if not loop.first and p.winner != loop.previtem.winner %}class="flip"{% endif %}>
+      <td class="num">{{ '%g'|format(p.slot_weight) }}</td>
+      <td>{{ p.winner }}{% if not loop.first and p.winner != loop.previtem.winner %}
+        <span class="badge warn">winner changes</span>{% endif %}</td>
+      <td class="muted small">{{ p.ranking|join(' › ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if frame_check %}
+<h2>Frame check</h2>
+<div class="panel">
+  <p style="margin-top:0">Verdict:
+    {% if frame_check.verdict.value == 'pass' %}<span class="badge ok">pass</span>
+    {% else %}<span class="badge bad">gap found</span>{% endif %}
+  </p>
+  <ul class="tight small">
+    <li><b>Gate-A removals:</b> {{ frame_check.removals_check.finding }}
+      {% if frame_check.removals_check.consequential %}<span class="badge warn">consequential</span>{% endif %}</li>
+    <li><b>Missed options:</b> {{ frame_check.missed_options_check.finding }}
+      {% if frame_check.missed_options_check.consequential %}<span class="badge warn">consequential</span>{% endif %}</li>
+    <li><b>Rubric fragility:</b> {{ frame_check.rubric_fragility_check.finding }}
+      {% if frame_check.rubric_fragility_check.consequential %}<span class="badge warn">consequential</span>{% endif %}</li>
+  </ul>
+  {% if frame_check.proposal %}
+  <p class="small"><b>Re-divergence proposal</b> <span class="badge">{{ frame_check.proposal.kind.value }}</span>
+    <span class="badge">{{ frame_check.proposal.estimated_cost_units }} unit(s)</span><br>
+    {{ frame_check.proposal.description }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<h2>Gate C decision</h2>
+{% if not pending %}
+<p class="muted">Gate C is not pending for this run.</p>
+{% else %}
+<p class="muted small">Iterations used: {{ iterations }} / {{ cap }}.
+  Loop actions are mutually exclusive with approval — run them in their own iteration.</p>
+<form class="gate" method="post" action="/run/{{ run }}/contenders">
+  {% if not capped %}
+  <h3 style="font-size:.95rem">Preference feedback <span class="muted small">(free re-score of the
+    preference-adjusted board only — the destination-only board cannot move)</span></h3>
+  {% for f in finalists %}
+  <div class="row">
+    <input type="hidden" name="pf_option" value="{{ f.id }}">
+    <input type="text" name="pf_reaction" placeholder="reaction to {{ f.id }} — blank = none">
+    <select name="pf_direction">
+      <option value="negative">negative</option>
+      <option value="positive">positive</option>
+      <option value="neutral">neutral</option>
+    </select>
+  </div>
+  {% endfor %}
+  <h3 style="font-size:.95rem">Evidence challenges <span class="muted small">(each fires one scoped
+    verifier task; scores never move on their own)</span></h3>
+  {% for _ in range(2) %}
+  <div class="row">
+    <select name="ec_option">
+      {% for f in finalists %}<option value="{{ f.id }}">{{ f.id }}</option>{% endfor %}
+    </select>
+    <input type="text" name="ec_claim" placeholder="claim id">
+    <input type="text" name="ec_challenge" placeholder="why you don't believe it — blank row = none">
+  </div>
+  {% endfor %}
+  {% if frame_check and frame_check.proposal %}
+  <p><label class="check"><input type="checkbox" name="accept_redivergence"> Accept the
+    re-divergence proposal (mini-loop S1&rarr;S6 on its own budget, then S7 reruns; max 1 per run)</label></p>
+  {% endif %}
+  {% else %}
+  <p class="muted">All {{ cap }} Gate-C feedback loops are used — the remaining action is approval.</p>
+  {% endif %}
+  <label for="notes">Notes</label>
+  <textarea id="notes" name="notes" rows="2"></textarea>
+  <p><label class="check"><input type="checkbox" name="approved"> Approve — proceed to S8
+    synthesis</label></p>
+  <button type="submit">Write gates/gate-c.yaml</button>
+  <span class="muted small">then run <code>deeper resume {{ run }}</code></span>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}deeper — runs{% endblock %}
+{% block content %}
+<h1>Runs</h1>
+{% if runs %}
+<table>
+  <tr><th>run</th><th>goal</th><th>node</th><th>status</th><th>spend vs cap</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td><a href="/run/{{ r.name }}/map">{{ r.name }}</a></td>
+    <td class="muted">{{ r.goal or "—" }}</td>
+    <td>{{ r.node }}</td>
+    <td>{{ r.status }}</td>
+    <td>
+      <div class="spend">
+        <div class="bar" title="${{ '%.2f'|format(r.spent) }} of ${{ '%g'|format(r.cap) }}">
+          <i style="width:{{ '%.0f'|format(r.pct) }}%"></i>
+        </div>
+        <span class="small muted">${{ '%.2f'|format(r.spent) }} / ${{ '%g'|format(r.cap) }}</span>
+      </div>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">No runs found under this directory. Start one with <code>deeper new "&lt;goal&gt;"</code>.</p>
+{% endif %}
+{% endblock %}

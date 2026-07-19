@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} — rubric · gate B{% endblock %}
+{% block content %}
+<h1>Rubric &middot; Gate B</h1>
+{% if written %}<div class="written">gates/gate-b.yaml written — run
+  <code>deeper resume {{ run }}</code> to apply it. Edits land in rubric.yaml before S5
+  scores anything against it.</div>{% endif %}
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if decision_problem %}<div class="error">The gate file on disk does not validate:
+{{ decision_problem }}</div>
+{% elif decision and (decision.approved or decision.weight_overrides or decision.edited_criteria) %}
+<div class="panel small">Current gates/gate-b.yaml: approved={{ decision.approved }},
+  preference-slot weight {{ '%g'|format(decision.preference_slot_weight) }},
+  {{ decision.weight_overrides|length }} weight override(s),
+  {{ decision.edited_criteria|length }} criterion edit(s).</div>
+{% endif %}
+
+{% if not rubric %}
+<p class="muted">No rubric yet — S4 has not completed.</p>
+{% else %}
+{% if not pending %}
+<p class="muted">Gate B is not pending for this run — the rubric below is read-only.
+  (Criterion weights shown are the applied, post-gate values.)</p>
+{% endif %}
+<form class="gate" method="post" action="/run/{{ run }}/rubric">
+<fieldset {% if not pending %}disabled{% endif %}>
+  <label for="psw">Preference-slot weight — the one number that says how much your tastes may
+    bend the destination-optimal answer (0 – 0.4; the report sweeps this range)</label>
+  <input class="short" id="psw" type="number" step="0.01" min="0" max="0.4"
+         name="preference_slot_weight"
+         value="{{ '%g'|format(decision.preference_slot_weight if decision else rubric.preference_slot.weight) }}">
+
+  <h2>Criteria</h2>
+  <p class="muted small">Leave an override blank to keep a weight; overridden criteria are
+    pinned and the rest rescale proportionally so weights still sum to 1.0. Full criterion
+    edits (definitions, levels) stay a YAML-file edit — see gates/gate-b.yaml.</p>
+  <table>
+    <tr><th>criterion</th><th>definition</th><th class="num">weight</th><th>override</th></tr>
+    {% for c in rubric.criteria %}
+    <tr>
+      <td><b>{{ c.name }}</b><br><span class="muted small">{{ c.id }}</span></td>
+      <td class="small">{{ c.definition|truncate(180) }}
+        <div class="muted small" title="{{ c.justification }}">why this weight: hover</div></td>
+      <td class="num">
+        <div class="barrow" style="min-width:140px">
+          <div class="bar" title="weight {{ '%g'|format(c.weight) }}">
+            <i style="width:{{ '%.0f'|format(c.weight * 100) }}%"></i></div>
+          <span class="val">{{ '%g'|format(c.weight) }}</span>
+        </div>
+      </td>
+      <td><input class="short" type="number" step="0.01" min="0.01" max="1"
+                 name="weight:{{ c.id }}" placeholder="keep"></td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <label for="notes">Notes</label>
+  <textarea id="notes" name="notes" rows="2"></textarea>
+  <p><label class="check"><input type="checkbox" name="approved"> Approve — apply these
+    weights and continue to S5 screening</label></p>
+  <button type="submit">Write gates/gate-b.yaml</button>
+  <span class="muted small">then run <code>deeper resume {{ run }}</code></span>
+</fieldset>
+</form>
+{% endif %}
+{% endblock %}

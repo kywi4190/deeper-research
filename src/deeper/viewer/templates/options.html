@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} — option cards{% endblock %}
+{% block content %}
+<h1>Option cards</h1>
+<div class="filter">
+  <a href="/run/{{ run }}/options" class="{{ 'on' if not selected }}">all angles</a>
+  {% for a in angles %}
+  <a href="/run/{{ run }}/options?angle={{ a.id }}" class="{{ 'on' if selected == a.id }}">{{ a.name }}</a>
+  {% endfor %}
+</div>
+{% for g in groups %}
+<h2>{{ g.angle.name }} <span class="muted small">({{ g.angle.id }})</span>
+  {% if g.critique %}
+    {% if g.critique.redundancy_pct > 40 %}
+      <span class="badge warn">redundancy {{ '%g'|format(g.critique.redundancy_pct) }}% — early stop</span>
+    {% else %}
+      <span class="badge">redundancy {{ '%g'|format(g.critique.redundancy_pct) }}%</span>
+    {% endif %}
+    {% if g.critique.missed_options %}
+      <span class="badge warn" title="{{ g.critique.missed_options|join('; ') }}">
+        {{ g.critique.missed_options|length }} missed option(s) flagged</span>
+    {% endif %}
+    {% if g.critique.distinctness_issues %}
+      <span class="badge warn">{{ g.critique.distinctness_issues|length }} distinctness issue(s)</span>
+    {% endif %}
+  {% endif %}
+</h2>
+<div class="grid">
+  {% for c in g.cards %}
+  <div class="card">
+    <h3>{{ c.name }}</h3>
+    <p class="small muted" style="margin:.1rem 0 .4rem">{{ c.id }}</p>
+    <p class="small">{{ c.description|truncate(220) }}</p>
+    <p class="small muted">{{ c.mechanism|truncate(160) }}</p>
+    <p style="margin:.4rem 0 0">
+      <span class="badge">{{ c.preliminary_evidence|length }} evidence</span>
+      <span class="badge">{{ c.uncertainties|length }} unknowns</span>
+      {% if c.kill_risks %}<span class="badge warn">{{ c.kill_risks|length }} kill risk(s)</span>{% endif %}
+      {% if c.id in g.issues %}
+        <span class="badge bad" title="{{ g.issues[c.id]|join('; ') }}">critic: completeness issue</span>
+      {% endif %}
+      {% if c.misplaced_flag %}<span class="badge warn">misplaced → {{ c.misplaced_flag }}</span>{% endif %}
+    </p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">No option cards yet — S3 scouting has not produced any
+  {% if selected %}for this angle{% endif %}.</p>
+{% endfor %}
+{% endblock %}

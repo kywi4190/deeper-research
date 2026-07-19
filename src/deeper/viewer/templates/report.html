@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} — decision report{% endblock %}
+{% block content %}
+{% if html %}
+<article class="report">{{ html|safe }}</article>
+{% else %}
+<h1>Decision report</h1>
+<p class="muted">No report yet — the run has not completed S8 synthesis.</p>
+{% endif %}
+{% endblock %}

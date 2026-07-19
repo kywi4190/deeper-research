@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ run }} — angle map{% endblock %}
+{% block content %}
+<h1>Angle map</h1>
+{% if angles %}
+  {% if total_units %}<p class="muted small">Allocation: {{ total_units }} units across
+    {{ angles|length }} angles (bars scale to the largest allocation).</p>{% endif %}
+  {% for a in angles %}
+  <div class="panel">
+    <h3 style="margin:0 0 .2rem">{{ a.name }} <span class="muted small">({{ a.id }})</span>
+      {% for h in a.contributing_heuristics %}<span class="badge">{{ h.value }}</span>{% endfor %}
+    </h3>
+    <div class="barrow">
+      <span class="lbl muted">relevance prior</span>
+      <div class="bar" title="prior {{ '%g'|format(a.relevance_prior) }}">
+        <i style="width:{{ '%.0f'|format(a.relevance_prior * 100) }}%"></i></div>
+      <span class="val">{{ '%g'|format(a.relevance_prior) }}</span>
+    </div>
+    {% if a.id in units %}
+    <div class="barrow">
+      <span class="lbl muted">allocated budget</span>
+      <div class="bar" title="{{ units[a.id] }} units">
+        <i style="width:{{ '%.0f'|format(units[a.id] / max_units * 100) if max_units else 0 }}%"></i></div>
+      <span class="val">{{ units[a.id] }} units</span>
+    </div>
+    {% endif %}
+    <p class="small" style="margin:.4rem 0 0">{{ a.definition }}</p>
+    {% if a.sub_angles %}
+    <ul class="tight small muted">
+      {% for s in a.sub_angles %}<li><b>{{ s.name }}</b> — {{ s.definition }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+<p class="muted">No angle map yet — S1 cartography has not completed.</p>
+{% endif %}
+{% endblock %}
