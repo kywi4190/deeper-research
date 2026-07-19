@@ -38,7 +38,10 @@ from deeper.agents_runtime import (
 )
 from deeper.config import RunConfig
 from deeper.schemas import (
+    ArtifactModel,
     FrameCheck,
+    GateADecision,
+    GateBDecision,
     GateCDecision,
     GateName,
     GateStatus,
@@ -374,6 +377,53 @@ class Engine:
             return _TEMPLATE_C_CAPPED
         return None
 
+    def _notify_auto_decision(
+        self, spec: GateSpec, decision: ArtifactModel
+    ) -> ArtifactModel | None:
+        """§11 gate-fatigue: when this gate's config mode is 'notify' and the
+        on-disk file is still the untouched template (the undecided default),
+        return the gate's auto-approve default decision. A file the human has
+        edited — any real decision, even a wrong one — always wins."""
+        if self.config.gate_modes.get(spec.name, "gate") != "notify":
+            return None
+        template = self._gate_template_override(spec) or spec.template
+        if decision != spec.model.load_yaml(template):
+            return None  # human-edited: honor it via the normal path
+        note = (
+            f"auto-approved: config.yaml gate_modes marks {spec.name.value} 'notify' "
+            "(design §11 gate-fatigue mitigation)"
+        )
+        if spec.name is GateName.A:
+            return GateADecision(approved=True, notes=note)
+        if spec.name is GateName.B:
+            return GateBDecision(
+                approved=True,
+                preference_slot_weight=self.config.preference_slot_default_weight,
+                notes=note,
+            )
+        return GateCDecision(approved=True, notes=note)
+
+    def _emit_notify_summary(self, spec: GateSpec, decision: ArtifactModel) -> None:
+        rule = "=" * 66
+        lines = [
+            rule,
+            f"{spec.name.value} NOTIFY MODE — auto-approved with the default decision",
+            f"  review (after the fact): {', '.join(spec.review_paths)}",
+            f"  decision recorded at:   {spec.relpath}",
+        ]
+        if isinstance(decision, GateBDecision):
+            lines.append(
+                f"  preference-slot weight: {decision.preference_slot_weight:g} "
+                "(the profile default — your tastes bend the destination-optimal "
+                "answer by at most this share)"
+            )
+        lines += [
+            f"  agent spend so far:     ${self.workspace.load_state().total_usd():.4f}",
+            f"  to review by hand next run: gate_modes: {{{spec.name.value}: gate}} in config.yaml",
+            rule,
+        ]
+        self.emit("\n".join(lines))
+
     async def _process_gate(self, spec: GateSpec) -> bool:
         """Validate + interpret the gate file; True when the machine advanced."""
         if write_template_if_absent(self.workspace, spec, self._gate_template_override(spec)):
@@ -384,6 +434,18 @@ class Engine:
             self.emit(problem or f"{spec.relpath} could not be read")
             self._emit_gate_instructions(spec)
             return False
+        auto = self._notify_auto_decision(spec, decision)
+        if auto is not None:
+            decision = auto
+            target = self.workspace.path(spec.relpath)
+            target.write_text(
+                f"# {spec.name.value}: auto-approved (gate_modes: notify) — the default\n"
+                f"# decision below was applied without a pause; review "
+                f"{', '.join(spec.review_paths)}.\n" + decision.dump_yaml(),
+                encoding="utf-8",
+                newline="\n",
+            )
+            self._emit_notify_summary(spec, decision)
         outcome = spec.interpret(decision)
         for message in outcome.messages:
             self.emit(message)

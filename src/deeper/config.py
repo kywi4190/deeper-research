@@ -17,8 +17,16 @@ from typing import Any, Literal
 import yaml
 from pydantic import Field, ValidationError, model_validator
 
-from .schemas import ArtifactModel, format_validation_error
+from .schemas import ArtifactModel, GateName, format_validation_error
 from .schemas.base import NonEmptyStr
+
+# §11 gate-fatigue dial: a gate that is consistently rubber-stamped can be
+# demoted from a hard pause to a notification, per gate, in config.yaml.
+GateMode = Literal["gate", "notify"]
+
+
+def _default_gate_modes() -> dict[GateName, GateMode]:
+    return {gate: "gate" for gate in GateName}
 
 
 class ConfigError(Exception):
@@ -157,11 +165,22 @@ class RunConfig(ArtifactModel):
         "retries, then a resumable pause — instead of hanging the run forever.",
     )
     concurrency: int = Field(ge=1, description="Max simultaneous agent invocations.")
+    gate_modes: dict[GateName, GateMode] = Field(
+        default_factory=_default_gate_modes,
+        description="Per-gate review mode (design §11 gate-fatigue mitigation): "
+        "'gate' (default) pauses the run for a human decision; 'notify' "
+        "auto-approves the gate's default decision, records it in the gate "
+        "file, and prints a prominent summary instead of pausing — demote a "
+        "gate you consistently rubber-stamp (Gate B is the §11 candidate). "
+        "Unlisted gates stay 'gate'.",
+    )
     size_classes: dict[SizeClass, SizeClassSpec]
     caps: HardCaps = Field(default_factory=HardCaps)
 
     @model_validator(mode="after")
     def _coherent(self) -> RunConfig:
+        for gate in GateName:  # a partial gate_modes override keeps the rest hard
+            self.gate_modes.setdefault(gate, "gate")
         missing = sorted(c.value for c in SizeClass if c not in self.size_classes)
         if missing:
             raise ValueError(f"size_classes must define all of S, M, L; missing: {missing}")

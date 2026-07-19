@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from deeper.schemas.common import SourceRecord, SourceTier
-from deeper.workspace import Workspace, _atomic_write
+from deeper.workspace import Workspace, _atomic_write, append_log_line
 
 from .contracts import AgentContract
 
@@ -127,9 +127,19 @@ def write_scope_gate(
 # page into a later agent context (design §6). Best-effort defense-in-depth,
 # paired with the prompts' untrusted-web-content rule.
 _STRIP_MARKER = "[stripped: potential-injection]"
+# Hidden-text carriers removed OUTRIGHT (no marker): invisible characters a
+# page can hide directives in — zero-width spaces/joiners, bidi controls, BOM,
+# word joiners, the Unicode tag block (U+E0000-E007F encodes invisible ASCII).
+_INVISIBLE_CHARS = re.compile(
+    "[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]|[\U000e0000-\U000e007f]"
+)
 _INJECTION_PATTERNS = [
     # A system-reminder span; unclosed → conservatively drop to end of text.
     re.compile(r"<system-reminder>.*?(</system-reminder>|\Z)", re.DOTALL | re.IGNORECASE),
+    # HTML comments: invisible in any rendered view, so a reader would never
+    # see what the model would — the classic hidden-text injection carrier.
+    # Unclosed → conservatively drop to end of text.
+    re.compile(r"<!--.*?(-->|\Z)", re.DOTALL),
     # Tool-call-like tags (opening or closing) stripped individually — never as
     # spans, so a stray closing tag cannot swallow the rest of the page.
     re.compile(
@@ -147,9 +157,14 @@ _INJECTION_PATTERNS = [
 
 
 def sanitize_source_text(text: str) -> str:
-    """Strip tool-call-like and instruction-injection patterns from fetched
-    content before it is cached — cached text gets re-injected into other agent
-    contexts, and must arrive as data, never directives."""
+    """Strip tool-call-like, instruction-injection, and hidden-text patterns
+    from fetched content before it is cached — cached text gets re-injected
+    into other agent contexts (the verifier's and analyst's cache-first
+    re-fetches, Gate-C challenge verification), and must arrive as data, never
+    directives. Invisible characters go first: a directive spelled in
+    zero-width or tag-block characters must not survive to dodge the visible
+    patterns."""
+    text = _INVISIBLE_CHARS.sub("", text)
     for pattern in _INJECTION_PATTERNS:
         text = pattern.sub(_STRIP_MARKER, text)
     return text
@@ -197,13 +212,13 @@ def cache_web_fetch(workspace: Workspace, role: str, url: str, content: str | No
                     content_hash=content_hash,
                 ),
             )
-    audit_path = workspace.path(AUDIT_LOG)
-    line = json.dumps(
-        {"url": url, "hash": content_hash, "role": role, "at": now.isoformat()},
-        ensure_ascii=False,
+    append_log_line(
+        workspace.path(AUDIT_LOG),
+        json.dumps(
+            {"url": url, "hash": content_hash, "role": role, "at": now.isoformat()},
+            ensure_ascii=False,
+        ),
     )
-    with audit_path.open("a", encoding="utf-8", newline="\n") as f:
-        f.write(line + "\n")
     return content_hash
 
 

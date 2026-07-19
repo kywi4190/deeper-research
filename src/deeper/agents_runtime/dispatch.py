@@ -11,6 +11,8 @@ real pipeline.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import os
 import random
 import re
@@ -22,7 +24,7 @@ from typing import NamedTuple, Protocol, cast
 
 from deeper.config import RunConfig
 from deeper.schemas import ArtifactModel, SpendEntry
-from deeper.workspace import Workspace
+from deeper.workspace import Workspace, append_log_line
 
 from .contracts import (
     AgentContract,
@@ -42,6 +44,11 @@ from .ledger import SpendLedger
 RESEARCH_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]
 NON_RESEARCH_TOOLS = ["Read"]
 DISALLOWED_TOOLS = ["Bash", "Task", "Agent"]
+
+# Structured ops log (design §11): one JSONL line per raw invocation attempt —
+# contract hash, duration, spend, retries, outcome — machine-greppable next to
+# the human-facing transcripts. Rotated per run by workspace.append_log_line.
+AGENT_LOG = "logs/agents.jsonl"
 
 # The SDK reads the CLI's stdout as newline-delimited JSON and kills the
 # dispatch when ONE message exceeds its buffer (default 1MB) — and a research
@@ -285,6 +292,44 @@ class _BaseDispatcher:
                 at=datetime.now(UTC),
             )
         )
+        self._log_invocation(contract, outcome="dispatch-error", error=str(err)[:500])
+
+    @staticmethod
+    def _contract_hash(contract: AgentContract) -> str:
+        """A stable fingerprint of everything the invocation received (role,
+        stage, task, inputs, budget) — lines sharing a hash re-ran the same
+        contract, which is what retry/cost analysis groups by."""
+        return hashlib.sha256(contract.model_dump_json().encode("utf-8")).hexdigest()[:16]
+
+    def _log_invocation(
+        self,
+        contract: AgentContract,
+        *,
+        outcome: str,
+        attempt: int = 0,
+        inv: _Invocation | None = None,
+        error: str | None = None,
+    ) -> None:
+        """One structured JSONL line per raw invocation attempt (design §11
+        ops): the machine-readable twin of the SpendEntry + logs/retries/
+        transcripts. Outcomes: ok | invalid | question | dispatch-error."""
+        line = {
+            "at": datetime.now(UTC).isoformat(),
+            "stage": contract.stage.value,
+            "role": contract.role,
+            "context": contract.context,
+            "contract_hash": self._contract_hash(contract),
+            "attempt": attempt,
+            "outcome": outcome,
+            "usd": inv.usd if inv else 0.0,
+            "input_tokens": inv.input_tokens if inv else 0,
+            "output_tokens": inv.output_tokens if inv else 0,
+            "duration_ms": inv.duration_ms if inv else 0,
+            "num_turns": inv.num_turns if inv else 0,
+            "session_id": inv.session_id if inv else None,
+            "error": error,
+        }
+        append_log_line(self.workspace.path(AGENT_LOG), json.dumps(line, ensure_ascii=False))
 
     async def run_agent(
         self,
@@ -329,13 +374,16 @@ class _BaseDispatcher:
             except ArtifactParseError as err:
                 raw, feedback = inv.text, err.report
                 self._log_failed_attempt(contract, attempt, feedback, raw)
+                self._log_invocation(contract, outcome="invalid", attempt=attempt, inv=inv)
                 continue
             if validate is not None:
                 problem = validate(artifacts)
                 if problem:
                     raw, feedback = inv.text, problem
                     self._log_failed_attempt(contract, attempt, feedback, raw)
+                    self._log_invocation(contract, outcome="invalid", attempt=attempt, inv=inv)
                     continue
+            self._log_invocation(contract, outcome="ok", attempt=attempt, inv=inv)
             return AgentResult(
                 role=contract.role,
                 artifacts=artifacts,
@@ -423,6 +471,7 @@ class _BaseDispatcher:
                 except ArtifactParseError as err:
                     retries += 1
                     self._log_failed_attempt(contract, retries, err.report, inv.text)
+                    self._log_invocation(contract, outcome="invalid", attempt=retries, inv=inv)
                     if retries > self.config.caps.max_schema_retries:
                         raise AgentOutputInvalid(
                             contract, errors=err.report, raw_output=inv.text, attempts=retries
@@ -430,6 +479,7 @@ class _BaseDispatcher:
                     self.ledger.bump_retry(retry_key)
                     raw, feedback = inv.text, err.report
                     continue
+                self._log_invocation(contract, outcome="ok", attempt=retries, inv=inv)
                 return AgentResult(
                     role=contract.role,
                     artifacts=artifacts,
@@ -455,6 +505,7 @@ class _BaseDispatcher:
                 )
                 retries += 1
                 self._log_failed_attempt(contract, retries, problem, inv.text)
+                self._log_invocation(contract, outcome="invalid", attempt=retries, inv=inv)
                 if retries > self.config.caps.max_schema_retries:
                     raise AgentOutputInvalid(
                         contract, errors=problem, raw_output=inv.text, attempts=retries
@@ -463,6 +514,7 @@ class _BaseDispatcher:
                 raw, feedback = inv.text, problem
                 continue
             raw, feedback = "", ""
+            self._log_invocation(contract, outcome="question", attempt=retries, inv=inv)
             assert ask_user is not None  # final would be True otherwise
             answer = ask_user(question)
             transcript.append((question, answer))

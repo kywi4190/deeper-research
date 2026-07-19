@@ -58,6 +58,36 @@ def _atomic_write(target: Path, text: str) -> None:
         raise
 
 
+# Per-run log rotation (design §11 ops): append-only logs are bounded so a
+# long or pathological run cannot grow one file without limit. 5MB × 3 backups
+# is ~4 orders of magnitude above a normal run's line volume.
+LOG_ROTATE_MAX_BYTES = 5 * 1024 * 1024
+LOG_ROTATE_BACKUPS = 3
+
+
+def append_log_line(
+    target: Path,
+    line: str,
+    *,
+    max_bytes: int = LOG_ROTATE_MAX_BYTES,
+    backups: int = LOG_ROTATE_BACKUPS,
+) -> None:
+    """Append one line to a per-run log, rotating target -> target.1 -> …
+    -> target.<backups> (oldest dropped) when the file would exceed max_bytes."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if target.stat().st_size >= max_bytes:
+            for i in range(backups - 1, 0, -1):
+                older = target.with_name(f"{target.name}.{i}")
+                if older.exists():
+                    older.replace(target.with_name(f"{target.name}.{i + 1}"))
+            target.replace(target.with_name(f"{target.name}.1"))
+    except OSError:  # missing file (fresh log) or a racing rotation: append anyway
+        pass
+    with target.open("a", encoding="utf-8", newline="\n") as f:
+        f.write(line + "\n")
+
+
 class Workspace:
     """One run directory: schema-checked artifact I/O + git audit trail."""
 

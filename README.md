@@ -45,6 +45,21 @@ renders as **TERM MATCH — confirm by hand**, never as a pass (the run's
 "compression" match was a context-compression card, not the fork test —
 Trap 2's NOT CARDED verdict stands).
 
+**Prompt 15 has closed the design-§11 risk register** — every mitigation the
+doc lists is now implemented *and pinned by tests*: the prompt-injection
+bullet is complete (hidden-text sanitizer patterns — HTML comments and
+invisible Unicode — plus adversarial fixture pages proven inert on cache
+re-injection, and `tests/test_policy_s11.py` turning the no-Bash /
+no-write-scope / quarantine-allowlist claims into executable policy); §6's
+"unresolved contradictions surface in the report" is wired into S8's
+residual-uncertainty register; the ops layer gained structured JSONL
+invocation logs with per-run rotation, `deeper status --spend` (stage×agent
+matrix), and a doctor check that probes hook denial through a dummy
+contract; and §11's gate-fatigue mitigation is a real config dial
+(`gate_modes: {gate-b: notify}` auto-approves with defaults + a prominent
+summary; all gates default to hard). "When things go wrong" below is the
+matching failure-mode runbook.
+
 The full pipeline S0–S8 runs end-to-end in mock (proven live end-to-end by
 the run above), from `deeper new` to a citation-linked decision report, and
 the Prompt 13 pre-live hardening pass has landed: every M1 triage finding is
@@ -155,7 +170,7 @@ state of a run.
 | `src/deeper/eval/` | Design-§10 measurement layer: pure metric math (`metrics.py`), benchmark loading (`benchmarks.py`), the eval-judge dispatch (`judge.py`), the per-run eval runner (`runner.py`), report/compare renders (`report.py`) | **built** |
 | `agents/` | Versioned agent prompt files (one per role), stages 0–8 | **built** |
 | `src/deeper/promptlab.py` | `deeper-lab` prompt-iteration harness (throwaway quality) | **built** |
-| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor, eval suites (1019 tests) |
+| `tests/` | Pytest suite | schema, prompt-library, workspace, config, allocation, sensitivity, report, agents-runtime (incl. adversarial injection fixtures), §11 policy, gate modes, orchestrator, stage (S0/S1/S3/S4/S5/S6/S7/S8, saturation, shortlist, depth, contradiction ledger, Gates A/B, Gate-C loops), end-to-end mock run, live guards, doctor, eval suites (1056 tests) |
 | `benchmarks/` | Eval question specs + baseline-answer slots (`baselines/`) | **seeded — 4 specs** |
 | `runs/` | Per-run workspaces (gitignored) | created at runtime |
 
@@ -338,12 +353,24 @@ goodwill. A second hook fences writes to the contract's declared subtrees (and
 hard-denies `state.json`/`config.yaml`/`preferences.yaml` for every agent); a
 `PostToolUse` hook caches every WebFetch content-addressed into `sources/` (with a
 `SourceRecord` and a `logs/web-audit.jsonl` line) after `sanitize_source_text`
-strips tool-call-like and instruction-injection patterns. Sanitization protects
-*re-injection from the cache*; the fetching agent's own defense is the prompt-level
-untrusted-web rule. Live dispatch is additionally fenced by
-`permission_mode="dontAsk"` + per-role `allowed_tools` (research roles get
-WebSearch/WebFetch/Read/Write; no research agent gets Bash or subagents) +
-`setting_sources=[]` + `cwd` pinned to the run workspace.
+strips tool-call-like, instruction-injection, and hidden-text patterns —
+system-reminder spans, fake tool-call tags, role-prefix lines,
+ignore-previous-instructions lines, tool-traffic JSON keys, HTML comments
+(invisible in any rendered view — the classic hidden-directive carrier), and
+invisible Unicode (zero-width/bidi/tag-block characters, removed *first* so a
+directive spelled in them cannot reassemble past the visible patterns).
+Sanitization protects *re-injection from the cache* into later verifier/analyst
+contexts; the fetching agent's own defense is the prompt-level untrusted-web
+rule. Adversarial fixture pages under `tests/fixtures/adversarial/` prove each
+family arrives inert, and `tests/test_policy_s11.py` pins the whole §11 posture
+as executable policy: Bash/Task/Agent stay disallowed, the research-role set is
+frozen, no contract in `src/` grants a write path (agents emit artifacts
+in-reply; the orchestrator writes files), the preference-reader allowlist is
+exactly {screener, synthesist}, and every research prompt carries the
+untrusted-web rule — loosening any of these fails the suite. Live dispatch is
+additionally fenced by `permission_mode="dontAsk"` + per-role `allowed_tools`
+(research roles get WebSearch/WebFetch/Read/Write; no research agent gets Bash
+or subagents) + `setting_sources=[]` + `cwd` pinned to the run workspace.
 
 **Billing enforcement** (`RunConfig.billing`, default `subscription`): the
 SDK builds each subagent's env as `{**os.environ, **options.env}` — an
@@ -379,7 +406,14 @@ sequences to exercise the retry loop.
 
 **Spend accounting**: every attempt lands a `SpendEntry` (stage, role, angle/option
 context, usd, tokens) in `state.json` immediately; `SpendLedger.spend_so_far(stage)`
-is what gates report and the orchestrator's cap checks read. A dispatch attempt
+is what gates report and the orchestrator's cap checks read. Every raw attempt
+also lands one structured line in `logs/agents.jsonl` — timestamp, stage, role,
+context, a 16-hex contract hash (grouping retries of the same contract), attempt
+number, outcome (`ok` / `invalid` / `question` / `dispatch-error`), usd, tokens,
+duration, session id — the machine-greppable twin of the transcripts. Per-run
+logs (`agents.jsonl`, `web-audit.jsonl`, `sdk.log`) rotate at 5MB × 3 backups
+(`workspace.append_log_line`), so a pathological run cannot grow one file
+without bound. A dispatch attempt
 that dies in flight lands a zero-cost marker entry (`failed: <error>`) — the
 tokens it consumed are unknowable, but the audit trail shows the attempt.
 Retry counts persist in `RunState.retry_counts` keyed `stage:role:context`,
@@ -686,7 +720,11 @@ in `STAGES`. The built stages:
   prominently), the dissent (the best surviving prosecution argument, marked
   explicitly when unrebutted; code checks it comes from the winner's
   prosecution), the residual-uncertainty register (open questions,
-  BUDGET-CAPPED areas, revisit triggers), next actions (execution strategic
+  BUDGET-CAPPED areas, revisit triggers — and, code-rendered beneath the
+  narration, every still-`open` contradiction-ledger entry with both statements
+  and their artifacts, per §6's "unresolved contradictions surface in the
+  report"; the full ledger, adjudicated entries included, renders in the
+  appendix), next actions (execution strategic
   notes folded in), and appendix commentary. Code cross-checks the winner
   against the adjusted board's rank 1, then runs the **mechanical citation
   pass** (`src/deeper/report.py`, code not LLM): every inline `[[claim-id]]`
@@ -765,6 +803,18 @@ pause: `deeper resume <run> --max-spend-usd <higher>`; for a usage-limit
 pause: just resume at the reset time stated in the message — never
 automatic).
 
+**Gate fatigue has a config dial** (design §11): `config.yaml` may set
+`gate_modes: {gate-b: notify}` per gate. A `notify` gate never pauses — when
+the machine reaches it with the template still untouched, the engine writes the
+gate's *default* decision into the gate file (marked auto-approved, riding the
+normal gate commit), applies it through the identical interpret/apply path
+(Gate B still writes the profile-default preference-slot weight into the
+rubric), and prints a prominent banner naming what was auto-approved, the
+after-the-fact review paths, and spend so far. A decision file the human
+already edited — any real decision — always wins over the auto-approval, and
+every gate defaults to the hard `gate` mode; demote only a gate you
+consistently rubber-stamp (Gate B is §11's candidate).
+
 **Surgical rerun** (`deeper rerun <run> --stage S3 [--angle x]`) is git-tracked
 deletion: the target stage's output subtree (angle-scoped for S3) plus everything
 downstream — stage outputs, gate files, gate statuses — is removed in one commit, the
@@ -805,6 +855,7 @@ deeper new "which vector database should we adopt" --profile quick
 #   4. pauses at Gate A telling you exactly what to review and which file to edit
 
 deeper status <run>          # node, gate statuses, spend by stage, pending-gate hint
+deeper status <run> --spend  # + the stage x agent spend matrix (usd, attempt counts)
 
 # edit runs/<...>/gates/gate-a.yaml — approve, optionally with actions:
 #   approved: true
@@ -926,13 +977,17 @@ Before the first live run:
 deeper doctor
 ```
 
-checks the five things a live run needs: auth (a Claude Code CLI login for the
+checks the six things a live run needs: auth (a Claude Code CLI login for the
 default subscription billing — a present `ANTHROPIC_API_KEY` is noted as
 ignored unless the run sets `billing: api`; warning only, since a macOS
 Keychain login isn't visible as a file), `claude-agent-sdk` importable (its
 version is printed), the shipped config profiles validating, every `agents/*.md`
 prompt parsing (frontmatter, `{{schema}}` placeholder, declared schemas known and
-exported), and `schemas/` exports fresh. It exits 1 on genuine failures only.
+exported), `schemas/` exports fresh, and the enforcement hooks actually denying:
+a dummy scout contract attempts a forbidden `preferences.yaml` read and a
+`state.json` write through the same gate functions the SDK hooks call — and,
+when the SDK is importable, through the registered `PreToolUse` callbacks
+themselves — expecting denial each time. It exits 1 on genuine failures only.
 
 Then start small — the `quick` profile is sized as a sanity pass (3 cartographers,
 floor 1, shortlist 3, budget B=16, cartography capped at one expansion pass)
@@ -967,6 +1022,67 @@ live-specific rails:
   CLI's notice carries one, and tells you to `deeper resume <run>` at that
   time. It never burns backoff or schema retries rediscovering the limit, and
   it never auto-resumes — resuming is your explicit action, like every pause.
+
+## When things go wrong
+
+Everything below starts the same way: `deeper status <run>` (add `--spend` for
+the stage×agent cost matrix) to see where the run is, then the newest
+`logs/attention-*.md` for the failure transcript. A run can only be in one of
+four states — running, gate-pending, `PAUSED_ATTENTION`, done — and a pause is
+always resumable: completed work is on disk, validated, and skipped on
+re-entry.
+
+**Triage for a `PAUSED_ATTENTION` run.** The transcript's first line names the
+stage, role, and cause; the pause commit (`git log -1` in the run) repeats it.
+By cause:
+
+- *Schema retries exhausted* (`agent 'X' output invalid after N time(s)`): the
+  transcript carries the last validation errors and raw output; the earlier
+  invalid attempts are in `logs/retries/`. Usually a prompt or schema defect —
+  fix `agents/<role>.md` (or the fixture, in mock), then `deeper resume`.
+  The retry pattern across runs is what `deeper eval`'s quality metric trends.
+- *Dispatch failed*: an SDK/network/CLI failure that survived the backoff
+  schedule. The transcript has the traceback, enriched with the CLI's own
+  result detail and the stderr tail (full capture in `logs/stderr/`);
+  `logs/sdk.log` has the SDK's own logging. Transient causes (network blips,
+  a hung call that hit the 20-minute timeout) need nothing but
+  `deeper resume`; a deterministic cause (a broken CLI install) needs the fix
+  first.
+- *Spend cap crossed*: not an error — the guard did its job. The transcript
+  shows spend by stage; `deeper resume <run> --max-spend-usd <higher>`
+  continues exactly where it stopped, or accept the partial run.
+- *Plan usage limit reached*: also not an error. Resume at the reset time the
+  message states (never automatic). Nothing was lost.
+- *Billing mismatch* (`BillingAuthError`): the run's `billing:` setting and
+  the actual auth path disagree — fix the config (or log in / set the key)
+  before resuming; this one is never retried because it would meter the wrong
+  account.
+
+**Rerun surgery.** When an *artifact* is bad rather than a dispatch —
+a scout misread an angle, a rubric criterion is nonsense, you edited a prompt
+and want its stage re-run — don't hand-edit downstream files:
+`deeper rerun <run> --stage S3 --angle <id>` deletes exactly that subtree plus
+everything downstream (one commit, so `git revert` undoes the surgery), moves
+the run pointer back, and rewalks. Spend entries are never touched — the
+ledger stays a complete audit trail. Scoping rules worth knowing: an
+angle-scoped S3 rerun keeps `options/reflow.yaml` and replays the persisted
+top-up decision for the re-scouted angle; any rerun also invalidates `eval/`
+(a stale eval must never look like evidence); gate decision files downstream
+of the target are deleted with their stages, but Gate-C iteration counters
+never reset (the §12 cap is per run).
+
+**Resuming mid-S6** (the longest stage — a crash or pause here looks scariest
+and is the most mechanical to resume). Per finalist, S6's progress is the
+code-owned round log `dossiers/<option>-rounds.yaml`: every completed analyst
+round, re-score, delta, the verification record, and whether the one targeted
+revision ran. `deeper resume` replays that log against the files on disk and
+re-dispatches only what is missing — recorded rounds are never re-paid, other
+finalists' settled dossiers are untouched, and a finalist that already
+converged (or hit BUDGET-CAPPED) is skipped entirely. The same holds inside
+S5 (paid screener batches persist at `screening/batches/`) and S7 (each
+adversarial artifact is written the moment its dispatch completes). If a
+dossier looks *wrong* rather than incomplete, that's rerun surgery instead:
+`deeper rerun <run> --stage S6` rebuilds every dossier from the shortlist.
 
 ## Cost expectations
 
@@ -1465,12 +1581,16 @@ Following the phases in the build guide:
   ledger reconciliation asserted end-to-end) ✅ → Prompt 14 (the eval
   harness: 4 seeded benchmark specs, the five §10 property metrics, the
   `eval-judge`, `deeper eval`/`--compare`/`--compare-baseline`) ✅ →
-  Prompt 15 (security/ops hardening) next.
+  Prompt 15 (security/ops hardening: the §11 mitigation audit closed —
+  hidden-text sanitizer patterns + adversarial fixtures, executable §11
+  policy tests, unresolved-contradiction surfacing in S8, structured JSONL
+  invocation logs + per-run rotation, `status --spend`, the doctor
+  hook-denial probe, per-gate `gate_modes` notify) ✅. **M3's build items are
+  done — what remains is the ongoing tuning loop.**
 - **Phase E — Viewer (M4, optional).**
 
-**Next: Phase D, Prompt 15 — hardening (the §11 mitigation audit: adversarial
-sanitizer fixtures, policy tests over agent tool scopes, contradiction-ledger
-surfacing in S8, structured JSONL logs, gate-fatigue config). The Prompt 14
-verify step is done (see Current status). Still worth doing sometime: a live
-probe at the plan-limit boundary to pin down how the SDK surfaces the
-usage-limit condition (the detector is deliberately broad until then).**
+**Next: the ongoing M3 tuning loop (eval-driven prompt iteration against the
+seeded benchmarks), then optionally the Phase E viewer. Still worth doing
+sometime: a live probe at the plan-limit boundary to pin down how the SDK
+surfaces the usage-limit condition (the detector is deliberately broad until
+then).**

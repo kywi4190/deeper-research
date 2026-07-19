@@ -125,6 +125,22 @@ def test_status_shows_node_gates_and_spend(tmp_path):
     assert (run_dir / "state.json").read_text(encoding="utf-8") == before
 
 
+def test_status_spend_prints_the_stage_by_role_matrix(tmp_path):
+    _, run_dir = new_run(tmp_path)  # mock walk: S0 + S1 spend is ledgered
+    result = runner.invoke(app, ["status", str(run_dir), "--spend"])
+    assert result.exit_code == 0, result.output
+    assert "stage x role" in result.output
+    # Rows for the walked stages, columns for the roles they dispatched (long
+    # role names wrap at narrow widths, so assert wrap-safe tokens).
+    assert "interview" in result.output
+    assert "merger" in result.output
+    assert "S1" in result.output
+    assert "x1" in result.output  # per-cell attempt counts
+    # Without the flag the matrix is not printed.
+    plain = runner.invoke(app, ["status", str(run_dir)])
+    assert "stage x role" not in plain.output
+
+
 def test_status_missing_run_fails_cleanly(tmp_path):
     result = runner.invoke(app, ["status", str(tmp_path / "nope")])
     assert result.exit_code == 1

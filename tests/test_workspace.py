@@ -17,7 +17,14 @@ from deeper.schemas import (
     SpendEntry,
     Stage,
 )
-from deeper.workspace import CONFIG_FILE, RUN_DIRS, STATE_FILE, Workspace, WorkspaceError
+from deeper.workspace import (
+    CONFIG_FILE,
+    RUN_DIRS,
+    STATE_FILE,
+    Workspace,
+    WorkspaceError,
+    append_log_line,
+)
 
 
 @pytest.fixture
@@ -164,3 +171,37 @@ def test_open_non_workspace_directory_raises(tmp_path):
     (tmp_path / "plain").mkdir()
     with pytest.raises(WorkspaceError, match="missing"):
         Workspace.open(tmp_path / "plain")
+
+
+# -- per-run log rotation (§11 ops) --------------------------------------------
+
+
+def test_append_log_line_creates_parents_and_appends(tmp_path):
+    target = tmp_path / "logs" / "agents.jsonl"
+    append_log_line(target, "one")
+    append_log_line(target, "two")
+    assert target.read_text(encoding="utf-8") == "one\ntwo\n"
+
+
+def test_append_log_line_rotates_at_the_size_cap(tmp_path):
+    target = tmp_path / "logs" / "agents.jsonl"
+    append_log_line(target, "a" * 100)
+    # Next append sees the file at/over the cap: current -> .1, fresh file starts.
+    append_log_line(target, "fresh", max_bytes=50)
+    assert target.read_text(encoding="utf-8") == "fresh\n"
+    assert target.with_name("agents.jsonl.1").read_text(encoding="utf-8") == "a" * 100 + "\n"
+    # A second rotation shifts .1 -> .2.
+    append_log_line(target, "b" * 100)
+    append_log_line(target, "newest", max_bytes=50)
+    assert target.with_name("agents.jsonl.2").exists()
+    assert target.read_text(encoding="utf-8") == "newest\n"
+
+
+def test_append_log_line_drops_the_oldest_backup(tmp_path):
+    target = tmp_path / "log.txt"
+    for n in range(5):
+        append_log_line(target, f"gen-{n}-" + "x" * 60, max_bytes=10, backups=2)
+    # Only .1 and .2 may exist — gen-0's file has been dropped.
+    backups = sorted(p.name for p in tmp_path.glob("log.txt.*"))
+    assert backups == ["log.txt.1", "log.txt.2"]
+    assert "gen-0" not in (tmp_path / "log.txt.2").read_text(encoding="utf-8")

@@ -14,6 +14,7 @@ from deeper.report import (
     render_report,
     strip_annotations,
     top_sensitivity_flag,
+    unresolved_contradictions_block,
 )
 from deeper.schemas import (
     AllocationTable,
@@ -21,7 +22,10 @@ from deeper.schemas import (
     AngleRemoval,
     Claim,
     Confidence,
+    ContradictionEntry,
     ContradictionLedger,
+    ContradictionStatement,
+    ContradictionStatus,
     CoverageReport,
     DecisionReport,
     Dossier,
@@ -199,6 +203,33 @@ def _report() -> DecisionReport:
     )
 
 
+def _ledger() -> ContradictionLedger:
+    return ContradictionLedger(
+        entries=[
+            ContradictionEntry(
+                id="sae-feature-atlas--c-sae-compute",
+                statement_a=ContradictionStatement(
+                    artifact="dossiers/sae-feature-atlas.md",
+                    statement="The cluster has December headroom.",
+                ),
+                statement_b=ContradictionStatement(
+                    artifact="tournament/sae-feature-atlas-prosecution.md",
+                    statement="Compute contention blocks December runs.",
+                ),
+                detected_by="verifier",
+            ),
+            ContradictionEntry(
+                id="settled-entry",
+                statement_a=ContradictionStatement(artifact="a.md", statement="X is 1."),
+                statement_b=ContradictionStatement(artifact="b.md", statement="X is 2."),
+                detected_by="verifier",
+                status=ContradictionStatus.ADJUDICATED,
+                resolution="a.md stands; b.md predates the fix.",
+            ),
+        ]
+    )
+
+
 def _appendix() -> AppendixContext:
     dossier = Dossier.from_yaml_file(FIXTURES / "analyst" / "dossier.sae-feature-atlas-r2.yaml")
     return AppendixContext(
@@ -273,3 +304,55 @@ def test_render_report_links_annotations_and_embeds_code_tables():
     assert "**Winner: sae-feature-atlas**" in text
     assert "- **research-tooling** - Out of scope." in text  # Gate-A removal audit
     assert "| S6 | $0.4200 |" in text  # spend by stage
+
+
+# -- §6: unresolved contradictions surface in the residual-uncertainty register ---------
+
+
+def test_unresolved_block_lists_open_entries_only():
+    block = unresolved_contradictions_block(_ledger())
+    assert "1 open" in block
+    assert "sae-feature-atlas--c-sae-compute" in block
+    assert "December headroom" in block and "Compute contention" in block
+    assert "settled-entry" not in block  # adjudicated entries are not residual
+
+
+def test_unresolved_block_empty_when_all_adjudicated_or_no_entries():
+    assert unresolved_contradictions_block(ContradictionLedger()) == ""
+    ledger = _ledger()
+    adjudicated_only = ContradictionLedger(entries=[ledger.entries[1]])
+    assert unresolved_contradictions_block(adjudicated_only) == ""
+
+
+def test_render_report_surfaces_open_contradictions_in_section_5():
+    appendix = _appendix()
+    appendix = AppendixContext(**{**appendix.__dict__, "contradictions": _ledger()})
+    text = render_report(
+        _report(),
+        boards_text="(boards)",
+        sensitivity_text="(sensitivity)",
+        matrix_table="(matrix)",
+        sensitivity_flag="(flag)",
+        appendix=appendix,
+    )
+    section_5 = text.split("## 5. Residual uncertainty")[1].split("## 6. Next actions")[0]
+    assert "Unresolved contradictions" in section_5
+    assert "sae-feature-atlas--c-sae-compute" in section_5
+    assert "settled-entry" not in section_5
+    # The full ledger (both entries, with statuses) still renders in the appendix.
+    appendix_text = text.split("## 7. Appendix")[1]
+    assert "`settled-entry` (adjudicated)" in appendix_text
+    assert "`sae-feature-atlas--c-sae-compute` (open)" in appendix_text
+
+
+def test_render_report_section_5_has_no_ledger_block_when_ledger_is_empty():
+    text = render_report(
+        _report(),
+        boards_text="(boards)",
+        sensitivity_text="(sensitivity)",
+        matrix_table="(matrix)",
+        sensitivity_flag="(flag)",
+        appendix=_appendix(),
+    )
+    section_5 = text.split("## 5. Residual uncertainty")[1].split("## 6. Next actions")[0]
+    assert "Unresolved contradictions" not in section_5

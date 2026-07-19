@@ -8,7 +8,14 @@ from deeper.orchestrator.cli import app
 
 runner = CliRunner()
 
-CHECKS = ("Auth", "Agent SDK", "Config profiles", "Agent prompts", "Schema exports")
+CHECKS = (
+    "Auth",
+    "Agent SDK",
+    "Config profiles",
+    "Agent prompts",
+    "Schema exports",
+    "Enforcement hooks",
+)
 
 
 def test_doctor_runs_every_check_and_passes_on_this_repo(monkeypatch):
@@ -60,6 +67,26 @@ def test_doctor_fails_on_stale_schema_exports(monkeypatch):
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 1
     assert "make schemas" in result.output
+
+
+def test_doctor_hook_check_probes_denial_through_a_dummy_contract(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-key")
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    assert "Enforcement hooks" in result.output
+    assert "deny" in result.output  # the probe's detail names the denial
+
+
+def test_doctor_fails_when_the_quarantine_gate_stops_denying(monkeypatch):
+    """The check must actually exercise the gate: a hypothetical future edit
+    that allowlists every role must turn the doctor red."""
+    import deeper.agents_runtime.hooks as hooks
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-key")
+    monkeypatch.setattr(hooks, "quarantine_gate", lambda *a, **k: None)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 1
+    assert "ALLOWED" in result.output
 
 
 def test_doctor_fails_when_a_prompt_is_broken(monkeypatch, tmp_path):

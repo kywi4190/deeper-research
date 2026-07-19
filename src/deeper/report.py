@@ -26,6 +26,7 @@ from deeper.schemas import (
     AngleRemoval,
     Claim,
     ContradictionLedger,
+    ContradictionStatus,
     CoverageReport,
     DecisionReport,
     Dossier,
@@ -273,6 +274,26 @@ def _claims_index(claims: ClaimIndex) -> str:
     return "\n".join(lines)
 
 
+def unresolved_contradictions_block(ledger: ContradictionLedger) -> str:
+    """§6: 'unresolved contradictions surface in the report' — the code-rendered
+    part of the residual-uncertainty register. Empty string when every entry is
+    adjudicated (the full ledger still renders in the appendix)."""
+    open_entries = [e for e in ledger.entries if e.status is ContradictionStatus.OPEN]
+    if not open_entries:
+        return ""
+    lines = [
+        f"- `{e.id}` (detected by {e.detected_by}): `{e.statement_a.artifact}` says "
+        f'"{e.statement_a.statement}" — but `{e.statement_b.artifact}` says '
+        f'"{e.statement_b.statement}"'
+        for e in open_entries
+    ]
+    return (
+        f"**Unresolved contradictions ({len(open_entries)} open in "
+        "`ledger/contradictions.md` — no statement below was adjudicated; treat "
+        "both sides as unsettled):**\n\n" + "\n".join(lines)
+    )
+
+
 def render_report(
     report: DecisionReport,
     *,
@@ -299,6 +320,8 @@ def render_report(
         contradictions = f"### Contradiction ledger\n\n{entries}\n\n"
     next_actions = "\n".join(f"{i}. {link(a)}" for i, a in enumerate(report.next_actions, 1))
     appendix_notes = f"{link(report.appendix_notes)}\n\n" if report.appendix_notes else ""
+    unresolved = unresolved_contradictions_block(appendix.contradictions)
+    residual = link(report.residual_uncertainty) + (f"\n\n{unresolved}" if unresolved else "")
     return f"""# Decision report
 
 ## 1. Recommendation
@@ -331,7 +354,7 @@ Top flag: {sensitivity_flag}
 
 ## 5. Residual uncertainty
 
-{link(report.residual_uncertainty)}
+{residual}
 
 ## 6. Next actions
 

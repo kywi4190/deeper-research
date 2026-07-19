@@ -91,6 +91,53 @@ async def test_retry_invalid_then_valid(ws: Workspace) -> None:
     assert state.retry_counts == {"S3:scout:interpretability-research": 1}
 
 
+async def test_every_attempt_lands_a_structured_jsonl_line(ws: Workspace) -> None:
+    """§11 ops: logs/agents.jsonl carries one machine-readable line per raw
+    invocation attempt — contract hash, duration, spend, outcome."""
+    import json
+
+    dispatcher = MockDispatcher(
+        ws, ws.load_config(), scripted_responses={"scout": [INVALID_TEXT, VALID_TEXT]}
+    )
+    await dispatcher.run_agent(scout_contract())
+    lines = [
+        json.loads(raw)
+        for raw in ws.path("logs/agents.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [line["outcome"] for line in lines] == ["invalid", "ok"]
+    assert [line["attempt"] for line in lines] == [0, 1]
+    first, second = lines
+    assert first["stage"] == "S3" and first["role"] == "scout"
+    assert first["context"] == "interpretability-research"
+    # Both attempts ran the same contract: the hash groups them.
+    assert first["contract_hash"] == second["contract_hash"]
+    assert len(first["contract_hash"]) == 16
+    for key in ("usd", "input_tokens", "output_tokens", "duration_ms", "at"):
+        assert key in first
+
+
+async def test_dispatch_error_lands_a_jsonl_line_too(ws: Workspace, monkeypatch) -> None:
+    import json
+
+    from deeper.agents_runtime import AgentDispatchFailed
+
+    dispatcher = MockDispatcher(ws, ws.load_config())
+    dispatcher.DISPATCH_RETRY_BACKOFF_S = ()  # no backoff sleeps in tests
+
+    async def boom(prompt, contract, attempt):
+        raise RuntimeError("stream died")
+
+    monkeypatch.setattr(dispatcher, "_invoke", boom)
+    with pytest.raises(AgentDispatchFailed):
+        await dispatcher.run_agent(scout_contract())
+    lines = [
+        json.loads(raw)
+        for raw in ws.path("logs/agents.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert lines and all(line["outcome"] == "dispatch-error" for line in lines)
+    assert "stream died" in lines[-1]["error"]
+
+
 async def test_retry_exhaustion_raises_and_persists(ws: Workspace) -> None:
     config = ws.load_config()
     attempts = config.caps.max_schema_retries + 1

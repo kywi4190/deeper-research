@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import logging.handlers
 import re
 import sys
 import time
@@ -28,7 +29,12 @@ from rich.table import Table
 from deeper.agents_runtime import BillingAuthError
 from deeper.config import ConfigError, RunConfig, profile_config
 from deeper.schemas import GateName, Stage
-from deeper.workspace import Workspace, WorkspaceError
+from deeper.workspace import (
+    LOG_ROTATE_BACKUPS,
+    LOG_ROTATE_MAX_BYTES,
+    Workspace,
+    WorkspaceError,
+)
 
 from .engine import Engine, Node, node_of
 from .gates import GATE_SPECS
@@ -72,7 +78,13 @@ def _configure_logging(workspace: Workspace) -> None:
             logger.removeHandler(handler)
             handler.close()
     workspace.path("logs").mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(target, encoding="utf-8", delay=True)
+    handler = logging.handlers.RotatingFileHandler(
+        target,
+        encoding="utf-8",
+        delay=True,
+        maxBytes=LOG_ROTATE_MAX_BYTES,
+        backupCount=LOG_ROTATE_BACKUPS,
+    )
     handler._deeper_sdk_log = True  # type: ignore[attr-defined]  # idempotency tag
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     logger.addHandler(handler)
@@ -272,8 +284,53 @@ def new(
     _run_engine(workspace, non_interactive=non_interactive)
 
 
+def _stage_sort_key(stage_name: str) -> tuple[bool, str]:
+    return (stage_name == "EVAL", stage_name)  # pipeline order, EVAL last
+
+
+def _spend_matrix(state) -> Table:
+    """The stage×agent spend table (design §11 ops): USD per (stage, role)
+    cell with the attempt count, plus row and column totals."""
+    cells: dict[tuple[str, str], float] = {}
+    counts: dict[tuple[str, str], int] = {}
+    for e in state.spend:
+        key = (e.stage.value, e.role)
+        cells[key] = cells.get(key, 0.0) + e.usd
+        counts[key] = counts.get(key, 0) + 1
+    stages = sorted({s for s, _ in cells}, key=_stage_sort_key)
+    roles = sorted({r for _, r in cells})
+    table = Table(title="agent spend by stage x role (usd, x attempts)")
+    table.add_column("stage")
+    for role in roles:
+        table.add_column(role, justify="right", overflow="fold")
+    table.add_column("total", justify="right")
+    for stage_name in stages:
+        row = [stage_name]
+        for role in roles:
+            key = (stage_name, role)
+            row.append(f"${cells[key]:.4f} x{counts[key]}" if key in cells else "-")
+        row.append(f"${sum(usd for (s, _), usd in cells.items() if s == stage_name):.4f}")
+        table.add_row(*row)
+    totals = ["[bold]total[/bold]"]
+    for role in roles:
+        totals.append(f"${sum(usd for (_, r), usd in cells.items() if r == role):.4f}")
+    totals.append(f"[bold]${sum(cells.values()):.4f}[/bold]")
+    table.add_row(*totals)
+    return table
+
+
 @app.command()
-def status(run: RunArg) -> None:
+def status(
+    run: RunArg,
+    spend: Annotated[
+        bool,
+        typer.Option(
+            "--spend",
+            help="Also print the stage x agent spend matrix (usd and attempt "
+            "counts per cell, from the state.json audit trail).",
+        ),
+    ] = False,
+) -> None:
     """Where the run is: node, gates, spend by stage."""
     workspace = _open_run(run)
     state = workspace.load_state()
@@ -290,13 +347,16 @@ def status(run: RunArg) -> None:
     table.add_row("updated", state.updated_at.isoformat())
     console.print(table)
 
-    spend = Table(title="agent spend")
-    spend.add_column("stage")
-    spend.add_column("usd", justify="right")
-    for stage_name, usd in sorted(state.spend_by_stage().items()):
-        spend.add_row(stage_name, f"${usd:.4f}")
-    spend.add_row("[bold]total[/bold]", f"[bold]${state.total_usd():.4f}[/bold]")
-    console.print(spend)
+    by_stage = Table(title="agent spend")
+    by_stage.add_column("stage")
+    by_stage.add_column("usd", justify="right")
+    ordered = sorted(state.spend_by_stage().items(), key=lambda i: _stage_sort_key(i[0]))
+    for stage_name, usd in ordered:
+        by_stage.add_row(stage_name, f"${usd:.4f}")
+    by_stage.add_row("[bold]total[/bold]", f"[bold]${state.total_usd():.4f}[/bold]")
+    console.print(by_stage)
+    if spend:
+        console.print(_spend_matrix(state))
 
     if state.retry_counts:
         retries = ", ".join(f"{k}×{v}" for k, v in state.retry_counts.items())
@@ -378,6 +438,76 @@ def rerun(
         raise _fail(str(err)) from err
     console.print(f"invalidated: {', '.join(removed) if removed else 'nothing to remove'}")
     _run_engine(workspace, non_interactive=non_interactive)
+
+
+def _doctor_hooks_check() -> tuple[str, str, str]:
+    """§11: verify the enforcement hooks actually deny, not just exist. A dummy
+    scout contract attempts the forbidden reads/writes through the same gate
+    functions the SDK hooks call — and, when the SDK is importable, through the
+    registered PreToolUse callbacks themselves."""
+    import tempfile
+    from types import SimpleNamespace
+
+    from deeper.agents_runtime.contracts import AgentContract
+    from deeper.agents_runtime.hooks import build_hooks, quarantine_gate, write_scope_gate
+    from deeper.config import SizeClass
+
+    probe_root = Path(tempfile.gettempdir())  # gates are pure path logic: any root works
+    dummy = AgentContract(
+        role="scout",
+        stage=Stage.S3,
+        output_schemas=("option-card-set",),
+        size_class=SizeClass.M,
+        budget_line="doctor probe — never dispatched",
+    )
+    problems = []
+    if quarantine_gate(dummy.role, "Read", {"file_path": "preferences.yaml"}, probe_root) is None:
+        problems.append("quarantine gate ALLOWED a scout to read preferences.yaml")
+    if quarantine_gate("screener", "Read", {"file_path": "preferences.yaml"}, probe_root):
+        problems.append("quarantine gate denied the screener (allowlist broken)")
+    if write_scope_gate("Write", {"file_path": "state.json"}, probe_root, (".",)) is None:
+        problems.append("write gate allowed an agent to write state.json")
+    if write_scope_gate("Write", {"file_path": "notes.md"}, probe_root, ()) is None:
+        problems.append("write gate allowed a write with no granted subtree")
+
+    wired = "pure gates verified; SDK hook wiring not checked (SDK not importable)"
+    try:
+        import claude_agent_sdk  # noqa: F401 — presence gates the wiring probe
+    except ImportError:
+        pass
+    else:
+        hooks = build_hooks(dummy, SimpleNamespace(root=probe_root))  # type: ignore[arg-type]
+        forbidden_read = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": "preferences.yaml"},
+        }
+
+        async def _probe() -> bool:
+            for matcher in hooks.get("PreToolUse", []):
+                for callback in matcher.hooks:
+                    result = await callback(forbidden_read, None, None)
+                    decision = (result or {}).get("hookSpecificOutput", {})
+                    if decision.get("permissionDecision") == "deny":
+                        return True
+            return False
+
+        if not hooks.get("PreToolUse") or not hooks.get("PostToolUse"):
+            problems.append("build_hooks did not register PreToolUse + PostToolUse matchers")
+        elif not asyncio.run(_probe()):
+            problems.append(
+                "a forbidden preferences.yaml Read through the registered PreToolUse "
+                "hooks was NOT denied"
+            )
+        wired = "forbidden preferences.yaml read denied through the registered SDK hooks"
+
+    if problems:
+        return ("Enforcement hooks", "fail", "; ".join(problems))
+    return (
+        "Enforcement hooks",
+        "ok",
+        f"dummy-contract probe: quarantine + write-scope gates deny correctly; {wired}",
+    )
 
 
 @app.command()
@@ -493,6 +623,8 @@ def doctor() -> None:
         )
     else:
         rows.append(("Schema exports", "ok", f"{len(ARTIFACT_REGISTRY)} exports fresh"))
+
+    rows.append(_doctor_hooks_check())
 
     table = Table(title="deeper doctor")
     table.add_column("check")
