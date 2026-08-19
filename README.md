@@ -9,7 +9,6 @@ process) driving LLM subagents (they own the content), with a plain-file workspa
 the single source of truth.
 
 Full design: [`docs/deeper-research-design.md`](docs/deeper-research-design.md).
-Build plan: [`docs/deeper-research-build-guide.md`](docs/deeper-research-build-guide.md).
 
 ## Current status
 
